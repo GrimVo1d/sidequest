@@ -185,9 +185,14 @@ function renderPause(paused) {
   const key = JSON.stringify(paused);
   if (key === lastPauseKey) return;
   lastPauseKey = key;
+  const wasHidden = overlay.hidden;
   overlay.hidden = paused.length === 0;
   toGame({kind: "pause", paused: paused.length > 0, sessions: paused});
-  if (!paused.length) return;
+  // The keys follow the overlay: to its buttons while it is up, back to the game after.
+  if (!paused.length) {
+    if (!wasHidden && !$("game").hidden) $("game-frame").focus();
+    return;
+  }
   const anyWaiting = paused.some((p) => p.reason === "waiting");
   $("pause-title").textContent = anyWaiting
     ? t("Claude ждёт ответа в терминале", "Claude is waiting for an answer in the terminal")
@@ -202,6 +207,7 @@ function renderPause(paused) {
     }
     list.appendChild(li);
   }
+  if (wasHidden) $("btn-resume").focus();
 }
 
 async function runCheck() {
@@ -520,9 +526,23 @@ function bindDev() {
 // --- start -------------------------------------------------------------------------
 
 // Arrows and Enter in the hub's menus; a game in the frame handles its own keys.
+const TYPING = new Set(["INPUT", "TEXTAREA", "SELECT"]);
+function passToGame(e) {
+  const frame = $("game-frame");
+  if (!frame.contentWindow || (document.activeElement && TYPING.has(document.activeElement.tagName))) return;
+  frame.focus();
+  frame.contentWindow.dispatchEvent(new frame.contentWindow.KeyboardEvent(e.type, {code: e.code, key: e.key, bubbles: true}));
+  e.preventDefault();
+}
 window.addEventListener("keydown", (e) => {
   const overlay = [$("modal"), $("pause")].find((x) => !x.hidden);
-  SidequestKeys.handle(e, overlay || ($("game").hidden ? $("hub") : null));
+  if (overlay || $("game").hidden) { SidequestKeys.handle(e, overlay || $("hub")); return; }
+  // A click on the hub's panels took the keys from the game: give them back.
+  passToGame(e);
+});
+window.addEventListener("keyup", (e) => {
+  if ($("game").hidden || [$("modal"), $("pause")].some((x) => !x.hidden)) return;
+  passToGame(e);
 });
 
 window.addEventListener("error", (e) => {
