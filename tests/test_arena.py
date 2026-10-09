@@ -9,6 +9,7 @@ from sidequest import paths
 from .test_avatar import JSC
 
 HARNESS = os.path.join(os.path.dirname(__file__), "arena_harness.js")
+ART_HARNESS = os.path.join(os.path.dirname(__file__), "art_harness.js")
 DLC = os.path.join(paths.PROJECT_DIR, "dlc", "last-commit-standing")
 
 
@@ -103,3 +104,41 @@ class ArenaTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+@unittest.skipUnless(os.path.exists(JSC), "JavaScriptCore jsc not found")
+class ArenaArtTest(unittest.TestCase):
+    """Sprites, the pixel font, and whole matches drawn into a fake canvas."""
+
+    @classmethod
+    def setUpClass(cls):
+        run = subprocess.run([JSC, ART_HARNESS, "--", paths.PROJECT_DIR],
+                             capture_output=True, text=True, timeout=120)
+        if run.returncode:
+            raise AssertionError(run.stdout + run.stderr)
+        cls.result = json.loads(run.stdout)
+
+    def test_sprites_are_well_formed(self):
+        self.assertEqual(self.result["spriteErrors"], [])
+
+    def test_sprite_sizes(self):
+        sizes = self.result["sizes"]
+        for name in ("grunt", "runner", "tank", "ally", "spirit"):
+            with self.subTest(name):
+                self.assertLessEqual(max(sizes[name]), 18)
+        self.assertLessEqual(max(sizes["boss"]), 32)
+
+    def test_font_covers_both_alphabets_and_game_texts(self):
+        self.assertEqual(self.result["fontErrors"], [])
+        self.assertEqual(self.result["missing"], [])
+        self.assertGreater(len(self.result["texts"]), 5)
+        self.assertEqual(self.result["missingInTexts"], [])
+
+    def test_every_map_draws_a_whole_match(self):
+        for name, match in self.result["maps"].items():
+            with self.subTest(name):
+                self.assertIsNone(match["error"])
+                self.assertTrue(match["over"])
+                self.assertTrue(match["sawItem"])
+                self.assertGreater(match["picked"], 0)
+        self.assertIsNone(self.result["badCall"])

@@ -36,16 +36,19 @@
 
     const s = {
       time: 0, over: false, finaleAt: null, results: null, immortal: false,
-      map: {id: map.id, name: map.name, width: W, height: H, walls: WALLS},
+      map: {id: map.id, name: map.name, theme: map.theme || "office", width: W, height: H,
+            walls: WALLS},
       player: {x: W / 2, y: H / 2, r: B.player.radius, hp: B.player.hp, invulnerable: 0,
-               dead: 0, cooldown: 0, ammo: B.player.weapon.magazine, reload: 0, reloadTotal: 0},
+               dead: 0, cooldown: 0, ammo: B.player.weapon.magazine, reload: 0, reloadTotal: 0,
+               shield: 0, moving: false, aim: 0, firedAt: -1, hurtAt: -1},
       stats: {damage: B.player.weapon.damage, interval: B.player.weapon.interval,
               magazine: B.player.weapon.magazine, reload: B.player.weapon.reload,
               projectiles: B.player.weapon.projectiles, pierce: B.player.weapon.pierce,
               speed: B.player.speed, max_hp: B.player.hp, regen: 0,
               ally_damage: 1, ally_area: 1, ally_missiles: 0},
       taken: {}, level: 1, xp: 0, xpNext: B.xp.first_level, pendingLevels: 0, choices: null,
-      enemies: [], shots: [], effects: [], texts: [], allies: [],
+      enemies: [], shots: [], effects: [], texts: [], allies: [], items: [],
+      buffs: {coffee: 0, duck: 0}, itemAt: B.items.every_seconds,
       spawnAcc: 0, nextBoss: B.spawn.boss_every_minutes * 60, rage: 0,
       score: 0, kills: 0, damageTaken: 0, deaths: 0, streak: 0, streakTimer: 0,
       bestStreak: 0, multiplier: 1, everAlly: false,
@@ -86,6 +89,13 @@
       return s.enemies.filter((e) => !e.dead && dist2(e, from) <= r2)
         .sort((a, b) => dist2(a, from) - dist2(b, from)).slice(0, n);
     }
+
+    // Stats with item buffs on top of upgrades.
+    const I = B.items;
+    const speed = () => s.stats.speed * (s.buffs.coffee > 0 ? I.coffee.speed : 1);
+    const interval = () => s.stats.interval * (s.buffs.coffee > 0 ? I.coffee.fire : 1);
+    const reloadTime = () => s.stats.reload * (s.buffs.coffee > 0 ? I.coffee.fire : 1);
+    const pierce = () => Math.round(s.stats.pierce) + (s.buffs.duck > 0 ? I.duck.pierce : 0);
 
     // --- walls -------------------------------------------------------------------
 
@@ -197,7 +207,7 @@
       const damage = cfg.damage * (1 + B.spawn.damage_growth_per_minute * minute);
       s.enemies.push({type, x, y, r: cfg.radius, hp, maxHp: hp, speed, damage,
                       score: cfg.score, slow: 0, slowFactor: 1,
-                      flash: 0, dead: false, incoming: 0});
+                      flash: 0, dead: false, incoming: 0, born: s.time});
     }
 
     function pickType() {
@@ -226,7 +236,88 @@
       s.streakTimer = B.score.streak_window;
       s.bestStreak = Math.max(s.bestStreak, s.streak);
       s.score += e.score * s.multiplier;
-      effect({type: "pop", x: e.x, y: e.y, r: e.r, color: e.type === "boss" ? "#e8c14a" : "#e8e6f0"});
+      effect({type: "pop", x: e.x, y: e.y, r: e.r, kind: e.type, life: 0.3,
+              color: e.type === "boss" ? "#e8c14a" : "#e8e6f0"});
+      if (e.type === "boss") {
+        for (let i = 0; i < I.boss_drops; i++) {
+          drop(i ? pickItem() : "medkit", e.x + (random() - 0.5) * 40, e.y + (random() - 0.5) * 40);
+        }
+      } else if (random() < I.drop_chance) {
+        drop(pickItem(), e.x, e.y);
+      }
+    }
+
+    // --- items -------------------------------------------------------------------
+
+    function pickItem() {
+      const pool = Object.entries(I.weights);
+      let roll = random() * pool.reduce((sum, [, w]) => sum + w, 0);
+      for (const [type, w] of pool) {
+        roll -= w;
+        if (roll <= 0) return type;
+      }
+      return pool[0][0];
+    }
+
+    function drop(type, x, y) {
+      if (s.items.length >= I.max_on_map) return;
+      const o = {x: clamp(x, 8, W - 8), y: clamp(y, 8, H - 8)};
+      pushOut(o, 8);
+      s.items.push({type, x: o.x, y: o.y, t: 0, life: I.lifetime});
+    }
+
+    // Now and then an item appears somewhere near the player, in the open.
+    function placeItem() {
+      const p = s.player;
+      for (let tries = 0; tries < 10; tries++) {
+        const angle = random() * Math.PI * 2, d = 60 + random() * 140;
+        const x = clamp(p.x + Math.cos(angle) * d, 12, W - 12);
+        const y = clamp(p.y + Math.sin(angle) * d, 12, H - 12);
+        if (!inWall(x, y, 10)) { drop(pickItem(), x, y); return; }
+      }
+    }
+
+    function pickUp(it) {
+      const p = s.player;
+      it.life = 0;
+      effect({type: "pickup", x: it.x, y: it.y, item: it.type, life: 0.3});
+      switch (it.type) {
+        case "medkit": {
+          const before = p.hp;
+          p.hp = Math.min(s.stats.max_hp, p.hp + I.medkit.heal);
+          text(p.x, p.y - 14, `+${Math.round(p.hp - before)}`, "#4fbf6f");
+          break;
+        }
+        case "coffee":
+          s.buffs.coffee = I.coffee.seconds;
+          text(p.x, p.y - 14, "КОФЕ", "#e89a4a");
+          break;
+        case "duck":
+          s.buffs.duck = I.duck.seconds;
+          text(p.x, p.y - 14, "УТОЧКА", "#e8c14a");
+          break;
+        case "shield":
+          p.shield = I.shield.hits;
+          text(p.x, p.y - 14, "ЩИТ", "#5b8bd0");
+          break;
+      }
+    }
+
+    function updateItems(dt) {
+      const p = s.player;
+      s.buffs.coffee = Math.max(0, s.buffs.coffee - dt);
+      s.buffs.duck = Math.max(0, s.buffs.duck - dt);
+      if (s.finaleAt === null && s.time >= s.itemAt) {
+        s.itemAt = s.time + I.every_seconds;
+        placeItem();
+      }
+      const reach = I.pickup_radius + p.r;
+      for (const it of s.items) {
+        it.t += dt;
+        if (it.t >= it.life) it.life = 0;
+        else if (!p.dead && (it.x - p.x) ** 2 + (it.y - p.y) ** 2 <= reach * reach) pickUp(it);
+      }
+      s.items = s.items.filter((it) => it.life > 0);
     }
 
     function explode(x, y, radius, damage, color) {
@@ -241,9 +332,15 @@
     function hurtPlayer(damage) {
       const p = s.player;
       if (s.immortal || p.dead || p.invulnerable > 0) return;
+      p.invulnerable = B.player.hit_invulnerable;
+      p.hurtAt = s.time;
+      if (p.shield > 0) {
+        p.shield--;
+        effect({type: "ring", x: p.x, y: p.y, r: 14, color: "#5b8bd0", life: 0.3});
+        return;
+      }
       p.hp -= damage;
       s.damageTaken += damage;
-      p.invulnerable = B.player.hit_invulnerable;
       s.streak = 0;
       if (p.hp <= 0) {
         p.hp = 0;
@@ -276,7 +373,7 @@
 
     function startReload() {
       const p = s.player;
-      p.reload = p.reloadTotal = s.stats.reload;
+      p.reload = p.reloadTotal = reloadTime();
     }
 
     // The weapon fires on its own while there are rounds in the magazine, then reloads.
@@ -289,7 +386,7 @@
         if (p.reload <= 0) { p.reload = 0; p.ammo = Math.round(s.stats.magazine); }
       } else if (p.cooldown <= 0) {
         if (fireWeapon()) {
-          p.cooldown = s.stats.interval;
+          p.cooldown = interval();
           if (--p.ammo <= 0) startReload();
         } else if (p.ammo < Math.round(s.stats.magazine)) {
           startReload();
@@ -306,12 +403,14 @@
       const targets = s.enemies.filter((e) => !e.dead && e.incoming < e.hp && dist2(e, p) <= r2)
         .sort((a, b) => dist2(a, p) - dist2(b, p)).slice(0, n);
       if (!targets.length) return false;
+      p.aim = Math.atan2(targets[0].y - p.y, targets[0].x - p.x);
+      p.firedAt = s.time;
       for (let i = 0; i < n; i++) {
         const t = targets[i % targets.length];
         let angle = Math.atan2(t.y - p.y, t.x - p.x);
         if (i >= targets.length) angle += (i - targets.length + 1) * 0.25 * (i % 2 ? 1 : -1);
         s.shots.push({x: p.x, y: p.y, vx: Math.cos(angle) * w.speed, vy: Math.sin(angle) * w.speed,
-                      r: w.radius, damage: st.damage, pierce: Math.round(st.pierce), hit: new Set(),
+                      r: w.radius, damage: st.damage, pierce: pierce(), hit: new Set(),
                       life: w.range / w.speed + 0.2, color: "#e8d36a", aim: t});
         t.incoming += st.damage;
       }
@@ -479,6 +578,9 @@
           a.actions++;
           addXp(B.xp.per_action[e.action] || B.xp.per_action.generic);
           if (canAct(a)) ability(a, src, e);
+          if (a.actions % I.ally_every_actions === 0 && s.finaleAt === null) {
+            drop(pickItem(), a.x + (random() - 0.5) * 20, a.y + 12);
+          }
           break;
         case "tool_error":
           a.actions++;
@@ -569,8 +671,9 @@
       let ix = clamp(+input.x || 0, -1, 1), iy = clamp(+input.y || 0, -1, 1);
       const len = Math.hypot(ix, iy);
       if (len > 1) { ix /= len; iy /= len; }
-      p.x = clamp(p.x + ix * s.stats.speed * dt, p.r, W - p.r);
-      p.y = clamp(p.y + iy * s.stats.speed * dt, p.r, H - p.r);
+      p.moving = len > 0;
+      p.x = clamp(p.x + ix * speed() * dt, p.r, W - p.r);
+      p.y = clamp(p.y + iy * speed() * dt, p.r, H - p.r);
       pushOut(p, p.r);
       p.hp = Math.min(s.stats.max_hp, p.hp + s.stats.regen * dt);
       updateWeapon(dt);
@@ -682,6 +785,7 @@
       updateSpawns(dt);
       updateEnemies(dt);
       updateShots(dt);
+      updateItems(dt);
 
       s.enemies = s.enemies.filter((e) => !e.dead);
       for (const sh of s.shots) if (sh.life <= 0) release(sh);
@@ -714,6 +818,7 @@
       },
       wave() { for (let i = 0; i < B.spawn.wave_size; i++) spawn(pickType()); },
       boss() { spawn("boss"); },
+      item() { drop(pickItem(), s.player.x + 30, s.player.y); },
       finale() {
         for (const a of s.allies) leave(a, true);
         s.finaleAt = s.time + B.finale.seconds;

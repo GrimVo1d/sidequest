@@ -61,6 +61,16 @@
 
   "rage": {"seconds": 8, "speed": 1.3, "damage": 1.3},
 
+  "items": {
+    "every_seconds": 25, "drop_chance": 0.015, "boss_drops": 3, "ally_every_actions": 15,
+    "max_on_map": 6, "lifetime": 30, "pickup_radius": 8,
+    "weights": {"medkit": 4, "coffee": 2, "duck": 2, "shield": 2},
+    "medkit": {"heal": 35},
+    "coffee": {"seconds": 8, "speed": 1.3, "fire": 0.6},
+    "duck":   {"seconds": 10, "pierce": 2},
+    "shield": {"hits": 3}
+  },
+
   "score": {"per_second": 1, "streak_window": 2.0, "streak_step": 15,
             "multiplier_step": 0.5, "max_multiplier": 5},
 

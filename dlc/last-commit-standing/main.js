@@ -75,6 +75,11 @@
     clear(box);
     for (const m of LCS_MAPS) {
       const b = el("button", null, "map" + (m.id === mapId ? " on" : ""));
+      const pic = el("canvas", null, "preview");
+      pic.width = 136;
+      pic.height = Math.round(136 * m.height / m.width);
+      renderer.preview(m, pic);
+      b.appendChild(pic);
       b.appendChild(el("span", m.name, "name"));
       b.appendChild(el("span", m.text, "text"));
       b.addEventListener("click", () => {
@@ -274,6 +279,7 @@
   dev("upgrade", "Улучшение", (d) => d.upgrade());
   dev("wave", "Волна", (d) => d.wave());
   dev("boss", "Босс", (d) => d.boss());
+  dev("item", "Предмет", (d) => d.item());
   dev("finale", "Финал", (d) => d.finale());
 
   $("btn-play").addEventListener("click", startMatch);
