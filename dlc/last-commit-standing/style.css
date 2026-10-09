@@ -46,6 +46,8 @@ button.primary { background: #3d3270; border-color: var(--accent); }
 #build { display: flex; gap: 12px; }
 #build:empty { display: none; }
 #build .slots { display: flex; gap: 3px; }
+/* An empty group would still take the gap and push the panel off centre. */
+#build .slots:empty { display: none; }
 #build .slot { position: relative; width: 28px; height: 28px; display: flex; align-items: center;
   justify-content: center; background: rgba(31, 31, 61, 0.8); border: 2px solid var(--edge); }
 #build .slot.gold { border-color: var(--accent); }
