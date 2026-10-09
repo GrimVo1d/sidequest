@@ -1,4 +1,4 @@
-// Pixel avatars: drawing, the builder and the presets. Format: sidequest/avatar.py.
+// Avatars: drawing, the builder and the presets. Format: sidequest/avatar.py.
 // The hub uses it, and a DLC may too:
 //   <script src="../../sdk/avatar.js"></script>
 //   const p = await Sidequest.profile();
@@ -452,26 +452,42 @@
 
   function resolve(avatar) { return avatar && avatar.frames ? avatar : DEFAULT; }
 
+  // A picture avatar (an upload kept in full color) has `rgba` frames instead of
+  // `pixels` and a palette; it is scaled smoothly, not as pixel art.
+  const isPicture = (avatar) => !resolve(avatar).palette;
+
+  const decoded = new WeakMap();   // frame -> its rgba bytes, decoded once
+
   function rgba(avatar, index) {
     const a = resolve(avatar);
-    const colors = a.palette.map((hex) => [parseInt(hex.slice(1, 3), 16),
-                                           parseInt(hex.slice(3, 5), 16),
-                                           parseInt(hex.slice(5, 7), 16)]);
-    const pixels = a.frames[index || 0].pixels;
-    const out = new Uint8ClampedArray(a.size * a.size * 4);
-    for (let k = 0; k < pixels.length; k++) {
-      const c = colors[CHARS.indexOf(pixels[k])];
-      if (!c) continue;
-      out[k * 4] = c[0]; out[k * 4 + 1] = c[1]; out[k * 4 + 2] = c[2]; out[k * 4 + 3] = 255;
+    const frame = a.frames[index || 0];
+    if (decoded.has(frame)) return decoded.get(frame);
+    let out;
+    if (frame.rgba) {
+      const text = atob(frame.rgba);
+      out = new Uint8ClampedArray(text.length);
+      for (let k = 0; k < text.length; k++) out[k] = text.charCodeAt(k);
+    } else {
+      const colors = a.palette.map((hex) => [parseInt(hex.slice(1, 3), 16),
+                                             parseInt(hex.slice(3, 5), 16),
+                                             parseInt(hex.slice(5, 7), 16)]);
+      out = new Uint8ClampedArray(a.size * a.size * 4);
+      for (let k = 0; k < frame.pixels.length; k++) {
+        const c = colors[CHARS.indexOf(frame.pixels[k])];
+        if (!c) continue;
+        out[k * 4] = c[0]; out[k * 4 + 1] = c[1]; out[k * 4 + 2] = c[2]; out[k * 4 + 3] = 255;
+      }
     }
+    decoded.set(frame, out);
     return out;
   }
 
-  // Draws one frame at its real size; scale the canvas with CSS
-  // (image-rendering: pixelated) to keep the pixels sharp.
+  // Draws one frame at its real size; scale the canvas with CSS. Pixel avatars get
+  // image-rendering: pixelated to stay sharp, pictures are smoothed.
   function draw(canvas, avatar, index) {
     const a = resolve(avatar);
     canvas.width = canvas.height = a.size;
+    canvas.style.imageRendering = isPicture(a) ? "auto" : "pixelated";
     const ctx = canvas.getContext("2d");
     ctx.putImageData(new ImageData(rgba(a, index), a.size, a.size), 0, 0);
   }
@@ -495,6 +511,6 @@
 
   root.SidequestAvatar = {
     CHARS, SIZE, OPTIONS, PRESETS, DEFAULT, DEFAULT_PARTS, MAX_COLORS: 32, MAX_FRAMES: 64,
-    compose, preset, resolve, rgba, draw, animate,
+    compose, preset, resolve, isPicture, rgba, draw, animate,
   };
 })(typeof window !== "undefined" ? window : globalThis);

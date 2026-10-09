@@ -1,7 +1,10 @@
-"""The player's avatar: a small pixel grid with a palette, optionally animated.
+"""The player's avatar: a small pixel grid with a palette, or a full-color picture.
 
-Every source (preset, builder, uploaded picture or GIF) is turned into this format in the
-page; Python only checks it. The uploaded file itself is never stored or passed on.
+Every source (preset, builder, uploaded picture or GIF) is turned into one of these
+formats in the page; Python only checks it. The uploaded file itself is never stored or
+passed on.
+
+Pixel avatar (presets, the builder, an upload turned into pixels):
 
     {"source": "preset" | "builder" | "upload",
      "preset": "<id>",                  # preset only
@@ -12,11 +15,24 @@ page; Python only checks it. The uploaded file itself is never stored or passed 
 
 `pixels` holds size * size characters, row by row: "." is transparent, "0".."9" and
 "a".."v" are palette indexes 0..31. `delay` is in milliseconds.
+
+Picture avatar (an upload kept as is, only shrunk to a square):
+
+    {"source": "upload",
+     "size": 128 | 256,
+     "frames": [{"rgba": "<base64>", "delay": 100}, ...]}
+
+`rgba` is size * size * 4 bytes, row by row. All frames together are at most
+MAX_PICTURE_BYTES, so a long GIF comes as 128 x 128.
 """
+import base64
+import binascii
 import re
 
 SOURCES = ("preset", "builder", "upload")
 SIZES = (16, 32)
+PICTURE_SIZES = (128, 256)
+MAX_PICTURE_BYTES = 4 * 1024 * 1024
 MAX_COLORS = 32
 MAX_FRAMES = 64
 MAX_PARTS = 16
@@ -35,8 +51,12 @@ def clean(avatar):
     if source not in SOURCES:
         raise ValueError("unknown avatar source")
     size = avatar.get("size")
-    if size not in SIZES or isinstance(size, bool):
-        raise ValueError("avatar size must be 16 or 32")
+    if isinstance(size, bool) or size not in SIZES + PICTURE_SIZES:
+        raise ValueError("avatar size must be 16, 32, 128 or 256")
+    if size in PICTURE_SIZES:
+        if source != "upload":
+            raise ValueError("only an uploaded avatar can be a picture")
+        return {"source": source, "size": size, "frames": _picture_frames(avatar, size)}
 
     palette = avatar.get("palette")
     if not isinstance(palette, list) or not 1 <= len(palette) <= MAX_COLORS:
@@ -58,11 +78,7 @@ def clean(avatar):
             raise ValueError("frame must have size * size pixels")
         if not set(pixels) <= allowed:
             raise ValueError("pixel outside the palette")
-        delay = frame.get("delay", 100)
-        if not isinstance(delay, (int, float)) or isinstance(delay, bool):
-            raise ValueError("delay must be a number")
-        clean_frames.append({"pixels": pixels,
-                             "delay": max(MIN_DELAY, min(MAX_DELAY, int(delay)))})
+        clean_frames.append({"pixels": pixels, "delay": _delay(frame)})
 
     result = {"source": source, "size": size, "palette": palette, "frames": clean_frames}
     if source == "preset":
@@ -79,4 +95,34 @@ def clean(avatar):
                     and isinstance(value, str) and _ID_RE.match(value)):
                 raise ValueError("bad part")
         result["parts"] = dict(parts)
+    return result
+
+
+def _delay(frame):
+    delay = frame.get("delay", 100)
+    if not isinstance(delay, (int, float)) or isinstance(delay, bool):
+        raise ValueError("delay must be a number")
+    return max(MIN_DELAY, min(MAX_DELAY, int(delay)))
+
+
+def _picture_frames(avatar, size):
+    frames = avatar.get("frames")
+    if not isinstance(frames, list) or not 1 <= len(frames) <= MAX_FRAMES:
+        raise ValueError(f"avatar must have 1..{MAX_FRAMES} frames")
+    if len(frames) * size * size * 4 > MAX_PICTURE_BYTES:
+        raise ValueError("picture avatar is too big")
+    result = []
+    for frame in frames:
+        if not isinstance(frame, dict) or not isinstance(frame.get("rgba"), str):
+            raise ValueError("frame must have rgba")
+        # The length is checked before decoding, so a huge string is never decoded.
+        if len(frame["rgba"]) != 4 * ((size * size * 4 + 2) // 3):
+            raise ValueError("frame must have size * size * 4 bytes")
+        try:
+            raw = base64.b64decode(frame["rgba"], validate=True)
+        except (binascii.Error, ValueError):
+            raise ValueError("rgba must be base64") from None
+        if len(raw) != size * size * 4:
+            raise ValueError("frame must have size * size * 4 bytes")
+        result.append({"rgba": base64.b64encode(raw).decode("ascii"), "delay": _delay(frame)})
     return result

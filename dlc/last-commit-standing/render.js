@@ -124,6 +124,8 @@
       }
 
       // The player: the profile avatar. Blinks while invulnerable, greyed out while dead.
+      // A picture avatar (256 px) is shrunk smoothly; pixel ones stay sharp.
+      ctx.imageSmoothingEnabled = avatar.width > 32;
       const blink = p.invulnerable > 0 && Math.floor(s.time * 10) % 2 === 0;
       if (p.dead > 0) {
         ctx.globalAlpha = 0.35;
@@ -134,6 +136,7 @@
         rect(p.x, p.y, 18, 18, "#0d0d1a");
         ctx.drawImage(avatar, px(p.x - 8), px(p.y - 8), 16, 16);
       }
+      ctx.imageSmoothingEnabled = false;
       if (s.immortal) ring(p.x, p.y, 12, "#e8c14a", 0.6);
 
       for (const t of s.texts) {

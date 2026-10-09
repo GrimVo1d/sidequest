@@ -21,8 +21,12 @@ function openAvatarEditor(current, onSaved) {
     draft = next;
     stopPreview();
     stopPreview = AV.animate(preview, draft);
-    status.textContent = draft && (draft.frames.length > 1 || draft.source === "upload")
-      ? `кадров: ${draft.frames.length}, цветов: ${draft.palette.length}` : "";
+    if (draft && AV.isPicture(draft)) {
+      status.textContent = `${draft.size}×${draft.size}, кадров: ${draft.frames.length}`;
+    } else {
+      status.textContent = draft && (draft.frames.length > 1 || draft.source === "upload")
+        ? `кадров: ${draft.frames.length}, цветов: ${draft.palette.length}` : "";
+    }
   }
 
   function finish() { stopPreview(); closeModal(); }
@@ -77,7 +81,7 @@ function openAvatarEditor(current, onSaved) {
 
   // --- upload ---
 
-  const options = {size: 32, colors: 16, mode: "crop"};
+  const options = {style: "picture", size: 32, colors: 16, mode: "crop"};
 
   function select(values, key) {
     const s = el("select");
@@ -88,7 +92,8 @@ function openAvatarEditor(current, onSaved) {
       s.appendChild(o);
     }
     s.addEventListener("change", () => {
-      options[key] = key === "mode" ? s.value : Number(s.value);
+      options[key] = key === "mode" || key === "style" ? s.value : Number(s.value);
+      if (key === "style") renderTab();
       reconvert();
     });
     return s;
@@ -123,17 +128,20 @@ function openAvatarEditor(current, onSaved) {
       }
     });
     content.appendChild(el("p", "PNG, JPEG, WebP или GIF (с анимацией) до 8 МБ. Картинка " +
-      "превращается в пиксели прямо здесь; сохраняется только результат, сам файл — нет.", "hint"));
+      "уменьшается прямо здесь; сохраняется только результат, сам файл — нет.", "hint"));
     const pickRow = el("div", null, "av-row");
     pickRow.appendChild(input);
     pickRow.appendChild(button("Выбрать файл…", () => input.click(), "primary"));
     pickRow.appendChild(name);
     content.appendChild(pickRow);
     const row = el("div", null, "av-row");
-    row.appendChild(select([[32, "32×32"], [16, "16×16"]], "size"));
-    row.appendChild(select([[4, "4 цвета"], [8, "8 цветов"], [16, "16 цветов"], [32, "32 цвета"]],
-                           "colors"));
+    row.appendChild(select([["picture", "как есть"], ["pixels", "в пиксели"]], "style"));
     row.appendChild(select([["crop", "обрезать по центру"], ["fit", "вписать целиком"]], "mode"));
+    if (options.style === "pixels") {
+      row.appendChild(select([[32, "32×32"], [16, "16×16"]], "size"));
+      row.appendChild(select([[4, "4 цвета"], [8, "8 цветов"], [16, "16 цветов"], [32, "32 цвета"]],
+                             "colors"));
+    }
     content.appendChild(row);
   }
 

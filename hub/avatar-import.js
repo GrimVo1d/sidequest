@@ -1,13 +1,16 @@
-// Turns a picture or an animated GIF chosen by the player into a pixel avatar
-// (format: sidequest/avatar.py). Everything happens in the page: the file is read once,
-// shrunk and reduced to a small palette; the file itself is never stored or sent anywhere.
+// Turns a picture or an animated GIF chosen by the player into an avatar (format:
+// sidequest/avatar.py): a full-color picture or, if asked, pixels with a small palette.
+// Everything happens in the page: the file is read once and shrunk; the file itself is
+// never stored or sent anywhere.
 "use strict";
 
 (function (root) {
   const MAX_FILE = 8 * 1024 * 1024;
   const MAX_SIDE = 2048;         // GIF canvas: bigger files are refused, not decoded
   const MAX_GIF_FRAMES = 1000;
-  const WORK_SIDE = 128;         // frames are kept at most this big between steps
+  const WORK_SIDE = 128;         // GIF frames are kept at most this big between steps
+  const STILL_SIDE = 512;        // the same for a still picture
+  const PICTURE_SIZE = 256, GIF_PICTURE_SIZE = 128;   // see PICTURE_SIZES in avatar.py
   const CHARS = "0123456789abcdefghijklmnopqrstuv";
 
   // --- GIF ---------------------------------------------------------------------------
@@ -303,7 +306,7 @@
     } catch (e) {
       throw new Error("это не картинка или формат не поддерживается");
     }
-    const scale = Math.min(1, 512 / Math.max(bitmap.width, bitmap.height));
+    const scale = Math.min(1, STILL_SIDE / Math.max(bitmap.width, bitmap.height));
     const w = Math.max(1, Math.round(bitmap.width * scale)), h = Math.max(1, Math.round(bitmap.height * scale));
     const canvas = document.createElement("canvas");
     canvas.width = w; canvas.height = h;
@@ -311,16 +314,44 @@
     ctx.imageSmoothingQuality = "high";
     ctx.drawImage(bitmap, 0, 0, w, h);
     bitmap.close();
-    const frame = fitWork(ctx.getImageData(0, 0, w, h).data, w, h);
-    return {animated: false, frames: [Object.assign(frame, {delay: 100})]};
+    return {animated: false, frames: [{w, h, rgba: ctx.getImageData(0, 0, w, h).data, delay: 100}]};
   }
 
-  // options: {size: 16 | 32, colors: up to 32, mode: "crop" | "fit"}
+  function toBase64(bytes) {
+    let text = "";
+    for (let k = 0; k < bytes.length; k += 8192) {
+      text += String.fromCharCode.apply(null, bytes.subarray(k, k + 8192));
+    }
+    return btoa(text);
+  }
+
+  // frames: [{rgba (n*n*4), delay}] -> a full-color avatar; repeated frames are merged.
+  function toPicture(frames, n) {
+    const out = [];
+    let last = null;
+    for (const f of frames) {
+      const same = last && last.rgba.length === f.rgba.length && last.rgba.every((v, k) => v === f.rgba[k]);
+      if (same) {
+        out[out.length - 1].delay = Math.min(10000, out[out.length - 1].delay + f.delay);
+      } else {
+        out.push({rgba: toBase64(f.rgba), delay: Math.max(20, Math.min(10000, Math.round(f.delay)))});
+      }
+      last = f;
+    }
+    return {source: "upload", size: n, frames: out};
+  }
+
+  // options: {style: "picture" | "pixels", mode: "crop" | "fit",
+  //           size: 16 | 32 and colors: up to 32 — for pixels only}
   function convert(loaded, options) {
+    if (options.style === "picture") {
+      const n = loaded.frames.length > 1 ? GIF_PICTURE_SIZE : PICTURE_SIZE;
+      return toPicture(loaded.frames.map((f) => ({rgba: square(f, n, options.mode), delay: f.delay})), n);
+    }
     const n = options.size === 16 ? 16 : 32;
     const frames = loaded.frames.map((f) => ({rgba: square(f, n, options.mode), delay: f.delay}));
     return toAvatar(frames, n, options.colors || 16);
   }
 
-  root.AvatarImport = {load, convert, decodeGif, toAvatar, square, MAX_FILE};
+  root.AvatarImport = {load, convert, decodeGif, toAvatar, toPicture, square, MAX_FILE};
 })(typeof window !== "undefined" ? window : globalThis);

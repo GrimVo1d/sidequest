@@ -35,6 +35,12 @@ result.fit = {
   crop: I.convert({frames: [wide]}, {size: 16, colors: 4, mode: "crop"}),
 };
 
+// Full-color pictures: a GIF becomes 128 px, a still picture 256 px.
+result.picture_gif = I.convert({frames: I.decodeGif(bytes, 64)}, {style: "picture", mode: "crop"});
+result.picture_still = I.convert({frames: [wide]}, {style: "picture", mode: "fit"});
+const back = A.rgba(result.picture_still, 0);
+result.picture_decoded = back.length === 256 * 256 * 4 && back[128 * 256 * 4] === 200 && A.isPicture(result.picture_still);
+
 let error = null;
 try { I.decodeGif(new Uint8Array([71, 73, 70, 56, 57, 97, 0, 64, 0, 64, 0, 0, 0, 59]), 64); }
 catch (e) { error = String(e.message); }

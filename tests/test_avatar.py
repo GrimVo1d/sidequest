@@ -1,3 +1,4 @@
+import base64
 import json
 import os
 import subprocess
@@ -48,6 +49,34 @@ class CleanTest(unittest.TestCase):
             good(source="builder", parts={"hair": "<b>"}),
             good(source="builder", parts={str(i): "a" for i in range(17)}),
             good(source="builder", parts=["hair"]),
+        ]
+        for value in bad:
+            with self.subTest(value=str(value)[:80]):
+                with self.assertRaises(ValueError):
+                    avatar.clean(value)
+
+
+def picture(size=128, frames=1, data=None):
+    rgba = data or base64.b64encode(bytes(size * size * 4)).decode()
+    return {"source": "upload", "size": size, "frames": [{"rgba": rgba, "delay": 70}] * frames}
+
+
+class PictureCleanTest(unittest.TestCase):
+    def test_valid_picture(self):
+        result = avatar.clean(dict(picture(256), palette=["#000000"], parts={"a": "b"}))
+        self.assertEqual(sorted(result), ["frames", "size", "source"])
+        self.assertEqual(result["frames"][0]["delay"], 70)
+
+    def test_rejects_bad_pictures(self):
+        ok = base64.b64encode(bytes(128 * 128 * 4)).decode()
+        bad = [
+            dict(picture(), source="preset", preset="x"),            # only uploads
+            picture(size=64),
+            picture(data=ok[:-4]),                                    # short
+            picture(data="!" * len(ok)),                              # not base64
+            picture(256, frames=17),                                  # over 4 MB together
+            picture(frames=65),
+            {"source": "upload", "size": 128, "frames": [{"pixels": "0" * 128 * 128}]},
         ]
         for value in bad:
             with self.subTest(value=str(value)[:80]):
@@ -196,6 +225,16 @@ class AvatarJsTest(unittest.TestCase):
         fit, crop = self.result["fit"]["fit"], self.result["fit"]["crop"]
         self.assertTrue(fit["frames"][0]["pixels"].startswith("." * 16))
         self.assertNotIn(".", crop["frames"][0]["pixels"])
+
+    def test_pictures_keep_full_color(self):
+        gif = avatar.clean(self.result["picture_gif"])
+        self.assertEqual((gif["size"], len(gif["frames"])), (128, 4))   # a GIF: 128 px
+        still = avatar.clean(self.result["picture_still"])
+        self.assertEqual((still["size"], len(still["frames"])), (256, 1))
+        raw = base64.b64decode(still["frames"][0]["rgba"])
+        self.assertEqual(raw[3], 0)                       # "fit": transparent band on top
+        self.assertEqual(raw[128 * 256 * 4:128 * 256 * 4 + 4], bytes([200] * 4))
+        self.assertTrue(self.result["picture_decoded"])
 
     def test_huge_gif_is_refused_before_decoding(self):
         self.assertIn("слишком большой", self.result["huge_error"])
