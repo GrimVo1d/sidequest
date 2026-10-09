@@ -31,12 +31,19 @@ function play(events, maxTime, seed) {
   const game = LCS.createGame(balance, {seed});
   const s = game.state;
   let i = 0, steps = 0, maxEnemies = 0, bad = null, choicesSeen = 0, firstLevelAt = null;
+  let reloads = 0, leaked = 0;
   const start = Date.now();
   while (!s.over && s.time < maxTime) {
     while (i < events.length && events[i].t <= s.time) game.agentEvent(events[i++]);
     if (s.choices) { choicesSeen++; game.choose(steps % s.choices.length); }
+    const wasReloading = s.player.reload > 0;
     game.step(DT, bot(s));
     steps++;
+    if (!wasReloading && s.player.reload > 0) reloads++;
+    // Damage "in flight" must belong to a shot that is still flying.
+    if (steps % 600 === 0) {
+      leaked += s.enemies.filter((e) => e.incoming > 0.001 && !s.shots.some((sh) => sh.aim === e)).length;
+    }
     if (s.level > 1 && firstLevelAt === null) firstLevelAt = s.time;
     maxEnemies = Math.max(maxEnemies, s.enemies.length);
     if (!bad) {
@@ -48,7 +55,7 @@ function play(events, maxTime, seed) {
   return {over: s.over, results: s.results, time: Math.round(s.time), level: s.level,
           choices: choicesSeen, max_enemies: maxEnemies, bad, kills: s.kills,
           allies: s.allies.map((a) => a.state), deaths: s.deaths, first_level_at: firstLevelAt,
-          ms_per_step: (Date.now() - start) / steps, taken: s.taken};
+          ms_per_step: (Date.now() - start) / steps, taken: s.taken, reloads, leaked};
 }
 
 // A busy agent: an action every ~2.5 s, some errors and a subagent.

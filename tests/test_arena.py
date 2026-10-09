@@ -49,6 +49,12 @@ class ArenaTest(unittest.TestCase):
                 self.assertEqual(len(match["allies"]), 2)
                 self.assertIn("active", match["allies"])
 
+    def test_weapon_reloads_and_tracks_shots(self):
+        self.assertGreater(self.result["busy_two"]["reloads"], 10)
+        for name, match in self.matches().items():
+            with self.subTest(name):
+                self.assertEqual(match["leaked"], 0)
+
     def test_no_agent_no_finale(self):
         idle = self.result["idle"]
         self.assertFalse(idle["over"])

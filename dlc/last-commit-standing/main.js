@@ -162,6 +162,7 @@
     $("xp-fill").style.width = Math.min(100, s.xp / s.xpNext * 100) + "%";
     $("xp-text").textContent = `ур. ${s.level}`;
     $("time").textContent = clock(s.time);
+    $("ammo").textContent = p.reload > 0 ? "перезарядка…" : `патроны ${p.ammo}/${Math.round(s.stats.magazine)}`;
     $("score").textContent = `счёт ${Math.floor(s.score)}`;
     $("multiplier").textContent = s.multiplier > 1 ? `×${s.multiplier}` : "";
     $("rage").hidden = s.rage <= 0;

@@ -34,8 +34,9 @@
     const s = {
       time: 0, over: false, finaleAt: null, results: null, immortal: false,
       player: {x: W / 2, y: H / 2, r: B.player.radius, hp: B.player.hp, invulnerable: 0,
-               dead: 0, cooldown: 0},
-      stats: {damage: B.player.weapon.damage, cooldown: B.player.weapon.cooldown,
+               dead: 0, cooldown: 0, ammo: B.player.weapon.magazine, reload: 0, reloadTotal: 0},
+      stats: {damage: B.player.weapon.damage, interval: B.player.weapon.interval,
+              magazine: B.player.weapon.magazine, reload: B.player.weapon.reload,
               projectiles: B.player.weapon.projectiles, pierce: B.player.weapon.pierce,
               speed: B.player.speed, max_hp: B.player.hp, regen: 0,
               ally_damage: 1, ally_area: 1, ally_missiles: 0},
@@ -105,7 +106,7 @@
       const damage = cfg.damage * (1 + B.spawn.damage_growth_per_minute * minute);
       s.enemies.push({type, x, y, r: cfg.radius, hp, maxHp: hp, speed, damage,
                       score: cfg.score, slow: 0, slowFactor: 1,
-                      flash: 0, dead: false});
+                      flash: 0, dead: false, incoming: 0});
     }
 
     function pickType() {
@@ -166,6 +167,8 @@
       const p = s.player;
       p.hp = s.stats.max_hp;
       p.invulnerable = B.player.respawn_invulnerable;
+      p.ammo = Math.round(s.stats.magazine);
+      p.reload = 0;
       // Throw nearby enemies back so the player does not respawn into a crowd.
       const clear = B.player.respawn_clear_radius;
       for (const e of s.enemies) {
@@ -179,10 +182,37 @@
       effect({type: "ring", x: p.x, y: p.y, r: clear, color: "#e8c14a", life: 0.5});
     }
 
+    function startReload() {
+      const p = s.player;
+      p.reload = p.reloadTotal = s.stats.reload;
+    }
+
+    // The weapon fires on its own while there are rounds in the magazine, then reloads.
+    // With no target in range a partly spent magazine is reloaded right away.
+    function updateWeapon(dt) {
+      const p = s.player;
+      p.cooldown -= dt;
+      if (p.reload > 0) {
+        p.reload -= dt;
+        if (p.reload <= 0) { p.reload = 0; p.ammo = Math.round(s.stats.magazine); }
+      } else if (p.cooldown <= 0) {
+        if (fireWeapon()) {
+          p.cooldown = s.stats.interval;
+          if (--p.ammo <= 0) startReload();
+        } else if (p.ammo < Math.round(s.stats.magazine)) {
+          startReload();
+        }
+      }
+    }
+
+    // Shots in flight are counted against their target (`incoming`), so a quick burst
+    // spreads over the crowd instead of piling into one enemy that is already done for.
     function fireWeapon() {
       const p = s.player, st = s.stats, w = B.player.weapon;
       const n = Math.round(st.projectiles);
-      const targets = nearestEnemies(p, n, w.range);
+      const r2 = w.range * w.range;
+      const targets = s.enemies.filter((e) => !e.dead && e.incoming < e.hp && dist2(e, p) <= r2)
+        .sort((a, b) => dist2(a, p) - dist2(b, p)).slice(0, n);
       if (!targets.length) return false;
       for (let i = 0; i < n; i++) {
         const t = targets[i % targets.length];
@@ -190,7 +220,8 @@
         if (i >= targets.length) angle += (i - targets.length + 1) * 0.25 * (i % 2 ? 1 : -1);
         s.shots.push({x: p.x, y: p.y, vx: Math.cos(angle) * w.speed, vy: Math.sin(angle) * w.speed,
                       r: w.radius, damage: st.damage, pierce: Math.round(st.pierce), hit: new Set(),
-                      life: w.range / w.speed + 0.2, color: "#e8d36a"});
+                      life: w.range / w.speed + 0.2, color: "#e8d36a", aim: t});
+        t.incoming += st.damage;
       }
       return true;
     }
@@ -226,6 +257,7 @@
       if (u.mul) s.stats[u.stat] *= u.mul;
       if (u.add) s.stats[u.stat] += u.add;
       if (u.stat === "max_hp" && !s.player.dead) s.player.hp += u.add || 0;
+      if (u.stat === "magazine" && s.player.reload <= 0) s.player.ammo += u.add || 0;
       if (u.heal && !s.player.dead) s.player.hp = s.stats.max_hp;
     }
 
@@ -448,8 +480,7 @@
       p.x = clamp(p.x + ix * s.stats.speed * dt, p.r, W - p.r);
       p.y = clamp(p.y + iy * s.stats.speed * dt, p.r, H - p.r);
       p.hp = Math.min(s.stats.max_hp, p.hp + s.stats.regen * dt);
-      p.cooldown -= dt;
-      if (p.cooldown <= 0 && fireWeapon()) p.cooldown = s.stats.cooldown;
+      updateWeapon(dt);
     }
 
     function updateSpawns(dt) {
@@ -503,6 +534,10 @@
       rebuildGrid();
     }
 
+    function release(sh) {
+      if (sh.aim) { sh.aim.incoming -= sh.damage; sh.aim = null; }
+    }
+
     function updateShots(dt) {
       for (const sh of s.shots) {
         sh.life -= dt;
@@ -526,6 +561,7 @@
           if (sh.life <= 0 || sh.hit.has(e)) return;
           if (Math.hypot(e.x - sh.x, e.y - sh.y) <= e.r + sh.r) {
             sh.hit.add(e);
+            if (e === sh.aim) release(sh);
             hurtEnemy(e, sh.damage);
             if (sh.pierce-- <= 0) sh.life = 0;
           }
@@ -550,6 +586,7 @@
       updateShots(dt);
 
       s.enemies = s.enemies.filter((e) => !e.dead);
+      for (const sh of s.shots) if (sh.life <= 0) release(sh);
       s.shots = s.shots.filter((sh) => sh.life > 0);
       for (const list of [s.effects, s.texts]) for (const x of list) x.t += dt;
       s.effects = s.effects.filter((x) => x.t < x.life);

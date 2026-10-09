@@ -25,6 +25,7 @@ button.primary { background: #3d3270; border-color: var(--accent); }
 .hp > div { background: var(--red); }
 .xp > div { background: var(--blue); }
 #score { color: var(--accent); }
+#ammo { color: #e8d36a; min-width: 13ch; }
 #multiplier { color: var(--green); }
 #rage { color: var(--red); }
 #allies { list-style: none; margin: 6px 0 0; padding: 0; font-size: 12px;

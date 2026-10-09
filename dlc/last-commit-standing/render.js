@@ -51,6 +51,23 @@
       ctx.globalAlpha = 1;
     }
 
+    // Under the player: a bar while reloading, otherwise one mark per round.
+    function drawAmmo(p, stats) {
+      const y = p.y + 12;
+      if (p.reload > 0) {
+        rect(p.x, y, 20, 4, "#0d0d1a");
+        ctx.fillStyle = "#e8d36a";
+        ctx.fillRect(px(p.x - 9), px(y - 1), Math.round(18 * (1 - p.reload / p.reloadTotal)), 2);
+        return;
+      }
+      const n = Math.round(stats.magazine), w = n * 3 - 1;
+      rect(p.x, y, w + 2, 4, "#0d0d1a");
+      for (let i = 0; i < n; i++) {
+        ctx.fillStyle = i < p.ammo ? "#e8d36a" : "#4a4a66";
+        ctx.fillRect(px(p.x - w / 2) + i * 3, px(y - 1), 2, 2);
+      }
+    }
+
     function draw(s, avatar) {
       const p = s.player;
       const camX = Math.max(0, Math.min(W - VW, p.x - VW / 2));
@@ -137,6 +154,7 @@
         ctx.drawImage(avatar, px(p.x - 8), px(p.y - 8), 16, 16);
       }
       ctx.imageSmoothingEnabled = false;
+      if (!p.dead) drawAmmo(p, s.stats);
       if (s.immortal) ring(p.x, p.y, 12, "#e8c14a", 0.6);
 
       for (const t of s.texts) {

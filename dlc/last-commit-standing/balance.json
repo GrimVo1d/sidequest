@@ -7,7 +7,8 @@
     "hit_invulnerable": 0.5,
     "respawn_seconds": 3, "respawn_invulnerable": 3, "respawn_clear_radius": 140,
     "death_penalty": 500,
-    "weapon": {"cooldown": 0.7, "damage": 12, "speed": 220, "range": 170,
+    "weapon": {"magazine": 6, "interval": 0.25, "reload": 1.4,
+               "damage": 10, "speed": 220, "range": 170,
                "projectiles": 1, "pierce": 0, "radius": 2}
   },
 
@@ -68,8 +69,10 @@
   "upgrades": [
     {"id": "damage",     "name": "Острее",        "text": "+25% урона",
      "stat": "damage", "mul": 1.25, "max_level": 8},
-    {"id": "rate",       "name": "Быстрее",       "text": "−15% перезарядки",
-     "stat": "cooldown", "mul": 0.85, "max_level": 6},
+    {"id": "reload",     "name": "Быстрая перезарядка", "text": "−20% времени перезарядки",
+     "stat": "reload", "mul": 0.8, "max_level": 5},
+    {"id": "magazine",   "name": "Обойма больше", "text": "+2 патрона в обойме",
+     "stat": "magazine", "add": 2, "max_level": 5},
     {"id": "multishot",  "name": "Залп",          "text": "+1 снаряд",
      "stat": "projectiles", "add": 1, "max_level": 5},
     {"id": "pierce",     "name": "Насквозь",      "text": "снаряд пробивает ещё одного врага",
