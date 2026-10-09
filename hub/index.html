@@ -21,7 +21,8 @@
 <main id="hub">
   <section class="col left">
     <div class="panel profile">
-      <img class="avatar" src="avatar.svg" alt="">
+      <canvas id="avatar" class="avatar" title="Сменить аватарку"></canvas>
+      <button id="btn-avatar" class="small">Сменить аватарку</button>
       <input id="profile-name" maxlength="32" spellcheck="false">
       <dl id="stats"></dl>
     </div>
@@ -97,6 +98,9 @@
   </div>
 </aside>
 
+<script src="../sdk/avatar.js"></script>
+<script src="avatar-import.js"></script>
+<script src="avatar-ui.js"></script>
 <script src="hub.js"></script>
 </body>
 </html>

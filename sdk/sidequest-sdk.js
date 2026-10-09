@@ -4,6 +4,7 @@
 //
 //   Sidequest.on("tool", (e) => ...)       // one kind of game event ("*" for all)
 //   Sidequest.onPause((paused, sessions) => ...)
+//   await Sidequest.profile()               // {name, avatar, stats}; avatar: sdk/avatar.js
 //   await Sidequest.storage.get("save")     // the DLC's own data (data/dlc/<id>/)
 //   await Sidequest.storage.set("save", {...})
 //   await Sidequest.match.start(); await Sidequest.match.end({score: 120})

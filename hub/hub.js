@@ -198,7 +198,8 @@ async function runCheck() {
 
 // --- modal dialogs -----------------------------------------------------------------
 
-function modal(title, body, actions) {
+function modal(title, body, actions, options) {
+  $("modal").querySelector(".dialog").classList.toggle("wide", !!(options && options.wide));
   $("modal-title").textContent = title;
   const b = $("modal-body");
   clear(b);
@@ -266,9 +267,14 @@ async function settingsFlow() {
 
 // --- profile and DLC list ----------------------------------------------------------
 
+let profile = null;
+let stopAvatar = () => {};
+
 async function loadProfile() {
-  const p = await api.profile();
+  const p = profile = await api.profile();
   $("profile-name").value = p.name;
+  stopAvatar();
+  stopAvatar = SidequestAvatar.animate($("avatar"), p.avatar);
   const dl = $("stats");
   clear(dl);
   const rows = [["Сессий", p.stats.sessions], ["Время агента", duration(p.stats.agent_seconds)],
@@ -471,6 +477,9 @@ window.addEventListener("pywebviewready", async () => {
   $("btn-settings").addEventListener("click", settingsFlow);
   $("btn-back").addEventListener("click", closeDlc);
   $("btn-resume").addEventListener("click", () => api.resume(null).then(refreshStatus));
+  const editAvatar = () => openAvatarEditor(profile && profile.avatar, loadProfile);
+  $("avatar").addEventListener("click", editAvatar);
+  $("btn-avatar").addEventListener("click", editAvatar);
   $("profile-name").addEventListener("change", async (e) => {
     e.target.value = await api.set_profile_name(e.target.value);
   });

@@ -10,7 +10,7 @@ import re
 import threading
 import time
 
-from . import claude_settings, paths, replay, selfcheck
+from . import avatar, claude_settings, paths, replay, selfcheck
 from .core import Core
 from .db import DEFAULT_SETTINGS
 
@@ -195,13 +195,21 @@ class Bridge:
 
     def profile(self):
         store = self._core.store
+        # avatar None means the default one (SidequestAvatar.DEFAULT in sdk/avatar.js).
         return {"name": store.get_meta("profile.name", "Игрок"),
+                "avatar": store.get_meta("profile.avatar"),
                 "stats": store.stats()}
 
     def set_profile_name(self, name):
         name = str(name).strip()[:32] or "Игрок"
         self._core.store.set_meta("profile.name", name)
         return name
+
+    def set_avatar(self, value):
+        """Store a checked avatar (see sidequest/avatar.py); None resets to the default."""
+        value = None if value is None else avatar.clean(value)
+        self._core.store.set_meta("profile.avatar", value)
+        return value
 
     def journal(self, limit=100):
         return self._core.store.recent_events(min(int(limit), 500))

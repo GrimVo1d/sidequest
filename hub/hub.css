@@ -60,7 +60,30 @@ main { flex: 1; display: grid; grid-template-columns: 260px 1fr 320px; gap: 10px
 .journal .list { overflow-y: auto; flex: 1; }
 
 .profile { display: flex; flex-direction: column; align-items: center; gap: 8px; }
-.avatar { width: 96px; height: 96px; border: var(--px) solid var(--edge); }
+.avatar { width: 96px; height: 96px; border: var(--px) solid var(--edge); cursor: pointer; }
+button.small { padding: 1px 8px; font-size: 11px; }
+canvas { image-rendering: pixelated; }
+
+/* Avatar editor. The checkerboard shows transparent pixels. */
+.dialog.wide { width: 780px; max-width: 95vw; }
+.av-editor { display: flex; gap: 16px; align-items: flex-start; }
+.av-side { width: 140px; flex: none; }
+.av-preview, .av-presets canvas, .av-swatch.none {
+  background: repeating-conic-gradient(#3a3a5e 0 25%, #2a2a4a 0 50%) 0 0 / 8px 8px;
+}
+.av-preview { width: 136px; height: 136px; border: var(--px) solid var(--edge); }
+.av-main { flex: 1; min-width: 0; }
+.av-tabs { display: flex; gap: 6px; margin-bottom: 10px; }
+.av-content { height: 400px; overflow-y: auto; }
+.av-tabs button.on, .av-content button.on { background: #3f3f7a; color: var(--accent); }
+.av-presets { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 6px; }
+.av-presets button { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 4px; font-size: 11px; }
+.av-presets canvas { width: 64px; height: 64px; }
+.av-row { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin: 4px 0; font-size: 12px; }
+.av-row .label { width: 104px; color: var(--muted); }
+.av-row button { padding: 1px 6px; font-size: 11px; }
+.av-row button.av-swatch { width: 18px; height: 18px; padding: 0; }
+.av-row button.av-swatch.on { outline: var(--px) solid var(--accent); outline-offset: 1px; }
 #profile-name { text-align: center; width: 100%; }
 dl { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; margin: 0; width: 100%; font-size: 12px; }
 dt { color: var(--muted); }

@@ -12,10 +12,12 @@ CWD = "/Users/someone/code/my-app"
 
 
 def temp_dir(test):
-    """A temp folder under <project>/.tmp/ removed after the test."""
+    """A temp folder under <project>/.tmp/ removed after the test (or the test class,
+    when called from setUpClass)."""
     os.makedirs(TMP_ROOT, mode=0o700, exist_ok=True)
     path = tempfile.mkdtemp(dir=TMP_ROOT)
-    test.addCleanup(shutil.rmtree, path, True)
+    cleanup = test.addClassCleanup if isinstance(test, type) else test.addCleanup
+    cleanup(shutil.rmtree, path, True)
     return path
 
 

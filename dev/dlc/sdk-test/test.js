@@ -32,4 +32,5 @@ Sidequest.ready().then(async (info) => {
   const profile = await Sidequest.profile();
   document.getElementById("info").textContent =
     `dlc=${info.dlc} dev=${info.dev} игрок=${profile.name}`;
+  SidequestAvatar.animate(document.getElementById("avatar"), profile.avatar);
 });

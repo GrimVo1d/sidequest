@@ -73,6 +73,20 @@ class BridgeTest(unittest.TestCase):
         self.assertEqual(bridge.match_end("arena", {"score": 7}), {"counted": True})
         self.assertEqual(bridge.dlc_load("arena", "stats")["matches"], 1)
 
+    def test_avatar_is_checked_and_stored(self):
+        _, bridge = self.make()
+        self.assertIsNone(bridge.profile()["avatar"])
+        value = {"source": "upload", "size": 16, "palette": ["#000000"],
+                 "frames": [{"pixels": "0" * 256, "delay": 100}], "file": "/etc/passwd"}
+        stored = bridge.set_avatar(value)
+        self.assertNotIn("file", stored)
+        self.assertEqual(bridge.profile()["avatar"], stored)
+        with self.assertRaises(ValueError):
+            bridge.set_avatar(dict(value, size=1000))
+        self.assertEqual(bridge.profile()["avatar"], stored)
+        self.assertIsNone(bridge.set_avatar(None))
+        self.assertIsNone(bridge.profile()["avatar"])
+
     def test_settings_are_clamped(self):
         _, bridge = self.make()
         self.assertEqual(bridge.set_setting("silence_pause_seconds", 1), 10)

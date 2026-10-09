@@ -5,3 +5,4 @@ button { font: inherit; background: #26264a; color: #e8e6f0; border: 2px solid #
 pre { background: #1f1f3d; padding: 6px; min-height: 1.4em; }
 ul { list-style: none; padding: 0; max-height: 60vh; overflow-y: auto; }
 .paused { color: #d9534f; }
+#avatar { width: 32px; height: 32px; image-rendering: pixelated; vertical-align: middle; }
