@@ -38,6 +38,13 @@ class BridgeTest(unittest.TestCase):
         for name in public:
             self.assertTrue(callable(getattr(bridge, name)), name)
 
+    def test_quit_closes_the_window(self):
+        _, bridge = self.make()
+        bridge.quit()  # no window yet: nothing to close
+        bridge._window = mock.Mock()
+        bridge.quit()
+        bridge._window.destroy.assert_called_once_with()
+
     def test_dev_methods_need_dev_flag(self):
         _, bridge = self.make(dev=False)
         for call in (lambda: bridge.dev_send("tool"), bridge.dev_sources,

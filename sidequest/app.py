@@ -147,6 +147,11 @@ class Bridge:
     def end_match(self, session):
         self._core.end_match(session)
 
+    def quit(self):
+        # Closing the window ends everything: "closing" cleans up as for the close button.
+        if self._window is not None:
+            self._window.destroy()
+
     # --- connect to Claude Code ---------------------------------------------------
 
     def install_preview(self):

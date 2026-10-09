@@ -575,6 +575,7 @@ window.addEventListener("pywebviewready", async () => {
   $("btn-check").addEventListener("click", runCheck);
   $("btn-connect").addEventListener("click", connectFlow);
   $("btn-settings").addEventListener("click", settingsFlow);
+  $("btn-exit").addEventListener("click", () => api.quit());
   $("btn-resume").addEventListener("click", () => api.resume(null).then(refreshStatus));
   // Leaving the game is enough of an answer: the pause goes away with it.
   $("btn-quit-game").addEventListener("click", () => {
