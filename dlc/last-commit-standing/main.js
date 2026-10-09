@@ -461,6 +461,9 @@
 
   // e.code, not e.key: WASD works on any keyboard layout.
   addEventListener("keydown", (e) => {
+    // A screen is open: the arrows and Enter work its buttons.
+    const screen = ["menu", "levelup", "esc", "codex", "results"].find((id) => !$(id).hidden);
+    if (screen && SidequestKeys.handle(e, $(screen))) return;
     if (codexFrom && e.code === "Escape") { closeCodex(); e.preventDefault(); return; }
     if (codexFrom) return;
     if (!game || game.state.over) return;

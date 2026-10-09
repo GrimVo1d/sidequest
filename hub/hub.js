@@ -519,6 +519,12 @@ function bindDev() {
 
 // --- start -------------------------------------------------------------------------
 
+// Arrows and Enter in the hub's menus; a game in the frame handles its own keys.
+window.addEventListener("keydown", (e) => {
+  const overlay = [$("modal"), $("pause")].find((x) => !x.hidden);
+  SidequestKeys.handle(e, overlay || ($("game").hidden ? $("hub") : null));
+});
+
 window.addEventListener("error", (e) => {
   if (api) api.report_error(`${e.message} at ${e.filename}:${e.lineno}`);
 });

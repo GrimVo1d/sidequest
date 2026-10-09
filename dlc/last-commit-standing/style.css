@@ -136,3 +136,5 @@ button:disabled { opacity: 0.4; cursor: default; }
 #codex-list .icon { flex: none; width: 48px; display: flex; justify-content: center; }
 #codex-list .name { color: var(--accent); }
 #codex-list .text { font-size: 12px; }
+/* The button the arrow keys are on. */
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
