@@ -1,0 +1,13 @@
+// Серия из 8 упавших тестов подряд, потом тесты проходят.
+{"t": 0, "kind": "session_start", "joined": false, "source": "startup", "session": "a1", "project": "demo"}
+{"t": 1, "kind": "prompt", "session": "a1", "project": "demo"}
+{"t": 3, "kind": "tool_error", "tool": "Bash", "action": "cast", "category": "test", "ok": false, "exit_code": 1, "interrupted": false, "agent": null, "session": "a1", "project": "demo"}
+{"t": 7, "kind": "tool_error", "tool": "Bash", "action": "cast", "category": "test", "ok": false, "exit_code": 1, "interrupted": false, "agent": null, "session": "a1", "project": "demo"}
+{"t": 11, "kind": "tool_error", "tool": "Bash", "action": "cast", "category": "test", "ok": false, "exit_code": 1, "interrupted": false, "agent": null, "session": "a1", "project": "demo"}
+{"t": 15, "kind": "tool_error", "tool": "Bash", "action": "cast", "category": "test", "ok": false, "exit_code": 1, "interrupted": false, "agent": null, "session": "a1", "project": "demo"}
+{"t": 19, "kind": "tool_error", "tool": "Bash", "action": "cast", "category": "test", "ok": false, "exit_code": 1, "interrupted": false, "agent": null, "session": "a1", "project": "demo"}
+{"t": 23, "kind": "tool_error", "tool": "Bash", "action": "cast", "category": "test", "ok": false, "exit_code": 1, "interrupted": false, "agent": null, "session": "a1", "project": "demo"}
+{"t": 27, "kind": "tool_error", "tool": "Bash", "action": "cast", "category": "test", "ok": false, "exit_code": 1, "interrupted": false, "agent": null, "session": "a1", "project": "demo"}
+{"t": 31, "kind": "tool_error", "tool": "Bash", "action": "cast", "category": "test", "ok": false, "exit_code": 1, "interrupted": false, "agent": null, "session": "a1", "project": "demo"}
+{"t": 40, "kind": "tool", "tool": "Bash", "action": "cast", "ok": true, "agent": null, "category": "test", "session": "a1", "project": "demo"}
+{"t": 45, "kind": "stop", "ok": true, "background": 0, "final": true, "session": "a1", "project": "demo"}

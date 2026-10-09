@@ -1,0 +1,132 @@
+/* Pixel look without a pixel font yet (the font is still an open decision, PLAN.md 8):
+   hard edges, no rounding, no blur, offset shadows. */
+:root {
+  --bg: #1b1b2f;
+  --panel: #26264a;
+  --ink: #e8e6f0;
+  --muted: #8f8bb0;
+  --edge: #0d0d1a;
+  --accent: #e8d36a;
+  --green: #4fbf6f;
+  --yellow: #e8c14a;
+  --red: #d9534f;
+  --px: 2px;
+}
+
+* { box-sizing: border-box; border-radius: 0 !important; }
+html, body { margin: 0; height: 100%; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font: 14px/1.4 Menlo, Monaco, "Courier New", monospace;
+  -webkit-font-smoothing: none;
+  image-rendering: pixelated;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+button, select, input {
+  font: inherit;
+  color: var(--ink);
+  background: var(--panel);
+  border: var(--px) solid var(--edge);
+  box-shadow: var(--px) var(--px) 0 var(--edge);
+  padding: 4px 10px;
+}
+button { cursor: pointer; }
+button:hover { background: #33335f; }
+button:active { transform: translate(var(--px), var(--px)); box-shadow: none; }
+button.primary { background: #3f3f7a; color: var(--accent); }
+input[type=range] { box-shadow: none; border: none; background: transparent; padding: 0; }
+
+h2 { margin: 0 0 8px; font-size: 13px; color: var(--accent); text-transform: uppercase; letter-spacing: 1px; }
+
+.bar { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: var(--edge); }
+.bar.small { padding: 4px 8px; }
+.logo { font-weight: bold; letter-spacing: 3px; color: var(--accent); }
+.spacer { flex: 1; }
+
+.indicator { display: flex; align-items: center; gap: 6px; }
+.indicator .dot { width: 10px; height: 10px; background: var(--muted); box-shadow: var(--px) var(--px) 0 #000; }
+.indicator.green .dot { background: var(--green); }
+.indicator.yellow .dot { background: var(--yellow); }
+.indicator.red .dot { background: var(--red); }
+
+main { flex: 1; display: grid; grid-template-columns: 260px 1fr 320px; gap: 10px; padding: 10px; min-height: 0; }
+.col { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+.panel { background: var(--panel); border: var(--px) solid var(--edge); box-shadow: 4px 4px 0 var(--edge); padding: 10px; }
+.journal { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.journal .list { overflow-y: auto; flex: 1; }
+
+.profile { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.avatar { width: 96px; height: 96px; border: var(--px) solid var(--edge); cursor: pointer; }
+button.small { padding: 1px 8px; font-size: 11px; }
+canvas { image-rendering: pixelated; }
+
+/* Avatar editor. The checkerboard shows transparent pixels. */
+.dialog.wide { width: 780px; max-width: 95vw; }
+.av-editor { display: flex; gap: 16px; align-items: flex-start; }
+.av-side { width: 140px; flex: none; }
+.av-preview, .av-presets canvas, .av-swatch.none {
+  background: repeating-conic-gradient(#3a3a5e 0 25%, #2a2a4a 0 50%) 0 0 / 8px 8px;
+}
+.av-preview { width: 136px; height: 136px; border: var(--px) solid var(--edge); }
+.av-main { flex: 1; min-width: 0; }
+.av-tabs { display: flex; gap: 6px; margin-bottom: 10px; }
+.av-content { height: 400px; overflow-y: auto; }
+.av-tabs button.on, .av-content button.on { background: #3f3f7a; color: var(--accent); }
+.av-presets { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 6px; }
+.av-presets button { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 4px; font-size: 11px; }
+.av-presets canvas { width: 64px; height: 64px; }
+.av-row { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin: 4px 0; font-size: 12px; }
+.av-row .label { width: 104px; color: var(--muted); }
+.av-row button { padding: 1px 6px; font-size: 11px; }
+.av-row button.av-swatch { width: 18px; height: 18px; padding: 0; }
+.av-row button.av-swatch.on { outline: var(--px) solid var(--accent); outline-offset: 1px; }
+#profile-name { text-align: center; width: 100%; }
+dl { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; margin: 0; width: 100%; font-size: 12px; }
+dt { color: var(--muted); }
+dd { margin: 0; text-align: right; }
+
+.list { list-style: none; margin: 0; padding: 0; font-size: 12px; }
+.list li { padding: 3px 0; border-bottom: 1px solid #1f1f3d; }
+.mono { font-variant-numeric: tabular-nums; }
+.hint { color: var(--muted); font-size: 12px; margin: 6px 0 0; }
+.ok { color: var(--green); } .warn { color: var(--yellow); } .bad { color: var(--red); }
+.fix { color: var(--muted); padding-left: 16px; }
+
+.dlc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
+.dlc { background: #1f1f3d; border: var(--px) solid var(--edge); padding: 10px; display: flex; flex-direction: column; gap: 6px; }
+.dlc .name { color: var(--accent); }
+.dlc .card-stats { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; margin: 0;
+  font-size: 12px; }
+.dlc .card-stats dt { color: var(--muted); }
+.dlc .card-stats dd { margin: 0; text-align: right; }
+.tag { font-size: 11px; color: var(--muted); }
+
+/* While a DLC runs it has the whole window; only the dev panel stays. */
+body.playing > header { display: none; }
+#game { flex: 1; display: flex; flex-direction: column; min-height: 0; position: relative; }
+#game iframe { flex: 1; border: 0; background: #000; }
+.flag { color: var(--yellow); font-size: 12px; }
+#game-flag { position: absolute; right: 8px; bottom: 6px; pointer-events: none;
+  text-shadow: 1px 1px 0 #000; }
+
+.overlay { position: fixed; inset: 0; background: rgba(13, 13, 26, 0.75); display: flex; align-items: center; justify-content: center; z-index: 10; }
+.overlay[hidden], [hidden] { display: none !important; }
+.banner, .dialog { background: var(--panel); border: 4px solid var(--edge); box-shadow: 8px 8px 0 var(--edge); padding: 18px 24px; min-width: 420px; max-width: 640px; }
+.banner #pause-title { color: var(--accent); font-size: 16px; margin-bottom: 8px; }
+.banner ul { list-style: none; padding: 0; margin: 0 0 12px; }
+.banner li { display: flex; gap: 8px; align-items: center; margin: 4px 0; }
+.banner li span { flex: 1; }
+.actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }
+.dialog label { display: block; margin: 6px 0; }
+.dialog pre { max-height: 240px; overflow: auto; background: #1f1f3d; padding: 8px; font-size: 12px; }
+
+#dev { background: #14142a; border-top: 4px solid var(--edge); padding: 8px 12px; font-size: 12px; }
+#dev .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 4px 0; }
+#dev button, #dev select { padding: 2px 6px; }
+#dev-seek { flex: 1; min-width: 120px; }
+/* The button the arrow keys are on. */
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

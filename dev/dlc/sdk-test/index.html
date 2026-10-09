@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'">
+<title>Тест SDK</title>
+<link rel="stylesheet" href="test.css">
+</head>
+<body>
+<h1><canvas id="avatar"></canvas> Тест SDK <span id="pause">▶ идёт</span></h1>
+<p id="info"></p>
+<div class="row">
+  <button id="save">storage.set</button>
+  <button id="load">storage.get</button>
+  <button id="start">match.start</button>
+  <button id="end">match.end</button>
+  <button id="ach">achievement</button>
+  <button id="exit">exit</button>
+</div>
+<pre id="out"></pre>
+<ul id="log"></ul>
+<script src="../../../sdk/sidequest-sdk.js"></script>
+<script src="../../../sdk/avatar.js"></script>
+<script src="test.js"></script>
+</body>
+</html>

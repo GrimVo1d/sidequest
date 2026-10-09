@@ -1,0 +1,131 @@
+// Задача на 30 минут со случайными действиями и одним compaction посередине.
+{"t": 0, "kind": "session_start", "joined": false, "source": "startup", "session": "a1", "project": "demo"}
+{"t": 3, "kind": "prompt", "session": "a1", "project": "demo"}
+{"t": 13.1, "kind": "tool", "tool": "Edit", "action": "attack", "ok": true, "agent": null, "file": "src/api.py", "lines_added": 5, "lines_removed": 3, "session": "a1", "project": "demo"}
+{"t": 24.2, "kind": "tool", "tool": "Edit", "action": "attack", "ok": true, "agent": null, "file": "README.md", "lines_added": 14, "lines_removed": 1, "session": "a1", "project": "demo"}
+{"t": 29.1, "kind": "tool", "tool": "Read", "action": "scout", "ok": true, "agent": null, "file": "src/models.py", "session": "a1", "project": "demo"}
+{"t": 34.1, "kind": "tool", "tool": "Read", "action": "scout", "ok": true, "agent": null, "file": "README.md", "session": "a1", "project": "demo"}
+{"t": 39.8, "kind": "tool", "tool": "Edit", "action": "attack", "ok": true, "agent": null, "file": "README.md", "lines_added": 4, "lines_removed": 12, "session": "a1", "project": "demo"}
+{"t": 43.9, "kind": "tool", "tool": "Edit", "action": "attack", "ok": true, "agent": null, "file": "README.md", "lines_added": 9, "lines_removed": 9, "session": "a1", "project": "demo"}
+{"t": 56.1, "kind": "tool", "tool": "Read", "action": "scout", "ok": true, "agent": null, "file": "README.md", "session": "a1", "project": "demo"}
+{"t": 65.9, "kind": "tool_error", "tool": "Bash", "action": "cast", "category": "test", "ok": false, "exit_code": 1, "interrupted": false, "agent": null, "session": "a1", "project": "demo"}
+{"t": 72.9, "kind": "tool", "tool": "Read", "action": "scout", "ok": true, "agent": null, "file": "src/models.py", "session": "a1", "project": "demo"}
+{"t": 84.0, "kind": "tool", "tool": "Read", "action": "scout", "ok": true, "agent": null, "file": "src/api.py", "session": "a1", "project": "demo"}
+{"t": 99.5, "kind": "tool", "tool": "Bash", "action": "cast", "ok": true, "agent": null, "category": "build", "session": "a1", "project": "demo"}
+{"t": 117.4, "kind": "tool", "tool": "Read", "action": "scout", "ok": true, "agent": null, "file": "src/views.py", "session": "a1", "project": "demo"}
+{"t": 130.7, "kind": "tool", "tool": "Write", "action": "attack", "ok": true, "agent": null, "file": "src/new_130.py", "lines_added": 56, "lines_removed": 0, "session": "a1", "project": "demo"}
+{"t": 140.3, "kind": "tool", "tool": "Bash", "action": "cast", "ok": true, "agent": null, "category": "other", "session": "a1", "project": "demo"}
+{"t": 145.1, "kind": "tool", "tool": "Edit", "action": "attack", "ok": true, "agent": null, "file": "tests/test_api.py", "lines_added": 22, "lines_removed": 14, "session": "a1", "project": "demo"}
+{"t": 154.4, "kind": "tool", "tool": "Write", "action": "attack", "ok": true, "agent": null, "file": "src/new_154.py", "lines_added": 25, "lines_removed": 0, "session": "a1", "project": "demo"}
+{"t": 168.7, "kind": "tool", "tool": "Edit", "action": "attack", "ok": true, "agent": null, "file": "src/views.py", "lines_added": 10, "lines_removed": 15, "session": "a1", "project": "demo"}
+{"t": 180.9, "kind": "tool", "tool": "Write", "action": "attack", "ok": true, "agent": null, "file": "src/new_180.py", "lines_added": 19, "lines_removed": 0, "session": "a1", "project": "demo"}
+{"t": 200.8, "kind": "tool", "tool": "Read", "action": "scout", "ok": true, "agent": null, "file": "src/views.py", "session": "a1", "project": "demo"}
+{"t": 211.2, "kind": "tool", "tool": "Read", "action": "scout", "ok": true, "agent": null, "file": "tests/test_api.py", "session": "a1", "project": "demo"}
+{"t": 227.0, "kind": "tool", "tool": "Read", "action": "scout", "ok": true, "agent": null, "file": "src/api.py", "session": "a1", "project": "demo"}
+{"t": 250.8, "kind": "tool", "tool": "Read", "action": "scout", "ok": true, "agent": null, "file": "src/api.py", "session": "a1", "project": "demo"}
+{"t": 255.1, "kind": "tool", "tool": "Bash", "action": "cast", "ok": true, "agent": null, "category": "build", "session": "a1", "project": "demo"}
+{"t": 264.4, "kind": "tool", "tool": "Read", "action": "scout", "ok": true, "agent": null, "file": "src/views.py", "session": "a1", "project": "demo"}
+{"t": 267.9, "kind": "tool", "tool": "Read", "action": "scout", "ok": true, "agent": null, "file": "src/models.py", "session": "a1", "project": "demo"}
+{"t": 284.3, "kind": "tool", "tool": "Read", "action": "scout", "ok": true, "agent": null, "file": "src/models.py", "session": "a1", "project": "demo"}
+{"t": 304.2, "kind": "tool", "tool": "Edit", "action": "attack", "ok": true, "agent": null, "file": "src/models.py", "lines_added": 26, "lines_removed": 12, "session": "a1", "project": "demo"}
+{"t": 327.4, "kind": "tool", "tool": "Read", "action": "scout", "ok": true, "agent": null, "file": "src/models.py", "session": "a1", "project": "demo"}
+{"t": 340.3, "kind": "tool", "tool": "Read", "action": "scout", "ok": true, "agent": null, "file": "src/models.py", "session": "a1", "project": "demo"}
+{"t": 361.3, "kind": "tool_error", "tool": "Bash", "action": "cast", "category": "test", "ok": false, "exit_code": 1, "interrupted": false, "agent": null, "session": "a1", "project": "demo"}
+{"t": 370.4, "kind": "tool", "tool": "Read", "action": "scout", "ok": true, "agent": null, "file": "src/views.py", "session": "a1", "project": "demo"}
+{"t": 388.4, "kind": "tool", "tool": "Read", "action": "scout", "ok": true, "agent": null, "file": "src/models.py", "session": "a1", "project": "demo"}
+{"t": 394.8, "kind": "tool", "tool": "Edit", "action": "attack", "ok": true, "agent": null, "file": "src/models.py", "lines_added": 15, "lines_removed": 0, "session": "a1", "project": "demo"}
+{"t": 408.4, "kind": "tool", "tool": "Read", "action": "scout", "ok": true, "agent": null, "file": "src/views.py", "session": "a1", "project": "demo"}
+{"t": 417.6, "kind": "tool", "tool": "Edit", "action": "attack", "ok": true, "agent": null, "file": "README.md", "lines_added": 24, "lines_removed": 10, "session": "a1", "project": "demo"}
+{"t": 441.6, "kind": "tool", "tool": "Bash", "action": "cast", "ok": true, "agent": null, "category": "test", "session": "a1", "project": "demo"}
+{"t": 454.7, "kind": "tool_error", "tool": "Bash", "action": "cast", "category": "test", "ok": false, "exit_code": 1, "interrupted": false, "agent": null, "session": "a1", "project": "demo"}
+{"t": 478.6, "kind": "tool", "tool": "Bash", "action": "cast", "ok": true, "agent": null, "category": "build", "session": "a1", "project": "demo"}
+{"t": 490.3, "kind": "tool", "tool": "Read", "action": "scout", "ok": true, "agent": null, "file": "tests/test_api.py", "session": "a1", "project": "demo"}
+{"t": 507.3, "kind": "tool", "tool": "Edit", "action": "attack", "ok": true, "agent": null, "file": "src/api.py", "lines_added": 14, "lines_removed": 14, "session": "a1", "project": "demo"}
+{"t": 513.9, "kind": "tool", "tool": "Edit", "action": "attack", "ok": true, "agent": null, "file": "src/api.py", "lines_added": 7, "lines_removed": 0, "session": "a1", "project": "demo"}
+{"t": 529.3, "kind": "tool", "tool": "Read", "action": "scout", "ok": true, "agent": null, "file": "src/views.py", "session": "a1", "project": "demo"}
+{"t": 545.8, "kind": "tool", "tool": "Edit", "action": "attack", "ok": true, "agent": null, "file": "src/models.py", "lines_added": 40, "lines_removed": 12, "session": "a1", "project": "demo"}
+{"t": 552.1, "kind": "tool", "tool": "Edit", "action": "attack", "ok": true, "agent": null, "file": "src/views.py", "lines_added": 39, "lines_removed": 11, "session": "a1", "project": "demo"}
+{"t": 565.5, "kind": "tool", "tool": "Edit", "action": "attack", "ok": true, "agent": null, "file": "tests/test_api.py", "lines_added": 30, "lines_removed": 15, "session": "a1", "project": "demo"}
+{"t": 579.2, "kind": "tool", "tool": "Edit", "action": "attack", "ok": true, "agent": null, "file": "src/api.py", "lines_added": 22, "lines_removed": 8, "session": "a1", "project": "demo"}
+{"t": 592.7, "kind": "tool", "tool": "Bash", "action": "cast", "ok": true, "agent": null, "category": "test", "session": "a1", "project": "demo"}
+{"t": 600.2, "kind": "tool", "tool": "Write", "action": "attack", "ok": true, "agent": null, "file": "src/new_600.py", "lines_added": 56, "lines_removed": 0, "session": "a1", "project": "demo"}
+{"t": 606.5, "kind": "tool", "tool": "Read", "action": "scout", "ok": true, "agent": null, "file": "src/api.py", "session": "a1", "project": "demo"}
+{"t": 626.1, "kind": "tool", "tool": "Edit", "action": "attack", "ok": true, "agent": null, "file": "src/api.py", "lines_added": 17, "lines_removed": 11, "session": "a1", "project": "demo"}
+{"t": 649.1, "kind": "tool", "tool": "Read", "action": "scout", "ok": true, "agent": null, "file": "src/models.py", "session": "a1", "project": "demo"}
+{"t": 663.8, "kind": "tool", "tool": "Bash", "action": "cast", "ok": true, "agent": null, "category": "git", "session": "a1", "project": "demo"}
+{"t": 680.8, "kind": "tool", "tool": "Bash", "action": "cast", "ok": true, "agent": null, "category": "other", "session": "a1", "project": "demo"}
+{"t": 701.6, "kind": "tool_error", "tool": "Bash", "action": "cast", "category": "test", "ok": false, "exit_code": 1, "interrupted": false, "agent": null, "session": "a1", "project": "demo"}
+{"t": 720.9, "kind": "tool", "tool": "Edit", "action": "attack", "ok": true, "agent": null, "file": "README.md", "lines_added": 32, "lines_removed": 11, "session": "a1", "project": "demo"}
+{"t": 739.9, "kind": "tool", "tool": "Write", "action": "attack", "ok": true, "agent": null, "file": "src/new_739.py", "lines_added": 45, "lines_removed": 0, "session": "a1", "project": "demo"}
+{"t": 753.3, "kind": "tool", "tool": "Edit", "action": "attack", "ok": true, "agent": null, "file": "README.md", "lines_added": 23, "lines_removed": 14, "session": "a1", "project": "demo"}
+{"t": 774.1, "kind": "tool", "tool": "Bash", "action": "cast", "ok": true, "agent": null, "category": "git", "session": "a1", "project": "demo"}
+{"t": 798.1, "kind": "tool", "tool": "Read", "action": "scout", "ok": true, "agent": null, "file": "src/models.py", "session": "a1", "project": "demo"}
+{"t": 803.4, "kind": "tool", "tool": "Read", "action": "scout", "ok": true, "agent": null, "file": "src/views.py", "session": "a1", "project": "demo"}
+{"t": 810.9, "kind": "tool", "tool": "Bash", "action": "cast", "ok": true, "agent": null, "category": "test", "session": "a1", "project": "demo"}
+{"t": 824.4, "kind": "tool", "tool": "Bash", "action": "cast", "ok": true, "agent": null, "category": "test", "session": "a1", "project": "demo"}
+{"t": 845.8, "kind": "tool", "tool": "Edit", "action": "attack", "ok": true, "agent": null, "file": "tests/test_api.py", "lines_added": 13, "lines_removed": 15, "session": "a1", "project": "demo"}
+{"t": 868.3, "kind": "tool", "tool": "Read", "action": "scout", "ok": true, "agent": null, "file": "src/views.py", "session": "a1", "project": "demo"}
+{"t": 873.2, "kind": "tool", "tool": "Write", "action": "attack", "ok": true, "agent": null, "file": "src/new_873.py", "lines_added": 60, "lines_removed": 0, "session": "a1", "project": "demo"}
+{"t": 886.4, "kind": "tool", "tool": "Bash", "action": "cast", "ok": true, "agent": null, "category": "test", "session": "a1", "project": "demo"}
+{"t": 887.4, "kind": "compact", "phase": "start", "trigger": "auto", "session": "a1", "project": "demo"}
+{"t": 926.4, "kind": "compact", "phase": "end", "trigger": "auto", "session": "a1", "project": "demo"}
+{"t": 946.4, "kind": "tool", "tool": "Edit", "action": "attack", "ok": true, "agent": null, "file": "src/models.py", "lines_added": 2, "lines_removed": 4, "session": "a1", "project": "demo"}
+{"t": 962.4, "kind": "tool", "tool": "Read", "action": "scout", "ok": true, "agent": null, "file": "src/models.py", "session": "a1", "project": "demo"}
+{"t": 978.8, "kind": "tool", "tool": "Read", "action": "scout", "ok": true, "agent": null, "file": "tests/test_api.py", "session": "a1", "project": "demo"}
+{"t": 996.3, "kind": "tool", "tool": "Read", "action": "scout", "ok": true, "agent": null, "file": "README.md", "session": "a1", "project": "demo"}
+{"t": 1011.4, "kind": "tool", "tool": "Edit", "action": "attack", "ok": true, "agent": null, "file": "src/api.py", "lines_added": 34, "lines_removed": 4, "session": "a1", "project": "demo"}
+{"t": 1023.9, "kind": "tool_error", "tool": "Bash", "action": "cast", "category": "test", "ok": false, "exit_code": 1, "interrupted": false, "agent": null, "session": "a1", "project": "demo"}
+{"t": 1045.1, "kind": "tool", "tool": "Edit", "action": "attack", "ok": true, "agent": null, "file": "src/views.py", "lines_added": 14, "lines_removed": 9, "session": "a1", "project": "demo"}
+{"t": 1059.1, "kind": "tool", "tool": "Bash", "action": "cast", "ok": true, "agent": null, "category": "git", "session": "a1", "project": "demo"}
+{"t": 1067.8, "kind": "tool", "tool": "Read", "action": "scout", "ok": true, "agent": null, "file": "src/models.py", "session": "a1", "project": "demo"}
+{"t": 1072.1, "kind": "tool", "tool": "Bash", "action": "cast", "ok": true, "agent": null, "category": "build", "session": "a1", "project": "demo"}
+{"t": 1089.7, "kind": "tool_error", "tool": "Bash", "action": "cast", "category": "test", "ok": false, "exit_code": 1, "interrupted": false, "agent": null, "session": "a1", "project": "demo"}
+{"t": 1104.1, "kind": "tool_error", "tool": "Bash", "action": "cast", "category": "test", "ok": false, "exit_code": 1, "interrupted": false, "agent": null, "session": "a1", "project": "demo"}
+{"t": 1126.4, "kind": "tool", "tool": "Edit", "action": "attack", "ok": true, "agent": null, "file": "src/models.py", "lines_added": 34, "lines_removed": 0, "session": "a1", "project": "demo"}
+{"t": 1148.6, "kind": "tool", "tool": "Bash", "action": "cast", "ok": true, "agent": null, "category": "test", "session": "a1", "project": "demo"}
+{"t": 1168.7, "kind": "tool", "tool": "Edit", "action": "attack", "ok": true, "agent": null, "file": "src/models.py", "lines_added": 31, "lines_removed": 3, "session": "a1", "project": "demo"}
+{"t": 1183.9, "kind": "tool", "tool": "Edit", "action": "attack", "ok": true, "agent": null, "file": "README.md", "lines_added": 34, "lines_removed": 15, "session": "a1", "project": "demo"}
+{"t": 1204.2, "kind": "tool", "tool": "Edit", "action": "attack", "ok": true, "agent": null, "file": "README.md", "lines_added": 4, "lines_removed": 7, "session": "a1", "project": "demo"}
+{"t": 1211.4, "kind": "tool", "tool": "Edit", "action": "attack", "ok": true, "agent": null, "file": "src/api.py", "lines_added": 33, "lines_removed": 14, "session": "a1", "project": "demo"}
+{"t": 1226.7, "kind": "tool", "tool": "Bash", "action": "cast", "ok": true, "agent": null, "category": "test", "session": "a1", "project": "demo"}
+{"t": 1239.5, "kind": "tool", "tool": "Bash", "action": "cast", "ok": true, "agent": null, "category": "other", "session": "a1", "project": "demo"}
+{"t": 1257.7, "kind": "tool", "tool": "Read", "action": "scout", "ok": true, "agent": null, "file": "README.md", "session": "a1", "project": "demo"}
+{"t": 1278.5, "kind": "tool", "tool": "Read", "action": "scout", "ok": true, "agent": null, "file": "src/models.py", "session": "a1", "project": "demo"}
+{"t": 1296.9, "kind": "tool_error", "tool": "Bash", "action": "cast", "category": "test", "ok": false, "exit_code": 1, "interrupted": false, "agent": null, "session": "a1", "project": "demo"}
+{"t": 1320.6, "kind": "tool", "tool": "Edit", "action": "attack", "ok": true, "agent": null, "file": "README.md", "lines_added": 13, "lines_removed": 14, "session": "a1", "project": "demo"}
+{"t": 1326.6, "kind": "tool", "tool": "Edit", "action": "attack", "ok": true, "agent": null, "file": "tests/test_api.py", "lines_added": 21, "lines_removed": 2, "session": "a1", "project": "demo"}
+{"t": 1344.4, "kind": "tool", "tool": "Read", "action": "scout", "ok": true, "agent": null, "file": "src/models.py", "session": "a1", "project": "demo"}
+{"t": 1362.1, "kind": "tool", "tool": "Bash", "action": "cast", "ok": true, "agent": null, "category": "other", "session": "a1", "project": "demo"}
+{"t": 1385.8, "kind": "tool", "tool": "Bash", "action": "cast", "ok": true, "agent": null, "category": "git", "session": "a1", "project": "demo"}
+{"t": 1391.9, "kind": "tool_error", "tool": "Bash", "action": "cast", "category": "test", "ok": false, "exit_code": 1, "interrupted": false, "agent": null, "session": "a1", "project": "demo"}
+{"t": 1416.2, "kind": "tool", "tool": "Edit", "action": "attack", "ok": true, "agent": null, "file": "src/api.py", "lines_added": 26, "lines_removed": 15, "session": "a1", "project": "demo"}
+{"t": 1422.8, "kind": "tool", "tool": "Bash", "action": "cast", "ok": true, "agent": null, "category": "other", "session": "a1", "project": "demo"}
+{"t": 1429.4, "kind": "tool", "tool": "Read", "action": "scout", "ok": true, "agent": null, "file": "README.md", "session": "a1", "project": "demo"}
+{"t": 1441.2, "kind": "tool", "tool": "Read", "action": "scout", "ok": true, "agent": null, "file": "src/views.py", "session": "a1", "project": "demo"}
+{"t": 1451.2, "kind": "tool", "tool": "Bash", "action": "cast", "ok": true, "agent": null, "category": "test", "session": "a1", "project": "demo"}
+{"t": 1461.7, "kind": "tool", "tool": "Read", "action": "scout", "ok": true, "agent": null, "file": "src/api.py", "session": "a1", "project": "demo"}
+{"t": 1473.1, "kind": "tool", "tool": "Read", "action": "scout", "ok": true, "agent": null, "file": "src/views.py", "session": "a1", "project": "demo"}
+{"t": 1487.4, "kind": "tool", "tool": "Edit", "action": "attack", "ok": true, "agent": null, "file": "src/models.py", "lines_added": 7, "lines_removed": 2, "session": "a1", "project": "demo"}
+{"t": 1496.2, "kind": "tool", "tool": "Edit", "action": "attack", "ok": true, "agent": null, "file": "src/models.py", "lines_added": 18, "lines_removed": 4, "session": "a1", "project": "demo"}
+{"t": 1517.3, "kind": "tool_error", "tool": "Bash", "action": "cast", "category": "test", "ok": false, "exit_code": 1, "interrupted": false, "agent": null, "session": "a1", "project": "demo"}
+{"t": 1535.2, "kind": "tool", "tool": "Write", "action": "attack", "ok": true, "agent": null, "file": "src/new_1535.py", "lines_added": 61, "lines_removed": 0, "session": "a1", "project": "demo"}
+{"t": 1541.4, "kind": "tool", "tool": "Write", "action": "attack", "ok": true, "agent": null, "file": "src/new_1541.py", "lines_added": 73, "lines_removed": 0, "session": "a1", "project": "demo"}
+{"t": 1559.8, "kind": "tool", "tool": "Edit", "action": "attack", "ok": true, "agent": null, "file": "src/api.py", "lines_added": 12, "lines_removed": 13, "session": "a1", "project": "demo"}
+{"t": 1582.5, "kind": "tool", "tool": "Edit", "action": "attack", "ok": true, "agent": null, "file": "src/api.py", "lines_added": 6, "lines_removed": 8, "session": "a1", "project": "demo"}
+{"t": 1587.4, "kind": "tool_error", "tool": "Bash", "action": "cast", "category": "test", "ok": false, "exit_code": 1, "interrupted": false, "agent": null, "session": "a1", "project": "demo"}
+{"t": 1591.9, "kind": "tool_error", "tool": "Bash", "action": "cast", "category": "test", "ok": false, "exit_code": 1, "interrupted": false, "agent": null, "session": "a1", "project": "demo"}
+{"t": 1604.8, "kind": "tool", "tool": "Edit", "action": "attack", "ok": true, "agent": null, "file": "README.md", "lines_added": 27, "lines_removed": 8, "session": "a1", "project": "demo"}
+{"t": 1621.5, "kind": "tool", "tool": "Edit", "action": "attack", "ok": true, "agent": null, "file": "src/models.py", "lines_added": 8, "lines_removed": 5, "session": "a1", "project": "demo"}
+{"t": 1630.3, "kind": "tool", "tool": "Edit", "action": "attack", "ok": true, "agent": null, "file": "src/views.py", "lines_added": 20, "lines_removed": 6, "session": "a1", "project": "demo"}
+{"t": 1639.7, "kind": "tool", "tool": "Read", "action": "scout", "ok": true, "agent": null, "file": "src/models.py", "session": "a1", "project": "demo"}
+{"t": 1648.6, "kind": "tool_error", "tool": "Bash", "action": "cast", "category": "test", "ok": false, "exit_code": 1, "interrupted": false, "agent": null, "session": "a1", "project": "demo"}
+{"t": 1673.5, "kind": "tool", "tool": "Edit", "action": "attack", "ok": true, "agent": null, "file": "src/api.py", "lines_added": 33, "lines_removed": 6, "session": "a1", "project": "demo"}
+{"t": 1687.8, "kind": "tool", "tool": "Edit", "action": "attack", "ok": true, "agent": null, "file": "tests/test_api.py", "lines_added": 7, "lines_removed": 13, "session": "a1", "project": "demo"}
+{"t": 1705.2, "kind": "tool", "tool": "Read", "action": "scout", "ok": true, "agent": null, "file": "tests/test_api.py", "session": "a1", "project": "demo"}
+{"t": 1729.6, "kind": "tool", "tool": "Edit", "action": "attack", "ok": true, "agent": null, "file": "src/models.py", "lines_added": 15, "lines_removed": 10, "session": "a1", "project": "demo"}
+{"t": 1737.0, "kind": "tool_error", "tool": "Bash", "action": "cast", "category": "test", "ok": false, "exit_code": 1, "interrupted": false, "agent": null, "session": "a1", "project": "demo"}
+{"t": 1756.0, "kind": "tool", "tool": "Edit", "action": "attack", "ok": true, "agent": null, "file": "src/views.py", "lines_added": 4, "lines_removed": 4, "session": "a1", "project": "demo"}
+{"t": 1759.3, "kind": "tool", "tool": "Bash", "action": "cast", "ok": true, "agent": null, "category": "git", "session": "a1", "project": "demo"}
+{"t": 1771.8, "kind": "tool", "tool": "Edit", "action": "attack", "ok": true, "agent": null, "file": "tests/test_api.py", "lines_added": 33, "lines_removed": 9, "session": "a1", "project": "demo"}
+{"t": 1788.0, "kind": "tool", "tool": "Bash", "action": "cast", "ok": true, "agent": null, "category": "test", "session": "a1", "project": "demo"}
+{"t": 1800, "kind": "stop", "ok": true, "background": 0, "final": true, "session": "a1", "project": "demo"}

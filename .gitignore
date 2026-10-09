@@ -1,0 +1,11 @@
+
+# Game data: database, socket, DLC saves
+data/
+
+# Temporary files of the test suite
+.tmp/
+__pycache__/
+.venv/
+
+# macOS
+.DS_Store

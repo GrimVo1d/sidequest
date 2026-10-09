@@ -1,0 +1,10 @@
+// Задача на 30 секунд: чтение, правки, тесты, финал.
+{"t": 0, "kind": "session_start", "joined": false, "source": "startup", "session": "a1", "project": "demo"}
+{"t": 2, "kind": "prompt", "session": "a1", "project": "demo"}
+{"t": 5, "kind": "tool", "tool": "Read", "action": "scout", "ok": true, "agent": null, "file": "src/app.py", "session": "a1", "project": "demo"}
+{"t": 9, "kind": "tool", "tool": "Edit", "action": "attack", "ok": true, "agent": null, "file": "src/app.py", "lines_added": 6, "lines_removed": 2, "session": "a1", "project": "demo"}
+{"t": 14, "kind": "tool", "tool": "Bash", "action": "cast", "ok": true, "agent": null, "category": "test", "session": "a1", "project": "demo"}
+{"t": 20, "kind": "tool", "tool": "Edit", "action": "attack", "ok": true, "agent": null, "file": "tests/test_app.py", "lines_added": 12, "lines_removed": 0, "session": "a1", "project": "demo"}
+{"t": 25, "kind": "tool", "tool": "Bash", "action": "cast", "ok": true, "agent": null, "category": "test", "session": "a1", "project": "demo"}
+{"t": 30, "kind": "stop", "ok": true, "background": 0, "final": true, "session": "a1", "project": "demo"}
+{"t": 40, "kind": "session_end", "reason": "prompt_input_exit", "session": "a1", "project": "demo"}
