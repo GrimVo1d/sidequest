@@ -29,10 +29,10 @@ button.primary { background: #3d3270; border-color: var(--accent); }
 #multiplier { color: var(--green); }
 /* The panel at the bottom middle: the build, then the buffs. */
 #panel { position: fixed; left: 50%; bottom: 10px; transform: translateX(-50%); display: flex;
-  flex-direction: column; align-items: center; gap: 4px; padding: 5px 8px;
-  background: rgba(31, 31, 61, 0.75); border: 2px solid var(--edge); }
+  flex-direction: column; align-items: center; gap: 8px; padding: 8px 12px;
+  background: rgba(31, 31, 61, 0.8); border: 2px solid var(--edge); font-size: 15px; }
 #panel:has(#build:empty):has(#buffs:empty) { display: none; }
-#buffs { display: flex; gap: 10px; align-items: center; font-size: 12px;
+#buffs { display: flex; gap: 12px; align-items: center;
   text-shadow: 1px 1px 0 var(--edge); }
 #buffs:empty { display: none; }
 #buffs .buff { display: flex; gap: 4px; align-items: center; color: var(--accent); }
@@ -43,25 +43,25 @@ button.primary { background: #3d3270; border-color: var(--accent); }
 #buffs .ending { animation: ending 0.25s steps(1) infinite; }
 @keyframes ending { 50% { opacity: 0.3; } }
 /* The build: weapons, then passives, each with its level. */
-#build { display: flex; gap: 12px; }
+#build { display: flex; gap: 16px; }
 #build:empty { display: none; }
-#build .slots { display: flex; gap: 3px; }
+#build .slots { display: flex; gap: 5px; }
 /* An empty group would still take the gap and push the panel off centre. */
 #build .slots:empty { display: none; }
-#build .slot { position: relative; width: 28px; height: 28px; display: flex; align-items: center;
+#build .slot { position: relative; width: 44px; height: 44px; display: flex; align-items: center;
   justify-content: center; background: rgba(31, 31, 61, 0.8); border: 2px solid var(--edge); }
 #build .slot.gold { border-color: var(--accent); }
-#build .lv { position: absolute; right: 1px; bottom: -2px; font-size: 10px; color: var(--accent);
+#build .lv { position: absolute; right: 2px; bottom: -2px; font-size: 13px; color: var(--accent);
   text-shadow: 1px 1px 0 var(--edge); }
 #allies { list-style: none; margin: 6px 0 0; padding: 0; font-size: 12px;
   text-shadow: 1px 1px 0 var(--edge); position: fixed; left: 10px; top: 20px; }
 #allies li { display: flex; gap: 6px; align-items: center; }
 #allies .swatch { width: 8px; height: 8px; border: 1px solid var(--edge); }
 #allies .state { color: var(--dim); }
-#notice { position: fixed; left: 0; right: 0; bottom: 96px; text-align: center; color: var(--accent);
+#notice { position: fixed; left: 0; right: 0; bottom: 128px; text-align: center; color: var(--accent);
   text-shadow: 1px 1px 0 var(--edge); }
 /* The first time something shows up: what it is and what it does. */
-#tip { position: fixed; left: 50%; bottom: 122px; transform: translateX(-50%); width: 420px;
+#tip { position: fixed; left: 50%; bottom: 154px; transform: translateX(-50%); width: 420px;
   display: flex; gap: 10px; align-items: center; padding: 8px 10px; background: var(--panel);
   border: 2px solid var(--accent); box-shadow: 3px 3px 0 var(--edge); }
 #tip-icon { flex: none; }

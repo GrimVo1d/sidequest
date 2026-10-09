@@ -562,7 +562,7 @@
       clear(box);
       for (const b of list) {
         const chip = el("span", null, "buff" + (b.cls ? " " + b.cls : ""));
-        if (b.icon) chip.appendChild(iconCanvas(b.icon, 22));
+        if (b.icon) chip.appendChild(iconCanvas(b.icon, 28));
         chip.appendChild(el("span"));
         box.appendChild(chip);
       }
@@ -582,7 +582,7 @@
     clear(box);
     const slot = (icon, level, gold, title) => {
       const item = el("span", null, "slot" + (gold ? " gold" : ""));
-      item.appendChild(iconCanvas(icon, 24, gold));
+      item.appendChild(iconCanvas(icon, 38, gold));
       item.appendChild(el("span", gold ? "★" : String(level), "lv"));
       item.title = title;
       return item;
