@@ -64,11 +64,14 @@
     const target = current || first(scope, list);
     const index = list.indexOf(target);
     target.click();
-    // A click that redraws the buttons (a mode, a tab) keeps the focus at the same place.
+    // A click that redraws the buttons (a mode, a tab) keeps the focus at the same place;
+    // one that closes the screen lets the focus go, so no hidden button keeps it.
     if (!document.contains(target)) {
       const again = targets(scope);
       const to = again[Math.min(index, again.length - 1)];
       if (to) to.focus();
+    } else if (!centre(target).w) {
+      target.blur();
     }
     return true;
   }
