@@ -234,6 +234,15 @@
       }
     }
 
+    // No wall between a point and (x, y) for a circle of radius r: checked every few pixels.
+    function clearPath(o, x, y, r) {
+      const n = Math.ceil(Math.hypot(x - o.x, y - o.y) / 6);
+      for (let i = 1; i <= n; i++) {
+        if (inWall(o.x + (x - o.x) * i / n, o.y + (y - o.y) * i / n, r)) return false;
+      }
+      return true;
+    }
+
     // Enemies find their way around walls along a distance field: a breadth-first search
     // over 16 px cells from the player's cell, redone when the player changes cell.
     const FCELL = 16, FW = Math.ceil(W / FCELL), FH = Math.ceil(H / FCELL);
@@ -1500,14 +1509,24 @@
         a.blocked = Math.max(0, a.blocked - dt);
         a.meditate = Math.max(0, a.meditate - dt);
         const angle = a.slot * 2.4 + Math.PI * 0.75;
-        const tx = p.x + Math.cos(angle) * B.ally.follow_distance;
-        const ty = p.y + Math.sin(angle) * B.ally.follow_distance;
+        let tx = p.x + Math.cos(angle) * B.ally.follow_distance;
+        let ty = p.y + Math.sin(angle) * B.ally.follow_distance;
+        // A wall in the way: around it along the enemies' path to the player.
+        if (WALLS.length && !clearPath(a, tx, ty, a.r)) {
+          updateFlow();
+          const w = waypoint(a);
+          tx = w.x;
+          ty = w.y;
+        }
         const d = Math.hypot(tx - a.x, ty - a.y);
         if (d > 1 && a.stun <= 0) {
           const step = Math.min(d, B.ally.speed * dt * Math.max(1, d / 40));
           a.x += (tx - a.x) / d * step;
           a.y += (ty - a.y) / d * step;
         }
+        pushOut(a, a.r);
+        a.x = clamp(a.x, a.r, W - a.r);
+        a.y = clamp(a.y, a.r, H - a.r);
         for (const [id, sp] of a.spirits) {
           if (s.time > sp.until) { a.spirits.delete(id); continue; }
           sp.angle += 3 * dt;

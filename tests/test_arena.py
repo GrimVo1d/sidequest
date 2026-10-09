@@ -268,6 +268,11 @@ class ArenaTest(unittest.TestCase):
         self.assertIsNotNone(path["reached"])
         self.assertLess(path["reached"], path["straight"] * 2)
 
+    def test_agents_go_round_walls(self):
+        a = self.result["allyWalls"]
+        self.assertEqual(a["inside"], 0)
+        self.assertIsNotNone(a["near"])  # reached the player through the door
+
     def test_no_agent_no_finale(self):
         idle = self.result["idle"]
         self.assertFalse(idle["over"])

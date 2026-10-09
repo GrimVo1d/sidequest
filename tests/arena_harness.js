@@ -139,6 +139,24 @@ for (const map of LCS_MAPS) result.maps[map.id] = play(two, 700, 9, map);
   result.pathfinding = {reached, straight: Math.hypot(1400 - 200, 300 - 600) / 40};
 }
 
+// An agent behind a wall from the player goes round it, never through it.
+{
+  const game = LCS.createGame(balance, {seed: 4, map: LCS_MAPS.find((m) => m.id === "legacy")});
+  const s = game.state;
+  game.dev.immortal();
+  game.agentEvent({kind: "prompt", session: "w", project: "w"});
+  const a = s.allies[0];
+  Object.assign(s.player, {x: 700, y: 200});
+  Object.assign(a, {x: 400, y: 200});
+  let inside = 0, near = null;
+  while (s.time < 30) {
+    game.step(DT, {x: 0, y: 0});
+    if (inWall(s, a)) inside++;
+    if (near === null && Math.hypot(a.x - s.player.x, a.y - s.player.y) < 80) near = s.time;
+  }
+  result.allyWalls = {inside, near};
+}
+
 // --- classic: alone, experience from crystals, a final boss ---------------------------
 
 const tweak = (f) => { const B = JSON.parse(JSON.stringify(balance)); f(B); return B; };
