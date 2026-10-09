@@ -137,8 +137,8 @@ def check_version(verified):
     version = claude_version()
     if version is None:
         return Result(t("Версия Claude Code", "Claude Code version"), False,
-                      t("claude не найден или не ответил за 3 с",
-                        "claude not found or no answer in 3 s"),
+                      t("claude не найден или не ответил за 3 сек",
+                        "claude not found or no answer in 3 sec"),
                       t("Проверьте, что Claude Code установлен",
                         "Check that Claude Code is installed")), None
     if version == verified:
@@ -194,7 +194,7 @@ def check_pipeline(emit_path, probe, timeout=1.0):
                       t("Проверьте hooks/sidequest-emit.sh", "Check hooks/sidequest-emit.sh"))
     if not probe.wait(timeout):
         return Result(t("Конвейер", "Pipeline"), False,
-                      t("событие не дошло до сокета за 1 с", "the event did not reach the socket in 1 s"),
+                      t("событие не дошло до сокета за 1 сек", "the event did not reach the socket in 1 sec"),
                       t("Перезапустите Sidequest", "Restart Sidequest"))
     if elapsed_ms > SLOW_HOOK_MS:
         return Result(t("Конвейер", "Pipeline"), True,

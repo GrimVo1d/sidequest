@@ -70,7 +70,7 @@ function describe(e) {
     }
     case "blocked": return `${t("запрет", "blocked")} · ${e.tool || "?"} · ${pair(BLOCK_REASONS, e.reason)}`;
     case "waiting": return `${t("ждёт ответа", "waiting for an answer")} · ${e.tool || ""}`;
-    case "silent": return t(`агент молчит ${e.seconds} с`, `agent silent for ${e.seconds} s`);
+    case "silent": return t(`агент молчит ${e.seconds} сек`, `agent silent for ${e.seconds} sec`);
     case "resumed": return e.source === "button" ? t("продолжено кнопкой", "resumed with the button")
       : t("продолжил", "resumed");
     case "compact": return e.phase === "start" ? "compaction…" : t("compaction закончен", "compaction done");
@@ -486,7 +486,7 @@ async function devPoll() {
   const r = await api.dev_replay_control("position");
   if (!r) { replayInfo = null; return; }
   $("dev-seek").value = r.position;
-  $("dev-pos").textContent = `${r.position.toFixed(1)} / ${r.duration.toFixed(1)} с`;
+  $("dev-pos").textContent = `${r.position.toFixed(1)} / ${r.duration.toFixed(1)} сек`;
 }
 
 let devPaused = false;
