@@ -14,6 +14,11 @@ from .receiver import Receiver
 SILENCE_TICK = 1.0
 
 
+# Kinds that show a session is busy with a task.
+WORK_KINDS = frozenset({"prompt", "tool", "tool_error", "blocked", "waiting", "subagent_start",
+                        "compact"})
+
+
 class Core:
     def __init__(self, db_path=paths.DB_PATH, socket_path=paths.SOCKET_PATH,
                  clock=time.time):
@@ -29,7 +34,7 @@ class Core:
         self._listeners = []
         self._lock = threading.RLock()
         self._last_activity = {}     # session -> ts of the last raw payload
-        self._working = set()        # sessions between a prompt and their final stop
+        self._working = set()        # sessions between a prompt (or any work) and their final stop
         self._paused = {}            # session -> "waiting" | "silent"
         self._replay_sessions = set()  # sessions paused by replayed / dev events
         self._stop = threading.Event()
@@ -104,7 +109,8 @@ class Core:
             elif kind == "resumed":
                 self._paused.pop(session, None)
             return
-        if kind == "prompt":
+        # A session we joined midway shows no prompt: any work means it is working too.
+        if kind in WORK_KINDS:
             self._working.add(session)
         elif kind == "stop":
             if event.get("final"):

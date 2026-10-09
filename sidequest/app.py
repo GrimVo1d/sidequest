@@ -335,6 +335,11 @@ class Bridge:
                  "duration": round(max(0.0, r["last_ts"] - r["started_at"]), 1),
                  "actions": r["actions"]} for r in rows]
 
+    def dlc_live_sessions(self, dlc_id=None):
+        """Sessions open right now with their status, so a new match can pick up an agent
+        that is already at work instead of waiting for its next event."""
+        return self._live_sessions()
+
     def dlc_session_events(self, dlc_id, session):
         """One past session's events, already normalized, with "t" in seconds from its start."""
         events = self._core.store.session_events(str(session))[:GHOST_MAX_EVENTS]

@@ -15,6 +15,8 @@
 //   await Sidequest.history.sessions()      // past sessions: [{session, project, started_at,
 //                                           //   duration, actions}], newest first
 //   await Sidequest.history.events(session) // its normalized events, "t" — seconds from the start
+//   await Sidequest.live()                  // sessions open now: [{session, project, status}],
+//                                           //   status "working" / "waiting" / "silent" / "idle"
 //   Sidequest.dev.command("wave", "Вызвать волну", () => ...)   // dev panel button
 //   Sidequest.exit()                        // back to the hub (the DLC has the whole window)
 //   Sidequest.ready()                       // call once the DLC is set up; resolves to
@@ -99,6 +101,8 @@
       sessions: () => call("sessions"),
       events: (session) => call("session_events", session),
     },
+    // Sessions open right now: a new match picks up agents that are already at work.
+    live: () => call("live_sessions"),
     exit() { post({kind: "exit"}); },
     achievements: {
       async list() { return (await call("load", "achievements")) || {}; },

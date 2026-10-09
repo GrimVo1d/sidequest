@@ -58,6 +58,14 @@ class CoreTest(unittest.TestCase):
         self.assertEqual(self.kinds()[-2:], ["resumed", "tool"])
         self.assertEqual(self.core.paused_sessions(), {})
 
+    def test_session_joined_midway_is_working(self):
+        # Sidequest opened while the agent was already busy: no prompt, just its tools.
+        self.feed(post("Read", "t1", {"file_path": "/x"}, {}))
+        self.assertEqual(self.kinds(), ["session_start", "tool"])
+        self.assertEqual(self.core.session_status(SID), "working")
+        self.feed(raw("Stop", stop_hook_active=False))
+        self.assertEqual(self.core.session_status(SID), "idle")
+
     def test_silence_threshold_is_a_setting(self):
         self.core.store.set_setting("silence_pause_seconds", 10)
         self.working_session()

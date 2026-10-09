@@ -345,6 +345,7 @@ const DLC_METHODS = {
   profile: () => api.profile(),
   settings: () => api.get_settings(),
   sessions: (id) => api.dlc_sessions(id),
+  live_sessions: (id) => api.dlc_live_sessions(id),
   session_events: (id, args) => api.dlc_session_events(id, String(args[0])),
 };
 

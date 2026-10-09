@@ -318,6 +318,18 @@
 
   // --- a match ----------------------------------------------------------------------
 
+  // Agents already at work join the new match at once, not on their next event: a long
+  // command or a big edit can keep a session quiet for minutes.
+  async function joinLiveAgents() {
+    let live = [];
+    try { live = await Sidequest.live(); } catch (e) { live = []; }
+    for (const x of live) {
+      if (x.status === "idle" || !game || game.state.over) continue;
+      game.agentEvent({kind: "session_start", session: x.session, project: x.project, joined: true,
+                       ts: Date.now() / 1000});
+    }
+  }
+
   async function startMatch() {
     let options = {seed: Date.now(), map: LCS_MAPS.find((m) => m.id === mapId), mode, modifiers: mods};
     if (mode === "daily") {
@@ -345,6 +357,7 @@
     show(null);
     $("hud").hidden = false;
     Sidequest.match.start();
+    joinLiveAgents();
     window.focus();
   }
 

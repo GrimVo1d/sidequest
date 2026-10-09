@@ -178,6 +178,7 @@ class BridgeTest(unittest.TestCase):
         self.assertEqual(status["sessions"], [{"session": SID, "project": "my-app",
                                                "status": "waiting"}])
         self.assertEqual(status["paused"][0]["reason"], "waiting")
+        self.assertEqual(bridge.dlc_live_sessions("arena"), status["sessions"])
 
 
 if __name__ == "__main__":
