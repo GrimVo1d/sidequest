@@ -10,6 +10,7 @@ let replayInfo = null;
 const JOURNAL_MAX = 200;
 
 const $ = (id) => document.getElementById(id);
+const t = (ru, en) => SidequestI18n.t(ru, en);
 
 function el(tag, text, cls) {
   const node = document.createElement(tag);
@@ -28,56 +29,67 @@ function clear(node) { while (node.firstChild) node.removeChild(node.firstChild)
 
 function time(ts) {
   const d = new Date(ts * 1000);
-  return d.toLocaleTimeString("ru-RU", {hour12: false});
+  return d.toLocaleTimeString(t("ru-RU", "en-GB"), {hour12: false});
 }
 
 function duration(seconds) {
   const h = Math.floor(seconds / 3600), m = Math.floor((seconds % 3600) / 60);
-  return h ? `${h} ч ${m} мин` : `${m} мин`;
+  return h ? t(`${h} ч ${m} мин`, `${h} h ${m} min`) : t(`${m} мин`, `${m} min`);
 }
 
 // --- events ------------------------------------------------------------------------
 
-const ACTIONS = {attack: "правка", scout: "чтение", cast: "команда", scout_far: "веб",
-                 summon: "сабагент", todo: "todo", generic: "инструмент"};
-const BLOCK_REASONS = {rule: "запрещено правилом", rejected: "отказано в диалоге",
-                       denied: "отказ автомода"};
+const ACTIONS = {attack: ["правка", "edit"], scout: ["чтение", "read"], cast: ["команда", "command"],
+                 scout_far: ["веб", "web"], summon: ["сабагент", "subagent"], todo: ["todo", "todo"],
+                 generic: ["инструмент", "tool"]};
+const BLOCK_REASONS = {rule: ["запрещено правилом", "denied by a rule"],
+                       rejected: ["отказано в диалоге", "rejected in the dialog"],
+                       denied: ["отказ автомода", "denied by auto mode"]};
+const pair = (table, key) => table[key] ? t(...table[key]) : key;
 
 function describe(e) {
   switch (e.kind) {
-    case "session_start": return e.joined ? "сессия (подключились посреди)" : "сессия началась";
-    case "session_end": return "сессия закончилась";
-    case "prompt": return "новый промпт";
+    case "session_start": return e.joined ? t("сессия (подключились посреди)", "session (joined midway)")
+      : t("сессия началась", "session started");
+    case "session_end": return t("сессия закончилась", "session ended");
+    case "prompt": return t("новый промпт", "new prompt");
     case "tool": {
-      let s = `${ACTIONS[e.action] || e.action} · ${e.tool}`;
+      let s = `${pair(ACTIONS, e.action)} · ${e.tool}`;
       if (e.category && e.category !== "other") s += ` (${e.category})`;
+      if (Array.isArray(e.git) && e.git.length) s += ` · ${e.git.join(" + ")}`;
       if (e.file) s += ` · ${e.file}`;
       if (e.lines_added || e.lines_removed) s += ` +${e.lines_added || 0}/-${e.lines_removed || 0}`;
-      if (e.agent) s += " · сабагент";
+      if (e.agent) s += t(" · сабагент", " · subagent");
       return s;
     }
     case "tool_error": {
-      let s = `ошибка · ${e.tool}`;
+      let s = `${t("ошибка", "error")} · ${e.tool}`;
       if (e.category && e.category !== "other") s += ` (${e.category})`;
-      if (e.exit_code !== null && e.exit_code !== undefined) s += ` · код ${e.exit_code}`;
+      if (e.exit_code !== null && e.exit_code !== undefined) s += ` · ${t("код", "code")} ${e.exit_code}`;
       return s;
     }
-    case "blocked": return `запрет · ${e.tool || "?"} · ${BLOCK_REASONS[e.reason] || e.reason}`;
-    case "waiting": return `ждёт ответа · ${e.tool || ""}`;
-    case "silent": return `агент молчит ${e.seconds} с`;
-    case "resumed": return e.source === "button" ? "продолжено кнопкой" : "продолжил";
-    case "compact": return e.phase === "start" ? "compaction…" : "compaction закончен";
-    case "subagent_start": return `сабагент запущен · ${e.agent_type || ""}`;
-    case "subagent_stop": return "сабагент закончил";
+    case "blocked": return `${t("запрет", "blocked")} · ${e.tool || "?"} · ${pair(BLOCK_REASONS, e.reason)}`;
+    case "waiting": return `${t("ждёт ответа", "waiting for an answer")} · ${e.tool || ""}`;
+    case "silent": return t(`агент молчит ${e.seconds} с`, `agent silent for ${e.seconds} s`);
+    case "resumed": return e.source === "button" ? t("продолжено кнопкой", "resumed with the button")
+      : t("продолжил", "resumed");
+    case "compact": return e.phase === "start" ? "compaction…" : t("compaction закончен", "compaction done");
+    case "subagent_start": return `${t("сабагент запущен", "subagent started")} · ${e.agent_type || ""}`;
+    case "subagent_stop": return t("сабагент закончил", "subagent finished");
     case "todo": return `todo · ${e.change}`;
-    case "stop": return e.manual ? "матч завершён кнопкой"
-      : e.final ? "задача закончена" : `ход закончен, фоновых задач: ${e.background}`;
-    case "unknown": return `незнакомое событие · ${e.event}`;
+    case "stop": return e.manual ? t("матч завершён кнопкой", "match ended with the button")
+      : e.final ? t("задача закончена", "task done")
+      : t(`ход закончен, фоновых задач: ${e.background}`, `turn over, background tasks: ${e.background}`);
+    case "unknown": return `${t("незнакомое событие", "unknown event")} · ${e.event}`;
     default: return e.kind;
   }
 }
 
+let journalEvents = [];  // newest first, kept to redraw the journal in another language
+
 function addJournal(e, prepend) {
+  if (prepend) journalEvents.unshift(e); else journalEvents.push(e);
+  journalEvents.length = Math.min(journalEvents.length, JOURNAL_MAX);
   const list = $("journal");
   const li = el("li");
   li.appendChild(el("span", time(e.ts) + " "));
@@ -105,20 +117,21 @@ window.__sidequestWake = () => { drain(); };
 
 // --- status, pause, self-check -----------------------------------------------------
 
-const INDICATOR_TEXT = {green: "Всё в порядке", yellow: "Есть что проверить",
-                        red: "Не работает"};
-const STATUS_TEXT = {working: "работает", idle: "ждёт промпт", waiting: "ждёт ответа",
-                     silent: "молчит"};
+const INDICATOR_TEXT = {green: ["Всё в порядке", "All good"], yellow: ["Есть что проверить", "Worth a look"],
+                        red: ["Не работает", "Not working"]};
+const STATUS_TEXT = {working: ["работает", "working"], idle: ["ждёт промпт", "waiting for a prompt"],
+                     waiting: ["ждёт ответа", "waiting for an answer"], silent: ["молчит", "silent"]};
 
 async function refreshStatus() {
   status = await api.status();
   const ind = $("indicator");
   ind.className = "indicator " + status.indicator;
-  let text = INDICATOR_TEXT[status.indicator];
-  if (!status.connected) text = "Не подключено к Claude Code";
-  else if (status.control.active) text = `Контрольная сессия ${status.control.version}`;
+  let text = pair(INDICATOR_TEXT, status.indicator);
+  if (!status.connected) text = t("Не подключено к Claude Code", "Not connected to Claude Code");
+  else if (status.control.active) text = t("Контрольная сессия ", "Control session ") + status.control.version;
   $("indicator-text").textContent = text;
-  $("btn-connect").textContent = status.connected ? "Отключить от Claude Code" : "Подключить к Claude Code";
+  $("btn-connect").textContent = status.connected ? t("Отключить от Claude Code", "Disconnect from Claude Code")
+                                                  : t("Подключить к Claude Code", "Connect to Claude Code");
   $("first-event").hidden = !status.waiting_first_event;
 
   const sessions = $("sessions");
@@ -126,10 +139,10 @@ async function refreshStatus() {
   for (const s of status.sessions) {
     const li = el("li");
     li.appendChild(el("span", (s.project || "?") + " "));
-    li.appendChild(el("span", STATUS_TEXT[s.status] || s.status, s.status === "working" ? "ok" : "tag"));
+    li.appendChild(el("span", pair(STATUS_TEXT, s.status), s.status === "working" ? "ok" : "tag"));
     sessions.appendChild(li);
   }
-  if (!status.sessions.length) sessions.appendChild(el("li", "нет активных", "tag"));
+  if (!status.sessions.length) sessions.appendChild(el("li", t("нет активных", "none active"), "tag"));
 
   renderChecks(status.checks);
   renderPause(status.paused);
@@ -151,19 +164,19 @@ function renderChecks(checks) {
   if (status) {
     const report = status.control.report;
     if (report && report.length) {
-      list.appendChild(el("li", "Контрольная сессия: есть замечания", "warn"));
+      list.appendChild(el("li", t("Контрольная сессия: есть замечания", "Control session: some remarks"), "warn"));
       for (const r of report) list.appendChild(el("li", "→ " + r, "fix"));
     } else if (report) {
-      list.appendChild(el("li", "Контрольная сессия: всё на месте", "ok"));
+      list.appendChild(el("li", t("Контрольная сессия: всё на месте", "Control session: everything in place"), "ok"));
     }
     for (const [name, n] of Object.entries(status.unknown_events)) {
-      list.appendChild(el("li", `! незнакомое событие ${name} ×${n}`, "warn"));
+      list.appendChild(el("li", `! ${t("незнакомое событие", "unknown event")} ${name} ×${n}`, "warn"));
     }
     for (const [name, n] of Object.entries(status.unknown_tools)) {
-      list.appendChild(el("li", `! незнакомый инструмент ${name} ×${n}`, "warn"));
+      list.appendChild(el("li", `! ${t("незнакомый инструмент", "unknown tool")} ${name} ×${n}`, "warn"));
     }
   }
-  if (!list.children.length) list.appendChild(el("li", "проверка идёт…", "tag"));
+  if (!list.children.length) list.appendChild(el("li", t("проверка идёт…", "checking…"), "tag"));
 }
 
 let lastPauseKey = "";
@@ -176,22 +189,23 @@ function renderPause(paused) {
   toGame({kind: "pause", paused: paused.length > 0, sessions: paused});
   if (!paused.length) return;
   const anyWaiting = paused.some((p) => p.reason === "waiting");
-  $("pause-title").textContent = anyWaiting ? "Claude ждёт ответа в терминале"
-                                            : "Агент молчит — возможно, его прервали";
+  $("pause-title").textContent = anyWaiting
+    ? t("Claude ждёт ответа в терминале", "Claude is waiting for an answer in the terminal")
+    : t("Агент молчит — возможно, его прервали", "The agent is silent — maybe it was interrupted");
   const list = $("pause-list");
   clear(list);
   for (const p of paused) {
     const li = el("li");
-    li.appendChild(el("span", `${p.project || "?"} · ${p.reason === "waiting" ? "ждёт ответа" : "молчит"}`));
+    li.appendChild(el("span", `${p.project || "?"} · ${pair(STATUS_TEXT, p.reason === "waiting" ? "waiting" : "silent")}`));
     if (p.reason === "silent") {
-      li.appendChild(button("Завершить матч", () => api.end_match(p.session).then(refreshStatus)));
+      li.appendChild(button(t("Завершить матч", "End the match"), () => api.end_match(p.session).then(refreshStatus)));
     }
     list.appendChild(li);
   }
 }
 
 async function runCheck() {
-  $("indicator-text").textContent = "Проверка…";
+  $("indicator-text").textContent = t("Проверка…", "Checking…");
   await api.run_check();
   await refreshStatus();
 }
@@ -214,38 +228,45 @@ function closeModal() { $("modal").hidden = true; }
 async function connectFlow() {
   if (status && status.connected) return disconnectFlow();
   const p = await api.install_preview();
-  if (!p.ok) return modal("Не получилось", [el("p", p.error)], [["Закрыть", closeModal]]);
-  if (!p.changes.length) return modal("Уже подключено", [el("p", "Все записи на месте.")], [["Закрыть", closeModal]]);
+  if (!p.ok) return modal(t("Не получилось", "Failed"), [el("p", p.error)], [[t("Закрыть", "Close"), closeModal]]);
+  if (!p.changes.length) {
+    return modal(t("Уже подключено", "Already connected"), [el("p", t("Все записи на месте.", "All entries are in place."))],
+                 [[t("Закрыть", "Close"), closeModal]]);
+  }
   const lines = p.changes.map((c) => `${c.event}: ${c.what}`).join("\n");
-  modal("Подключить к Claude Code", [
-    el("p", `В ${p.path} будут добавлены хуки Sidequest. Перед записью будет сделана резервная копия.`),
-    el("p", `Скрипт: ${p.script}`, "tag"),
+  modal(t("Подключить к Claude Code", "Connect to Claude Code"), [
+    el("p", t(`В ${p.path} будут добавлены хуки Sidequest. Перед записью будет сделана резервная копия.`,
+              `Sidequest hooks will be added to ${p.path}. A backup is made before writing.`)),
+    el("p", t("Скрипт: ", "Script: ") + p.script, "tag"),
     el("pre", lines),
-  ], [["Отмена", closeModal], ["Подключить", async () => {
+  ], [[t("Отмена", "Cancel"), closeModal], [t("Подключить", "Connect"), async () => {
     const r = await api.install_apply();
-    modal(r.ok ? "Подключено" : "Ошибка", [
-      el("p", r.ok ? "Уже открытые сессии Claude Code, возможно, нужно перезапустить." : r.error),
-      el("p", r.backup ? `Резервная копия: ${r.backup}` : "", "tag"),
-    ], [["Закрыть", closeModal]]);
+    modal(r.ok ? t("Подключено", "Connected") : t("Ошибка", "Error"), [
+      el("p", r.ok ? t("Уже открытые сессии Claude Code, возможно, нужно перезапустить.",
+                       "Claude Code sessions that are already open may need a restart.") : r.error),
+      el("p", r.backup ? t("Резервная копия: ", "Backup: ") + r.backup : "", "tag"),
+    ], [[t("Закрыть", "Close"), closeModal]]);
     refreshStatus();
   }, "primary"]]);
 }
 
 async function disconnectFlow() {
   const p = await api.uninstall_preview();
-  if (!p.ok) return modal("Не получилось", [el("p", p.error)], [["Закрыть", closeModal]]);
+  if (!p.ok) return modal(t("Не получилось", "Failed"), [el("p", p.error)], [[t("Закрыть", "Close"), closeModal]]);
   const core = el("input"); core.type = "checkbox";
   const dlcBox = el("input"); dlcBox.type = "checkbox";
-  const coreLabel = el("label"); coreLabel.appendChild(core); coreLabel.appendChild(el("span", " Профиль и общая статистика"));
-  const dlcLabel = el("label"); dlcLabel.appendChild(dlcBox); dlcLabel.appendChild(el("span", " Данные всех DLC"));
-  modal("Отключить от Claude Code", [
-    el("p", `Из ${p.path} будут удалены только записи Sidequest (${p.changes.length}). Будет сделана резервная копия.`),
-    el("p", "Заодно удалить данные:"), coreLabel, dlcLabel,
-  ], [["Отмена", closeModal], ["Отключить", async () => {
+  const coreLabel = el("label"); coreLabel.appendChild(core); coreLabel.appendChild(el("span", t(" Профиль и общая статистика", " Profile and shared stats")));
+  const dlcLabel = el("label"); dlcLabel.appendChild(dlcBox); dlcLabel.appendChild(el("span", t(" Данные всех DLC", " Data of every DLC")));
+  modal(t("Отключить от Claude Code", "Disconnect from Claude Code"), [
+    el("p", t(`Из ${p.path} будут удалены только записи Sidequest (${p.changes.length}). Будет сделана резервная копия.`,
+              `Only Sidequest entries (${p.changes.length}) will be removed from ${p.path}. A backup is made.`)),
+    el("p", t("Заодно удалить данные:", "Also delete data:")), coreLabel, dlcLabel,
+  ], [[t("Отмена", "Cancel"), closeModal], [t("Отключить", "Disconnect"), async () => {
     const dlcIds = dlcBox.checked ? (await api.list_dlc()).map((d) => d.id) : [];
     const r = await api.uninstall_apply(core.checked, dlcIds);
-    modal(r.ok ? "Отключено" : "Ошибка", [el("p", r.ok ? "Хуки Sidequest удалены." : r.error)],
-          [["Закрыть", closeModal]]);
+    modal(r.ok ? t("Отключено", "Disconnected") : t("Ошибка", "Error"),
+          [el("p", r.ok ? t("Хуки Sidequest удалены.", "Sidequest hooks removed.") : r.error)],
+          [[t("Закрыть", "Close"), closeModal]]);
     refreshStatus(); loadProfile();
   }, "primary"]]);
 }
@@ -256,12 +277,22 @@ async function settingsFlow() {
   silence.value = s.silence_pause_seconds;
   const fps = el("select");
   for (const v of [30, 60]) { const o = el("option", v); o.value = v; o.selected = v === s.fps_limit; fps.appendChild(o); }
-  const l1 = el("label"); l1.appendChild(el("span", "Пауза, если агент молчит дольше, с: ")); l1.appendChild(silence);
-  const l2 = el("label"); l2.appendChild(el("span", "Ограничение FPS: ")); l2.appendChild(fps);
-  modal("Настройки", [l1, l2], [["Отмена", closeModal], ["Сохранить", async () => {
+  const language = el("select");
+  for (const [v, label] of [["auto", t("Как в системе", "System")], ["ru", "Русский"], ["en", "English"]]) {
+    const o = el("option", label); o.value = v; o.selected = v === s.language; language.appendChild(o);
+  }
+  const l1 = el("label");
+  l1.appendChild(el("span", t("Пауза, если агент молчит дольше, с: ", "Pause when the agent is silent longer than, s: ")));
+  l1.appendChild(silence);
+  const l2 = el("label"); l2.appendChild(el("span", t("Ограничение FPS: ", "FPS limit: "))); l2.appendChild(fps);
+  const l3 = el("label"); l3.appendChild(el("span", t("Язык: ", "Language: "))); l3.appendChild(language);
+  modal(t("Настройки", "Settings"), [l1, l2, l3], [[t("Отмена", "Cancel"), closeModal], [t("Сохранить", "Save"), async () => {
     await api.set_setting("silence_pause_seconds", Number(silence.value));
     await api.set_setting("fps_limit", Number(fps.value));
+    const changed = language.value !== s.language;
+    await api.set_setting("language", language.value);
     closeModal();
+    if (changed) setLanguage((await api.get_settings()).lang);
   }, "primary"]]);
 }
 
@@ -277,9 +308,10 @@ async function loadProfile() {
   stopAvatar = SidequestAvatar.animate($("avatar"), p.avatar);
   const dl = $("stats");
   clear(dl);
-  const rows = [["Сессий", p.stats.sessions], ["Время агента", duration(p.stats.agent_seconds)],
-                ["Действий", p.stats.actions], ["Строк добавлено", p.stats.lines_added],
-                ["Ошибок", p.stats.errors], ["Запретов", p.stats.blocked]];
+  const rows = [[t("Сессий", "Sessions"), p.stats.sessions],
+                [t("Время агента", "Agent time"), duration(p.stats.agent_seconds)],
+                [t("Действий", "Actions"), p.stats.actions], [t("Строк добавлено", "Lines added"), p.stats.lines_added],
+                [t("Ошибок", "Errors"), p.stats.errors], [t("Запретов", "Blocked"), p.stats.blocked]];
   for (const [k, v] of rows) { dl.appendChild(el("dt", k)); dl.appendChild(el("dd", v)); }
 }
 
@@ -290,11 +322,16 @@ async function loadDlc() {
   for (const d of list) {
     const card = el("div", null, "dlc");
     card.appendChild(el("div", d.name, "name"));
-    card.appendChild(el("div", d.dev_only ? "только --dev" : "", "tag"));
-    card.appendChild(button("Играть", () => openDlc(d), "primary"));
+    card.appendChild(el("div", d.dev_only ? t("только --dev", "--dev only") : "", "tag"));
+    if (d.card && d.card.length) {
+      const dl = el("dl", null, "card-stats");
+      for (const [k, v] of d.card) { dl.appendChild(el("dt", k)); dl.appendChild(el("dd", v)); }
+      card.appendChild(dl);
+    }
+    card.appendChild(button(t("Играть", "Play"), () => openDlc(d), "primary"));
     grid.appendChild(card);
   }
-  if (!list.length) grid.appendChild(el("p", "Пока нет ни одного режима — они появятся на этапе 2.", "hint"));
+  if (!list.length) grid.appendChild(el("p", t("Пока нет ни одного режима.", "No modes yet."), "hint"));
 }
 
 // --- DLC host: the DLC talks to the core only through these messages ----------------
@@ -307,6 +344,8 @@ const DLC_METHODS = {
   balance: (id) => api.dlc_balance(id),
   profile: () => api.profile(),
   settings: () => api.get_settings(),
+  sessions: (id) => api.dlc_sessions(id),
+  session_events: (id, args) => api.dlc_session_events(id, String(args[0])),
 };
 
 function openDlc(d) {
@@ -315,7 +354,7 @@ function openDlc(d) {
   renderDlcDev();
   $("hub").hidden = true;
   $("game").hidden = false;
-  $("game-title").textContent = d.name;
+  document.body.classList.add("playing");
   const frame = $("game-frame");
   // Keys go to the game right away, without a click into it first.
   frame.onload = () => frame.contentWindow && frame.focus();
@@ -329,8 +368,10 @@ function closeDlc() {
   $("game-frame").onload = null;
   $("game-frame").src = "about:blank";
   $("game").hidden = true;
+  document.body.classList.remove("playing");
   $("hub").hidden = false;
   loadProfile();
+  loadDlc();  // the card may show new records
 }
 
 function toGame(message) {
@@ -345,7 +386,8 @@ window.addEventListener("message", async (msg) => {
   const m = msg.data;
   if (!m || m.sidequest !== true) return;
   if (m.kind === "ready") {
-    toGame({kind: "hello", dlc: currentDlc.id, dev: status ? status.dev : false});
+    toGame({kind: "hello", dlc: currentDlc.id, dev: status ? status.dev : false,
+            lang: SidequestI18n.lang});
     lastPauseKey = "";
     if (status) renderPause(status.paused);
   } else if (m.kind === "call") {
@@ -359,6 +401,8 @@ window.addEventListener("message", async (msg) => {
       reply = {kind: "reply", id: m.id, error: String(e && e.message || e)};
     }
     toGame(reply);
+  } else if (m.kind === "exit") {
+    closeDlc();
   } else if (m.kind === "dev_register" && Array.isArray(m.commands)) {
     dlcDevCommands = m.commands.slice(0, 40).map((c) => ({id: String(c.id), label: String(c.label)}));
     renderDlcDev();
@@ -372,13 +416,19 @@ const DEV_EVENTS = [
   ["Read", "tool", {tool: "Read", action: "scout", ok: true, file: "src/app.py"}],
   ["Bash: тесты", "tool", {tool: "Bash", action: "cast", category: "test", ok: true}],
   ["Bash: поиск", "tool", {tool: "Bash", action: "scout", category: "search", ok: true}],
-  ["Ошибка", "tool_error", {tool: "Bash", action: "cast", category: "test", ok: false, exit_code: 1}],
+  ["Bash: сборка", "tool", {tool: "Bash", action: "cast", category: "build", ok: true}],
+  ["git commit", "tool", {tool: "Bash", action: "cast", category: "git", git: ["commit"], ok: true}],
+  ["git push", "tool", {tool: "Bash", action: "cast", category: "git", git: ["push"], ok: true}],
+  ["Ошибка", "tool_error", {tool: "Bash", action: "cast", category: "other", ok: false, exit_code: 1}],
+  ["Тесты упали", "tool_error", {tool: "Bash", action: "cast", category: "test", ok: false, exit_code: 1}],
   ["Запрет", "blocked", {tool: "Bash", reason: "rule"}],
   ["Ждёт ответа", "waiting", {tool: "Write"}],
   ["Продолжил", "resumed", {}],
   ["Compaction", "compact", {phase: "start"}],
   ["Compaction ✓", "compact", {phase: "end"}],
   ["Сабагент", "subagent_start", {agent: "dev-agent", agent_type: "general-purpose"}],
+  ["Сабагент Explore", "subagent_start", {agent: "dev-explore", agent_type: "Explore"}],
+  ["Сабагент Plan", "subagent_start", {agent: "dev-plan", agent_type: "Plan"}],
   ["Сабагент ✓", "subagent_stop", {agent: "dev-agent"}],
   ["Задача закончена", "stop", {ok: true, background: 0, final: true}],
 ];
@@ -475,12 +525,27 @@ window.addEventListener("unhandledrejection", (e) => {
   if (api) api.report_error(`unhandled: ${e.reason && (e.reason.stack || e.reason.message) || e.reason}`);
 });
 
+// Everything on the hub is drawn again; the self-check runs again for its texts.
+function setLanguage(lang) {
+  SidequestI18n.set(lang);
+  SidequestI18n.apply(document);
+  const events = journalEvents.slice().reverse();
+  journalEvents = [];
+  clear($("journal"));
+  for (const e of events) addJournal(e, true);
+  loadProfile();
+  loadDlc();
+  lastPauseKey = "";
+  runCheck();
+}
+
 window.addEventListener("pywebviewready", async () => {
   api = window.pywebview.api;
+  SidequestI18n.set((await api.get_settings()).lang);
+  SidequestI18n.apply(document);
   $("btn-check").addEventListener("click", runCheck);
   $("btn-connect").addEventListener("click", connectFlow);
   $("btn-settings").addEventListener("click", settingsFlow);
-  $("btn-back").addEventListener("click", closeDlc);
   $("btn-resume").addEventListener("click", () => api.resume(null).then(refreshStatus));
   const editAvatar = () => openAvatarEditor(profile && profile.avatar, loadProfile);
   $("avatar").addEventListener("click", editAvatar);

@@ -13,9 +13,25 @@
   const GORE = {
     grunt: ["#c8443c", "#9a3029", "#e87a6a"], runner: ["#e89a4a", "#b86a2a", "#f0c080"],
     tank: ["#8a5bd0", "#6a40a8", "#8a8aa0"], boss: ["#c8443c", "#4a7ae8", "#e8c14a"],
+    leak: ["#5fbf5a", "#3f8f3c", "#a8e89a"], leak_small: ["#5fbf5a", "#3f8f3c", "#a8e89a"],
+    race: ["#4ac0c8", "#2e8a92", "#c8c8d4"], nullptr: ["#d07ad0", "#9a4a9a", "#7fe0e0"],
+    deprecated: ["#b8b4cc", "#8a86a0", "#e8e6f0"],
+    flaky: ["#4fbf6f", "#d9534f", "#e8e6f0"], spaghetti: ["#e8c14a", "#b8902a", "#c8443c"],
+    offbyone: ["#4ac0a0", "#2e8a72", "#fffbe0"], debt: ["#8a7a5a", "#6a5a40", "#e8c14a"],
+    logspam: ["#8a8aa0", "#1b1b2f", "#4fbf6f"], regression: ["#c84a8a", "#963066", "#fffbe0"],
+    scope: ["#e87aa8", "#b84a7a", "#fff0f6"], monolith: ["#6a6a82", "#4a4a62", "#5bd0e8"],
+    micro: ["#4ac0c8", "#2e8a92", "#e8e6f0"], boss_oom: ["#7fbf3a", "#5a8f2a", "#c8e87a"],
+    boss_loop: ["#5b6ad0", "#3a48a0", "#e8c14a"], loop_segment: ["#5b6ad0", "#3a48a0", "#e8c14a"],
+    boss_race: ["#4ac0c8", "#e89a4a", "#c8c8d4"], boss_fire: ["#5a5a72", "#e85a2a", "#ffe066"],
   };
-  const ITEM_COLORS = {medkit: "#d9534f", coffee: "#e89a4a", duck: "#e8c14a", shield: "#5b8bd0"};
-  const BOSS_NAME = "Конфликт слияния";
+  // Enemies with a health bar over them: the tough ones, and every elite.
+  const BAR_TYPES = new Set(["tank", "monolith", "debt", "scope"]);
+  const ITEM_COLORS = {medkit: "#d9534f", coffee: "#e89a4a", duck: "#e8c14a", shield: "#5b8bd0",
+                       chest: "#e8c14a"};
+  const tr = (ru, en) => root.SidequestI18n ? root.SidequestI18n.t(ru, en) : ru;
+  const AMMO_MARKS = 10;   // the most rounds shown as marks under the player
+  const BOSS_NAME = ["Конфликт слияния", "Merge conflict"];
+  const FINAL_NAME = ["Финальный конфликт", "Final conflict"];
 
   // --- map themes: a color for every floor and wall pixel ------------------------------
 
@@ -98,16 +114,23 @@
   const faceHeight = (w) => Math.min(8, Math.floor(w.h / 2));
 
   function createRenderer(canvas, balance) {
-    const VW = balance.view.width, VH = balance.view.height;
-    canvas.width = VW;
-    canvas.height = VH;
+    // The view is at least balance.view and fills the whole window: the scale goes in whole
+    // steps of device pixels (1, 1.5, 2, ... on a Retina screen) so pixels stay sharp, and
+    // the view grows to cover what is left, up to balance.view.max_*.
+    const V = balance.view;
+    let VW = V.width, VH = V.height;
     const ctx = canvas.getContext("2d");
-    ctx.imageSmoothingEnabled = false;
 
-    // Whole steps in device pixels: on a Retina screen the scale goes 1, 1.5, 2, ...
     function fit() {
       const dpr = devicePixelRatio || 1;
-      const scale = Math.max(1, Math.floor(Math.min(innerWidth / VW, innerHeight / VH) * dpr)) / dpr;
+      const scale = Math.max(1, Math.floor(Math.min(innerWidth / V.width, innerHeight / V.height) * dpr)) / dpr;
+      const w = Math.min(V.max_width || V.width, Math.ceil(innerWidth / scale));
+      const h = Math.min(V.max_height || V.height, Math.ceil(innerHeight / scale));
+      if (w !== canvas.width || h !== canvas.height) {
+        VW = canvas.width = w;
+        VH = canvas.height = h;
+      }
+      ctx.imageSmoothingEnabled = false;
       canvas.style.width = VW * scale + "px";
       canvas.style.height = VH * scale + "px";
     }
@@ -474,9 +497,9 @@
         if (fx.type === "pop") {
           const colors = GORE[fx.kind] || ["#e8e6f0"];
           burst(fx.x, fx.y, 6 + fx.r, colors, 40 + fx.r * 4,
-                {gravity: 220, vz: 40 + Math.random() * 40, drag: 2, size: fx.kind === "boss" ? 2 : 1});
+                {gravity: 220, vz: 40 + Math.random() * 40, drag: 2, size: fx.boss ? 2 : 1});
           splat(fx.x, fx.y, fx.r, SP.shade(colors[0], 0.38));
-          if (fx.kind === "boss") { shake = Math.max(shake, 5); flash = 0.3; }
+          if (fx.boss) { shake = Math.max(shake, 5); flash = 0.3; }
         } else if (fx.type === "ring") {
           burst(fx.x, fx.y, Math.min(24, 6 + fx.r / 4), [fx.color, "#fffbe0"], fx.r * 3, {drag: 5});
           if (fx.r > 60) shake = Math.max(shake, 1.5);
@@ -501,6 +524,12 @@
           burst(e.x, e.y, 2, ["#fffbe0", (GORE[e.type] || GORE.grunt)[0]], 50, {drag: 6});
         }
         flashes.set(e, e.flash);
+        // Elites: a fast one kicks up dust, a vampire drips.
+        if (e.elite === "fast" && Math.random() < dt * 12) {
+          particle(e.x, e.y + e.r, (Math.random() - 0.5) * 10, -6, "#e8c14a", 0.3, {drag: 4});
+        } else if (e.elite === "vampire" && Math.random() < dt * 4) {
+          particle(e.x + (Math.random() - 0.5) * e.r, e.y, 0, 10, "#d9534f", 0.5, {gravity: 60});
+        }
       }
       if (s.level > lastLevel) {
         levelGlow = 1;
@@ -547,13 +576,25 @@
 
     function drawEnemy(e, s) {
       const age = s.time - (e.born === undefined ? -1 : e.born);
-      const frame = Math.floor(s.time * (e.slow > 0 ? 3 : 7) + (e.born || 0) * 13) & 1;
+      let frame = Math.floor(s.time * (e.slow > 0 ? 3 : 7) + (e.born || 0) * 13) & 1;
+      // Off-by-one crouches before it jumps.
+      if (e.type === "offbyone") frame = e.windupAt ? 1 : 0;
       const o = {frame};
       if (e.flash > 0) o.fill = "#ffffff";
+      else if (e.elite) o.outline = Math.floor(s.time * 4) & 1 ? "#e8c14a" : "#fff0a0";
       else if (s.rage > 0) o.outline = "#ff3030";
       else if (e.slow > 0) o.outline = "#7fb3e0";
+      else if (e.final) o.outline = Math.floor(s.time * 4) & 1 ? "#e8c14a" : "#b8902a";
+      else if (e.returned) o.outline = "#d9534f";
+      if (e.type === "boss_race" && e.twinB) o.tint = "#e89a4a";
       const c = sprite(e.type, o);
-      let y = e.y - c.height / 2 - 2;
+      // Scope creep and out of memory grow in whole steps.
+      const k = e.size || 1, cw = c.width * k, ch = c.height * k;
+      let x = e.x - cw / 2, y = e.y - ch / 2 - 2;
+      // Null pointer glitches: now and then it slips a pixel or two sideways.
+      if (e.type === "nullptr" && hash(Math.floor(s.time * 10), e.born * 100, 3) < 0.15) x += 2;
+      if (e.windupAt) x += Math.floor(s.time * 30) & 1 ? 1 : -1;
+      if (e.ghost) ctx.globalAlpha = 0.55 + Math.sin(s.time * 5 + e.born) * 0.15;
       if (age < 0.35) {
         // Crawling out of the floor.
         const k = age / 0.35;
@@ -561,10 +602,19 @@
         ctx.globalAlpha = k;
         y += (1 - k) * 6;
       }
-      ctx.drawImage(c, px(e.x - c.width / 2), px(y));
+      if (k === 1) ctx.drawImage(c, px(x), px(y));
+      else ctx.drawImage(c, px(x), px(y), cw, ch);
       ctx.globalAlpha = 1;
-      if (e.type === "tank" && e.hp < e.maxHp) {
-        const w = 14, x0 = px(e.x - w / 2), y0 = px(y - 3);
+      // A twin left alone: it is about to bring the other one back.
+      if (e.revive && Math.floor(s.time * 8) & 1) label(e.x, y - 5, "!", "#7fe0e0");
+      if (e.windupAt) label(e.x, y - 5, "!", "#4ac0a0");
+      if (e.shield > 0) pixelRing(e.x, e.y, e.r + 4, "#5b8bd0", 0.4 + 0.6 * e.shield / e.shieldMax, 1);
+      if (e.elite) {
+        const crown = sprite("elite", {});
+        ctx.drawImage(crown, px(e.x - crown.width / 2), px(y - crown.height - (e.hp < e.maxHp ? 4 : 1)));
+      }
+      if ((BAR_TYPES.has(e.type) || e.elite) && e.hp < e.maxHp) {
+        const w = Math.max(14, Math.min(30, Math.round(cw * 0.8))), x0 = px(e.x - w / 2), y0 = px(y - 3);
         ctx.fillStyle = DARK;
         ctx.fillRect(x0 - 1, y0 - 1, w + 2, 4);
         ctx.fillStyle = "#d9534f";
@@ -577,6 +627,8 @@
       prevPos.set(o, {x: o.x, y: o.y});
       return prev ? Math.hypot(o.x - prev.x, o.y - prev.y) > 0.2 : false;
     }
+
+    const SPIRIT_SPRITES = {scout: "spirit_scout", plan: "spirit_plan"};
 
     function drawAlly(a, s) {
       const walking = moved(a);
@@ -611,8 +663,15 @@
         ctx.fillRect(px(a.x + 8), y + Math.floor(s.time * 20) % 16, 1, 3);
         ctx.globalAlpha = 1;
       }
+      if (a.waiting && a.state === "active") {
+        // Waiting for an answer: a question over the head.
+        const q = sprite("ask", {});
+        const qy = y - q.height - 2 + (Math.floor(s.time * 2) & 1);
+        ctx.drawImage(q, px(a.x - q.width / 2), qy);
+      }
       for (const sp of a.spirits.values()) {
-        const g = sprite("spirit", {frame: Math.floor(s.time * 6) & 1, tint: a.color});
+        const name = SPIRIT_SPRITES[sp.type] || "spirit";
+        const g = sprite(name, {frame: Math.floor(s.time * 6) & 1, tint: a.color});
         ctx.globalAlpha = 0.85 * alpha;
         ctx.drawImage(g, px(sp.x - g.width / 2), px(sp.y - g.height / 2 + Math.sin(s.time * 5 + sp.angle) * 1.5));
         ctx.globalAlpha = 1;
@@ -635,7 +694,10 @@
     function drawGun(p, s, x, y) {
       const flip = Math.cos(p.aim) < 0;
       const recoil = s.time - p.firedAt < 0.06 ? 1 : 0;
-      const gx = x + Math.cos(p.aim) * (7 - recoil), gy = y + 3 + Math.sin(p.aim) * 4;
+      // Held in a hand at the side: the avatar is an opaque square, so a gun in front of
+      // it (aiming up or down) would cover the face and one behind it would vanish.
+      const side = Math.max(5, Math.abs(Math.cos(p.aim)) * 7) * (flip ? -1 : 1);
+      const gx = x + side - (flip ? -recoil : recoil), gy = y + 3 + Math.sin(p.aim) * 3;
       const c = sprite("gun", {flip});
       ctx.drawImage(c, px(flip ? gx - c.width + 3 : gx - 3), px(gy - 2));
       if (recoil) {
@@ -657,12 +719,11 @@
         ctx.globalAlpha = 0.35;
         ctx.drawImage(avatarBox, x, y - Math.round((3 - p.dead) * 3));
         ctx.globalAlpha = 1;
-        label(p.x, p.y - 16, String(Math.ceil(p.dead)), "#e8e6f0");
+        // Alone (classic) there is no coming back, so no countdown.
+        if (!s.solo) label(p.x, p.y - 16, String(Math.ceil(p.dead)), "#e8e6f0");
         return;
       }
       const blink = p.invulnerable > 0 && Math.floor(s.time * 12) % 2 === 0;
-      const behind = Math.sin(p.aim) < -0.3;
-      if (behind) drawGun(p, s, p.x, p.y + bob);
       ctx.globalAlpha = blink ? 0.4 : 1;
       const sil = silhouetteOf(DARK);
       for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) ctx.drawImage(sil, x + dx, y + dy);
@@ -672,7 +733,7 @@
         ctx.drawImage(silhouetteOf("#ff4040"), x, y);
       }
       ctx.globalAlpha = 1;
-      if (!behind) drawGun(p, s, p.x, p.y + bob);
+      drawGun(p, s, p.x, p.y + bob);
       if (p.shield > 0) {
         const r = 13 + Math.sin(s.time * 4);
         pixelRing(p.x, p.y - 2, r, "#5b8bd0", 0.5);
@@ -683,11 +744,12 @@
         }
       }
       if (s.immortal) pixelRing(p.x, p.y - 2, 12, "#e8c14a", 0.6);
-      drawAmmo(p, s.stats);
+      drawAmmo(p);
     }
 
-    // Under the player: a bar while reloading, otherwise one mark per round.
-    function drawAmmo(p, stats) {
+    // Under the player: a bar while reloading, otherwise one mark per round; a big
+    // magazine would be too wide for marks, so it shows the rounds left as a number.
+    function drawAmmo(p) {
       const y = px(p.y + 10);
       if (p.reload > 0) {
         ctx.fillStyle = DARK;
@@ -696,13 +758,60 @@
         ctx.fillRect(px(p.x - 9), y - 1, Math.round(18 * (1 - p.reload / p.reloadTotal)), 2);
         return;
       }
-      const n = Math.round(stats.magazine), w = n * 3 - 1;
+      const n = p.magazine, w = n * 3 - 1;
+      if (n > AMMO_MARKS) {
+        label(p.x, y + 1, String(p.ammo), p.ammo > 0 ? "#e8d36a" : "#8a88a0");
+        return;
+      }
       ctx.fillStyle = DARK;
       ctx.fillRect(px(p.x - w / 2) - 1, y - 2, w + 2, 4);
       for (let i = 0; i < n; i++) {
         ctx.fillStyle = i < p.ammo ? "#e8d36a" : "#4a4a66";
         ctx.fillRect(px(p.x - w / 2) + i * 3, y - 1, 2, 2);
       }
+    }
+
+    // Sauce left by spaghetti code; fire on the floor, first a blinking warning.
+    function drawHazard(h, s) {
+      const left = h.until - s.time;
+      if (h.kind === "goo") {
+        const c = sprite("goo", {outline: null});
+        const k = Math.max(1, Math.round(h.r * 2 / c.width));
+        ctx.globalAlpha = Math.max(0, Math.min(0.8, left / 1.5));
+        ctx.drawImage(c, px(h.x - c.width * k / 2), px(h.y - c.height * k / 2), c.width * k, c.height * k);
+        ctx.globalAlpha = 1;
+        return;
+      }
+      if (s.time < h.from) {
+        if (Math.floor(s.time * 10) & 1) pixelRing(h.x, h.y, h.r, "#ff3030", 0.9, 1);
+        pixelRing(h.x, h.y, h.r * 0.5, "#e89a4a", 0.5, 1);
+        return;
+      }
+      ctx.globalAlpha = Math.max(0, Math.min(1, left / 0.6));
+      pixelRing(h.x, h.y, h.r, "#e85a2a", 0.35, 1);
+      const n = Math.max(1, Math.round(h.r * h.r / 90));
+      for (let i = 0; i < n; i++) {
+        const a = hash(h.x | 0, h.y | 0, i) * TAU, d = i ? Math.sqrt(hash(h.y | 0, h.x | 0, i)) * (h.r - 3) : 0;
+        const c = sprite("fire", {frame: (Math.floor(s.time * 8) + i) & 1});
+        ctx.globalAlpha = Math.max(0, Math.min(1, left / 0.6));
+        ctx.drawImage(c, px(h.x + Math.cos(a) * d - c.width / 2), px(h.y + Math.sin(a) * d - c.height + 2));
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    function drawEnemyShot(sh) {
+      const c = sprite("log_line", {});
+      ctx.drawImage(c, px(sh.x - c.width / 2), px(sh.y - c.height / 2));
+    }
+
+    // The incident: a zone to stand in; the green ring fills up while the player holds it.
+    function drawIncident(z, s) {
+      const hold = balance.events.incident.hold;
+      pixelRing(z.x, z.y, z.r, "#d9534f", 0.6 + Math.sin(s.time * 6) * 0.3, 2);
+      pixelRing(z.x, z.y, z.r * Math.min(1, z.held / hold), "#4fbf6f", 0.9, 1);
+      const c = sprite("incident", {});
+      ctx.drawImage(c, px(z.x - c.width / 2), px(z.y - c.height / 2));
+      label(z.x, z.y - z.r - 6, String(Math.ceil(z.left)), "#d9534f");
     }
 
     function drawItem(it, s) {
@@ -723,6 +832,48 @@
       }
     }
 
+    function drawMine(m, s) {
+      const armed = s.time >= m.armAt;
+      const c = sprite("mine", {frame: armed && Math.floor(s.time * 4) & 1 ? 0 : 1,
+                                outline: m.evolved ? "#b8902a" : undefined});
+      ctx.drawImage(c, px(m.x - c.width / 2), px(m.y - c.height / 2));
+    }
+
+    // A turret from a build: its barrel follows the target, it blinks before it goes.
+    function drawTurret(t, s) {
+      const left = t.until - s.time;
+      if (left < 3 && Math.floor(s.time * 6) & 1) return;
+      const c = sprite("turret", {tint: t.color});
+      const x = px(t.x - c.width / 2), y = px(t.y - c.height / 2);
+      ctx.drawImage(c, x, y);
+      const cx = t.x, cy = t.y - 2, len = s.time - t.firedAt < 0.08 ? 4 : 5;
+      line(cx, cy, cx + Math.cos(t.aim) * len, cy + Math.sin(t.aim) * len, "#3a3a4a");
+    }
+
+    // Linters circling the player, with a short trail behind each.
+    function drawLinters(w, s) {
+      const tint = w.evolved ? "#e8c14a" : "#7fe08a";
+      const c = sprite("linter", {tint});
+      const p = s.player;
+      for (const b of w.blades) {
+        const a = Math.atan2(b.y - p.y, b.x - p.x), d = Math.hypot(b.x - p.x, b.y - p.y);
+        ctx.globalAlpha = 0.35;
+        ctx.fillStyle = tint;
+        for (let i = 1; i <= 3; i++) {
+          const t = a - i * 0.12;
+          ctx.fillRect(px(p.x + Math.cos(t) * d), px(p.y + Math.sin(t) * d), 1, 1);
+        }
+        ctx.globalAlpha = 1;
+        ctx.drawImage(c, px(b.x - c.width / 2), px(b.y - c.height / 2));
+      }
+    }
+
+    function drawGem(g, s) {
+      const c = sprite(g.xp >= 10 ? "gem_big" : "gem", {});
+      const bob = g.pull ? 0 : Math.round(Math.sin(s.time * 4 + g.x * 0.3) * 1);
+      ctx.drawImage(c, px(g.x - c.width / 2), px(g.y - c.height / 2 + bob));
+    }
+
     function drawShot(sh) {
       if (sh.target !== undefined) {
         const c = sprite("missile", {tint: sh.color});
@@ -741,6 +892,13 @@
       }
     }
 
+    // A one-pixel line, pixel by pixel: sharper than a stroked path.
+    function line(x0, y0, x1, y1, color) {
+      const n = Math.max(1, Math.ceil(Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0))));
+      ctx.fillStyle = color;
+      for (let i = 0; i <= n; i++) ctx.fillRect(px(x0 + (x1 - x0) * i / n), px(y0 + (y1 - y0) * i / n), 1, 1);
+    }
+
     function drawEffect(fx, s) {
       const k = fx.t / fx.life;
       if (fx.type === "ring") {
@@ -750,6 +908,9 @@
         pixelRing(fx.x, fx.y, r - 3, fx.color, (1 - k) * 0.4, 1);
       } else if (fx.type === "pop") {
         pixelRing(fx.x, fx.y, fx.r * (1 + k * 1.5), "#fffbe0", 1 - k, 1);
+      } else if (fx.type === "miss") {
+        // A flaky test let the bullet through.
+        label(fx.x, fx.y - k * 6, tr("МИМО", "MISS"), "#a8a6c0", 1 - k);
       } else if (fx.type === "ult") {
         pixelRing(fx.x, fx.y, fx.r * k, fx.color, 1 - k, 4);
         pixelRing(fx.x, fx.y, fx.r * k * 0.8, "#fffbe0", (1 - k) * 0.6, 2);
@@ -765,6 +926,43 @@
         ctx.lineWidth = 1;
         ctx.stroke();
         ctx.globalAlpha = 1;
+      } else if (fx.type === "bolt") {
+        // Lightning: a jagged line through every enemy hit, redrawn each frame.
+        ctx.globalAlpha = 1 - k;
+        for (let i = 1; i < fx.points.length; i++) {
+          const a = fx.points[i - 1], b = fx.points[i];
+          const n = Math.max(2, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / 6));
+          let x0 = a.x, y0 = a.y;
+          for (let j = 1; j <= n; j++) {
+            const jitter = j === n ? 0 : (Math.random() - 0.5) * 6;
+            const x1 = a.x + (b.x - a.x) * j / n + jitter, y1 = a.y + (b.y - a.y) * j / n + jitter;
+            line(x0, y0, x1, y1, j % 2 ? fx.color : "#e8fbff");
+            x0 = x1;
+            y0 = y1;
+          }
+        }
+        ctx.globalAlpha = 1;
+      } else if (fx.type === "heal") {
+        // Plan's spirit heals: green dots running from it to the player.
+        const n = Math.max(2, Math.ceil(Math.hypot(fx.x2 - fx.x, fx.y2 - fx.y) / 4));
+        ctx.globalAlpha = 1 - k;
+        ctx.fillStyle = "#4fbf6f";
+        for (let i = 0; i <= n; i++) {
+          if ((i + Math.floor(k * 8)) % 2) continue;
+          ctx.fillRect(px(fx.x + (fx.x2 - fx.x) * i / n), px(fx.y + (fx.y2 - fx.y) * i / n), 1, 1);
+        }
+        ctx.globalAlpha = 1;
+      } else if (fx.type === "strike") {
+        // Cron: a bolt from the top of the screen, then a ring where it lands.
+        if (k < 0.4) {
+          ctx.globalAlpha = 1 - k / 0.4;
+          ctx.fillStyle = fx.color;
+          ctx.fillRect(px(fx.x) - 1, px(fx.y - 120), 3, 120);
+          ctx.fillStyle = "#fffbe0";
+          ctx.fillRect(px(fx.x), px(fx.y - 120), 1, 120);
+          ctx.globalAlpha = 1;
+        }
+        pixelRing(fx.x, fx.y, fx.r * (0.4 + 0.6 * k), fx.color, 1 - k, 1);
       } else if (fx.type === "pickup") {
         // The item flies into the player.
         const p = s.player, e = k * k;
@@ -773,24 +971,43 @@
         ctx.drawImage(c, px(fx.x + (p.x - fx.x) * e - c.width / 2), px(fx.y + (p.y - 4 - fx.y) * e - c.height / 2));
         ctx.globalAlpha = 1;
         pixelRing(p.x, p.y - 2, 6 + k * 10, ITEM_COLORS[fx.item] || "#fffbe0", 1 - k, 1);
+      } else if (fx.type === "blink") {
+        // A dotted trail from where the null pointer was to where it is now.
+        pixelRing(fx.x, fx.y, 6 + k * 6, "#d07ad0", 1 - k, 1);
+        pixelRing(fx.x2, fx.y2, 10 - k * 6, "#7fe0e0", 1 - k, 1);
+        ctx.globalAlpha = 1 - k;
+        ctx.fillStyle = "#d07ad0";
+        const n = Math.ceil(Math.hypot(fx.x2 - fx.x, fx.y2 - fx.y) / 6);
+        for (let i = 1; i < n; i++) {
+          ctx.fillRect(px(fx.x + (fx.x2 - fx.x) * i / n), px(fx.y + (fx.y2 - fx.y) * i / n), 1, 1);
+        }
+        ctx.globalAlpha = 1;
       }
     }
 
     // --- overlays in screen space ---------------------------------------------------
 
     function drawBossBar(s) {
-      const boss = s.enemies.find((e) => e.type === "boss" && !e.dead);
+      const boss = s.enemies.find((e) => e.final && !e.dead)
+        || s.enemies.find((e) => e.boss && !e.dead);
       if (!boss) return;
+      const cfg = balance.enemies[boss.type];
+      const name = boss.final ? FINAL_NAME : boss.type === "boss" ? BOSS_NAME : [cfg.name, cfg.name_en];
+      // Twins share one bar.
+      const pair = boss.partner ? [boss, boss.partner] : [boss];
+      const hp = pair.reduce((sum, e) => sum + (e.dead ? 0 : Math.max(0, e.hp)), 0);
+      const max = pair.reduce((sum, e) => sum + e.maxHp, 0);
       const w = 160, x = Math.round((VW - w) / 2), y = 14;
-      label(VW / 2, y - 6, BOSS_NAME, "#e8c14a");
+      label(VW / 2, y - 6, tr(...name), "#e8c14a");
       ctx.fillStyle = DARK;
       ctx.fillRect(x - 1, y - 1, w + 2, 6);
       ctx.fillStyle = "#26264a";
       ctx.fillRect(x, y, w, 4);
-      const fill = Math.max(0, Math.round(w * boss.hp / boss.maxHp));
-      ctx.fillStyle = "#c8443c";
-      ctx.fillRect(x, y, Math.min(fill, w / 2), 4);
-      if (fill > w / 2) {
+      const fill = Math.max(0, Math.round(w * hp / max));
+      // The merge conflict: ours and theirs; every other boss in its own color.
+      ctx.fillStyle = boss.type === "boss" ? "#c8443c" : (GORE[boss.type] || GORE.boss)[0];
+      ctx.fillRect(x, y, boss.type === "boss" ? Math.min(fill, w / 2) : fill, 4);
+      if (boss.type === "boss" && fill > w / 2) {
         ctx.fillStyle = "#4a7ae8";
         ctx.fillRect(x + w / 2, y, fill - w / 2, 4);
       }
@@ -800,21 +1017,23 @@
 
     function drawBuffs(s) {
       const p = s.player, list = [];
-      if (s.buffs.coffee > 0) list.push(["coffee", s.buffs.coffee / balance.items.coffee.seconds]);
+      if (s.buffs.coffee > 0) list.push(["coffee", Math.min(1, s.buffs.coffee / balance.items.coffee.seconds)]);
       if (s.buffs.duck > 0) list.push(["duck", s.buffs.duck / balance.items.duck.seconds]);
-      if (p.shield > 0) list.push(["shield", null]);
+      if (s.redCi > 0) list.push(["red_ci", s.redCi / balance.agent.red_ci.seconds]);
+      if (p.shield > 0) list.push(["shield", null, "×" + p.shield]);
+      if (s.orchestra) list.push(["orchestra", null, ""]);
       let x = 6;
-      for (const [name, left] of list) {
+      for (const [name, left, note] of list) {
         const c = sprite(name, {});
         const y = VH - c.height - 8;
         if (left === null || left > 0.25 || Math.floor(s.time * 8) & 1) ctx.drawImage(c, x, y);
         if (left === null) {
-          label(x + c.width + 4, y + c.height / 2, "×" + p.shield, "#8fb3e0");
-          x += c.width + 14;
+          if (note) label(x + c.width + 4, y + c.height / 2, note, "#8fb3e0");
+          x += c.width + (note ? 14 : 4);
         } else {
           ctx.fillStyle = DARK;
           ctx.fillRect(x, VH - 6, c.width, 3);
-          ctx.fillStyle = ITEM_COLORS[name];
+          ctx.fillStyle = ITEM_COLORS[name] || "#d9534f";
           ctx.fillRect(x + 1, VH - 5, Math.round((c.width - 2) * left), 1);
           x += c.width + 4;
         }
@@ -843,6 +1062,17 @@
       }
     }
 
+    // The incident off screen: a blinking sign at the edge.
+    function drawIncidentMarker(z, camX, camY, s) {
+      const sx = z.x - camX, sy = z.y - camY;
+      if (sx > -z.r && sx < VW + z.r && sy > -z.r && sy < VH + z.r) return;
+      if (!(Math.floor(s.time * 4) & 1)) return;
+      const c = sprite("incident", {});
+      const x = Math.max(4, Math.min(VW - c.width - 4, sx - c.width / 2));
+      const y = Math.max(22, Math.min(VH - c.height - 22, sy - c.height / 2));
+      ctx.drawImage(c, px(x), px(y));
+    }
+
     function frameBorder(color, alpha, width) {
       ctx.globalAlpha = alpha;
       ctx.fillStyle = color;
@@ -869,8 +1099,11 @@
       const p = s.player, W = s.map.width, H = s.map.height;
       const sx = shake > 0 ? Math.round((Math.random() - 0.5) * 2 * shake) : 0;
       const sy = shake > 0 ? Math.round((Math.random() - 0.5) * 2 * shake) : 0;
-      const camX = Math.round(Math.max(0, Math.min(W - VW, p.x - VW / 2))) + sx;
-      const camY = Math.round(Math.max(0, Math.min(H - VH, p.y - VH / 2))) + sy;
+      // A map smaller than the view sits in the middle.
+      const cam = (pos, size, view) => (size <= view ? (size - view) / 2
+        : Math.max(0, Math.min(size - view, pos - view / 2)));
+      const camX = Math.round(cam(p.x, W, VW)) + sx;
+      const camY = Math.round(cam(p.y, H, VH)) + sy;
 
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.fillStyle = "#0d0d1a";
@@ -885,7 +1118,13 @@
 
       const visible = (o, m) => o.x > camX - m && o.x < camX + VW + m && o.y > camY - m && o.y < camY + VH + m;
 
+      for (const h of s.hazards) if (h.kind === "goo" && visible(h, h.r)) drawHazard(h, s);
+      if (s.incident) drawIncident(s.incident, s);
+      for (const h of s.hazards) if (h.kind === "fire" && visible(h, h.r + 8)) drawHazard(h, s);
+      for (const g of s.gems) if (visible(g, 6)) drawGem(g, s);
       for (const it of s.items) if (visible(it, 16)) drawItem(it, s);
+      for (const m of s.mines) if (visible(m, 8)) drawMine(m, s);
+      for (const t of s.turrets) if (visible(t, 10)) drawTurret(t, s);
 
       // Shadows first, then everyone sorted by height on screen.
       const actors = [];
@@ -912,7 +1151,9 @@
         else drawEnemy(o, s);
       }
 
+      if (!p.dead) for (const w of s.weapons) if (w.on && w.blades) drawLinters(w, s);
       for (const sh of s.shots) if (visible(sh, 10)) drawShot(sh);
+      for (const sh of s.enemyShots) if (visible(sh, 10)) drawEnemyShot(sh);
       for (const fx of s.effects) drawEffect(fx, s);
       drawParticles();
       if (levelGlow > 0) pixelRing(p.x, p.y - 2, 10 + (1 - levelGlow) * 30, "#e8c14a", levelGlow, 2);
@@ -923,9 +1164,11 @@
 
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       drawAllyMarkers(s, camX, camY);
+      if (s.incident) drawIncidentMarker(s.incident, camX, camY, s);
       drawBossBar(s);
       drawBuffs(s);
       if (s.rage > 0) frameBorder("#ff3030", 0.35 + Math.sin(s.time * 8) * 0.15, 3);
+      else if (s.redCi > 0) frameBorder("#d9534f", 0.3, 2);
       if (hurtFlash > 0) frameBorder("#ff3030", hurtFlash * 2.5, 6);
       if (flash > 0) {
         ctx.globalAlpha = Math.min(0.8, flash);
@@ -961,7 +1204,13 @@
       tx.drawImage(small, 0, 0);
     }
 
-    return {draw, preview};
+    // A sprite as a small canvas, for the menus: cards, the build bar, the handbook.
+    // `gold`: an evolved weapon, outlined in gold.
+    const icon = (name, gold) => sprite(name, gold ? {outline: "#e8c14a"} : {});
+
+    const view = () => ({width: VW, height: VH});
+
+    return {draw, preview, icon, view};
   }
 
   root.LCSRender = {createRenderer, THEMES};

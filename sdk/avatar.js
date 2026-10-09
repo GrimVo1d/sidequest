@@ -272,10 +272,33 @@
     {key: "acc", label: "Аксессуар", type: "shape"},
     {key: "bg", label: "Фон", type: "color"},
   ];
+  // English labels (SidequestI18n.field(x, "label") picks the language).
+  const EN = {
+    skin: ["Skin", {light: "light", fair: "fair", tan: "tan", brown: "brown", dark: "dark",
+                    orc: "green", alien: "blue"}],
+    hair: ["Hair", {none: "none", short: "short", spiky: "spiky", long: "long", bun: "bun",
+                    mohawk: "mohawk"}],
+    hair_color: ["Hair color", {black: "black", brown: "chestnut", blonde: "blonde",
+                                ginger: "ginger", gray: "gray", pink: "pink", blue: "blue",
+                                green: "green", purple: "purple"}],
+    eyes: ["Eyes", {dots: "dots", big: "big", sleepy: "sleepy", happy: "happy", angry: "angry",
+                    wink: "wink"}],
+    mouth: ["Mouth", {smile: "smile", flat: "flat", open: "open", grin: "grin", frown: "frown"}],
+    body: ["Clothes", {tee: "t-shirt", hoodie: "hoodie", jacket: "jacket", armor: "armor"}],
+    cloth: ["Clothes color", {red: "red", blue: "blue", green: "green", purple: "purple",
+                              yellow: "yellow", gray: "gray", black: "black", white: "white"}],
+    acc: ["Accessory", {none: "none", glasses: "glasses", shades: "sunglasses",
+                        headphones: "headphones", cap: "cap", beanie: "beanie", crown: "crown"}],
+    bg: ["Background", {none: "none", night: "night", sky: "sky", mint: "mint", rose: "rose",
+                        sand: "sand", void: "void"}],
+  };
   for (const o of OPTIONS) {
     const table = o.type === "shape" ? PARTS[o.key] : COLORS[o.key];
+    const en = EN[o.key];
+    o.label_en = en[0];
     o.choices = Object.entries(table).map(([id, v]) =>
-      o.type === "shape" ? {id, label: v[0]} : {id, label: v[0], color: v[1]});
+      o.type === "shape" ? {id, label: v[0], label_en: en[1][id] || id}
+        : {id, label: v[0], label_en: en[1][id] || id, color: v[1]});
   }
 
   const DEFAULT_PARTS = {skin: "light", hair: "none", hair_color: "brown", eyes: "dots",
@@ -329,35 +352,35 @@
 
   // Presets: builder combinations, and a few creatures the builder cannot make.
   const PRESETS = [
-    {id: "adventurer", name: "Искатель", parts: {}},
-    {id: "hacker", name: "Хакер", parts: {body: "hoodie", cloth: "black", acc: "shades",
+    {id: "adventurer", name: "Искатель", name_en: "Adventurer", parts: {}},
+    {id: "hacker", name: "Хакер", name_en: "Hacker", parts: {body: "hoodie", cloth: "black", acc: "shades",
                                           mouth: "flat", bg: "void"}},
-    {id: "reviewer", name: "Ревьюер", parts: {skin: "fair", hair: "short", hair_color: "gray",
+    {id: "reviewer", name: "Ревьюер", name_en: "Reviewer", parts: {skin: "fair", hair: "short", hair_color: "gray",
                                               body: "jacket", cloth: "gray", acc: "glasses",
                                               mouth: "flat", bg: "sand"}},
-    {id: "intern", name: "Стажёр", parts: {skin: "tan", hair: "spiky", hair_color: "ginger",
+    {id: "intern", name: "Стажёр", name_en: "Intern", parts: {skin: "tan", hair: "spiky", hair_color: "ginger",
                                            eyes: "big", mouth: "open", body: "tee",
                                            cloth: "yellow", bg: "sky"}},
-    {id: "devops", name: "Девопс", parts: {skin: "brown", hair: "short", hair_color: "black",
+    {id: "devops", name: "Девопс", name_en: "DevOps", parts: {skin: "brown", hair: "short", hair_color: "black",
                                            body: "tee", cloth: "blue", acc: "headphones",
                                            bg: "mint"}},
-    {id: "lead", name: "Тимлид", parts: {skin: "light", hair: "bun", hair_color: "brown",
+    {id: "lead", name: "Тимлид", name_en: "Team lead", parts: {skin: "light", hair: "bun", hair_color: "brown",
                                          body: "jacket", cloth: "blue", acc: "glasses",
                                          bg: "rose"}},
-    {id: "merge-king", name: "Король мержей", parts: {skin: "fair", hair: "long",
+    {id: "merge-king", name: "Король мержей", name_en: "Merge king", parts: {skin: "fair", hair: "long",
                                                       hair_color: "blonde", body: "tee",
                                                       cloth: "purple", acc: "crown",
                                                       eyes: "happy", bg: "night"}},
-    {id: "night-owl", name: "Сова", parts: {skin: "dark", hair: "none", body: "hoodie",
+    {id: "night-owl", name: "Сова", name_en: "Night owl", parts: {skin: "dark", hair: "none", body: "hoodie",
                                             cloth: "green", acc: "beanie", eyes: "sleepy",
                                             mouth: "flat", bg: "void"}},
-    {id: "orc", name: "Орк", parts: {skin: "orc", hair: "mohawk", hair_color: "black",
+    {id: "orc", name: "Орк", name_en: "Orc", parts: {skin: "orc", hair: "mohawk", hair_color: "black",
                                      body: "armor", eyes: "angry", mouth: "grin",
                                      bg: "sand"}},
-    {id: "alien", name: "Пришелец", parts: {skin: "alien", hair: "none", body: "tee",
+    {id: "alien", name: "Пришелец", name_en: "Alien", parts: {skin: "alien", hair: "none", body: "tee",
                                             cloth: "white", eyes: "big", mouth: "smile",
                                             bg: "void"}},
-    {id: "robot", name: "Робот", colors: {".": "#5b8bd0"}, sprite: [
+    {id: "robot", name: "Робот", name_en: "Robot", colors: {".": "#5b8bd0"}, sprite: [
       ".......TT.......",
       ".......KK.......",
       "....OOOOOOOO....",
@@ -375,7 +398,7 @@
       ".OGGGGGGGGGGGGO.",
       ".OGGGGGGGGGGGGO.",
     ]},
-    {id: "slime", name: "Слизень", colors: {A: "#6fd08c", a: "#3f9a5a", B: "#26264a"}, sprite: [
+    {id: "slime", name: "Слизень", name_en: "Slime", colors: {A: "#6fd08c", a: "#3f9a5a", B: "#26264a"}, sprite: [
       "BBBBBBBBBBBBBBBB",
       "BBBBBBBBBBBBBBBB",
       "BBBBBBBBBBBBBBBB",
@@ -393,7 +416,7 @@
       "BBOaaaaaaaaaaOBB",
       "BBBOOOOOOOOOOBBB",
     ]},
-    {id: "ghost", name: "Призрак", colors: {B: "#0d0d1a"}, sprite: [
+    {id: "ghost", name: "Призрак", name_en: "Ghost", colors: {B: "#0d0d1a"}, sprite: [
       "BBBBBBBBBBBBBBBB",
       "BBBBBOOOOOOBBBBB",
       "BBBBOWWWWWWOBBBB",
@@ -411,7 +434,7 @@
       "BBOWOBOWWOBOWOBB",
       "BBBOBBBOOBBBOBBB",
     ]},
-    {id: "cat", name: "Кот", colors: {A: "#e8a050", a: "#c07a30", B: "#7fc8a0"}, sprite: [
+    {id: "cat", name: "Кот", name_en: "Cat", colors: {A: "#e8a050", a: "#c07a30", B: "#7fc8a0"}, sprite: [
       "BBBBBBBBBBBBBBBB",
       "BBBOBBBBBBBBOBBB",
       "BBOAOBBBBBBOAOBB",

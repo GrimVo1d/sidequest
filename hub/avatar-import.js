@@ -12,6 +12,8 @@
   const STILL_SIDE = 512;        // the same for a still picture
   const PICTURE_SIZE = 256, GIF_PICTURE_SIZE = 128;   // see PICTURE_SIZES in avatar.py
   const CHARS = "0123456789abcdefghijklmnopqrstuv";
+  // Tests run this file in jsc without sdk/i18n.js.
+  const tr = (ru, en) => root.SidequestI18n ? root.SidequestI18n.t(ru, en) : ru;
 
   // --- GIF ---------------------------------------------------------------------------
 
@@ -22,13 +24,14 @@
   // Walks the GIF blocks; calls onImage(descriptor, control) for every frame.
   function walkGif(bytes, onImage) {
     let pos = 6;
-    const u8 = () => { if (pos >= bytes.length) throw new Error("GIF обрывается"); return bytes[pos++]; };
+    const u8 = () => { if (pos >= bytes.length) throw new Error(tr("GIF обрывается", "the GIF is cut short")); return bytes[pos++]; };
     const u16 = () => u8() | (u8() << 8);
     const skipBlocks = () => { for (let n = u8(); n; n = u8()) pos += n; };
     const width = u16(), height = u16(), packed = u8();
     pos += 2;
     if (!width || !height || width > MAX_SIDE || height > MAX_SIDE) {
-      throw new Error(`GIF слишком большой: ${width}×${height}, можно до ${MAX_SIDE}`);
+      throw new Error(tr(`GIF слишком большой: ${width}×${height}, можно до ${MAX_SIDE}`,
+                                `the GIF is too big: ${width}×${height}, up to ${MAX_SIDE}`));
     }
     let globalTable = null;
     if (packed & 0x80) {
@@ -66,22 +69,23 @@
         const minCode = u8();
         const dataStart = pos;
         skipBlocks();
-        if (++frames > MAX_GIF_FRAMES) throw new Error(`в GIF больше ${MAX_GIF_FRAMES} кадров`);
+        if (++frames > MAX_GIF_FRAMES) throw new Error(tr(`в GIF больше ${MAX_GIF_FRAMES} кадров`,
+                                                                  `the GIF has more than ${MAX_GIF_FRAMES} frames`));
         onImage({left, top, w, h, interlaced: !!(p & 0x40), table, minCode, dataStart}, control);
         control = {delay: 0, disposal: 0, transparent: -1};
       } else if (pos >= bytes.length) {
         break;  // a missing trailer is common and harmless
       } else {
-        throw new Error("GIF повреждён");
+        throw new Error(tr("GIF повреждён", "the GIF is damaged"));
       }
     }
-    if (!frames) throw new Error("в GIF нет кадров");
+    if (!frames) throw new Error(tr("в GIF нет кадров", "the GIF has no frames"));
     return {width, height, frames};
   }
 
   // LZW: returns w*h palette indexes (missing tail stays 0).
   function lzw(bytes, pos, minCode, count) {
-    if (minCode < 2 || minCode > 8) throw new Error("GIF повреждён");
+    if (minCode < 2 || minCode > 8) throw new Error(tr("GIF повреждён", "the GIF is damaged"));
     const out = new Uint8Array(count);
     const clear = 1 << minCode, end = clear + 1;
     const prefix = new Int16Array(4096), suffix = new Uint8Array(4096), first = new Uint8Array(4096);
@@ -264,7 +268,8 @@
         counts.set(key, (counts.get(key) || 0) + 1);
       }
     }
-    if (!counts.size) throw new Error("картинка получилась пустой — она вся прозрачная");
+    if (!counts.size) throw new Error(tr("картинка получилась пустой — она вся прозрачная",
+                                            "the picture came out empty — it is all transparent"));
     const colors = [...counts].map(([key, w]) => [key >> 16, (key >> 8) & 255, key & 255, w]);
     const palette = medianCut(colors, Math.min(k, CHARS.length));
     const nearest = new Map();
@@ -297,14 +302,15 @@
 
   // Reads the file once. Returns working frames for convert().
   async function load(file) {
-    if (file.size > MAX_FILE) throw new Error("файл больше 8 МБ");
+    if (file.size > MAX_FILE) throw new Error(tr("файл больше 8 МБ", "the file is over 8 MB"));
     const bytes = new Uint8Array(await file.arrayBuffer());
     if (isGif(bytes)) return {animated: true, frames: decodeGif(bytes, 64)};
     let bitmap;
     try {
       bitmap = await createImageBitmap(file);
     } catch (e) {
-      throw new Error("это не картинка или формат не поддерживается");
+      throw new Error(tr("это не картинка или формат не поддерживается",
+                             "not a picture, or the format is not supported"));
     }
     const scale = Math.min(1, STILL_SIDE / Math.max(bitmap.width, bitmap.height));
     const w = Math.max(1, Math.round(bitmap.width * scale)), h = Math.max(1, Math.round(bitmap.height * scale));

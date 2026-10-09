@@ -10,8 +10,15 @@
 //   await Sidequest.storage.set("save", {...})
 //   await Sidequest.match.start(); await Sidequest.match.end({score: 120})
 //   await Sidequest.achievements.unlock("first-blood", "Первая кровь")
+//   await Sidequest.card([["Лучший счёт", 1200], ["Матчей", 5]])   // rows on the hub card, up to 4;
+//                                           // a label may be {ru: "Матчей", en: "Matches"}
+//   await Sidequest.history.sessions()      // past sessions: [{session, project, started_at,
+//                                           //   duration, actions}], newest first
+//   await Sidequest.history.events(session) // its normalized events, "t" — seconds from the start
 //   Sidequest.dev.command("wave", "Вызвать волну", () => ...)   // dev panel button
-//   Sidequest.ready()                       // call once the DLC is set up
+//   Sidequest.exit()                        // back to the hub (the DLC has the whole window)
+//   Sidequest.ready()                       // call once the DLC is set up; resolves to
+//                                           // info {dlc, dev, lang} — lang is "ru" or "en"
 "use strict";
 
 (function () {
@@ -21,7 +28,7 @@
   const pending = {};
   let nextId = 1;
   let paused = false;
-  let info = {dlc: null, dev: false};
+  let info = {dlc: null, dev: false, lang: "ru"};
   let helloResolve;
   const hello = new Promise((resolve) => { helloResolve = resolve; });
 
@@ -59,7 +66,8 @@
       delete pending[m.id];
       if (m.error) p.reject(new Error(m.error)); else p.resolve(m.result);
     } else if (m.kind === "hello") {
-      info = {dlc: m.dlc, dev: !!m.dev};
+      info = {dlc: m.dlc, dev: !!m.dev, lang: m.lang === "en" ? "en" : "ru"};
+      if (window.SidequestI18n) window.SidequestI18n.set(info.lang);
       helloResolve(info);
     } else if (m.kind === "dev_command" && devCommands[m.id]) {
       devCommands[m.id].fn();
@@ -85,6 +93,13 @@
       start: () => call("match_start"),
       end: (result) => call("match_end", result),
     },
+    card: (rows) => call("save", "card", rows),
+    // Past sessions, to replay one inside the game on its own clock.
+    history: {
+      sessions: () => call("sessions"),
+      events: (session) => call("session_events", session),
+    },
+    exit() { post({kind: "exit"}); },
     achievements: {
       async list() { return (await call("load", "achievements")) || {}; },
       async unlock(id, title) {

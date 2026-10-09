@@ -141,6 +141,39 @@ def bash_category(command):
     return "other"
 
 
+# git options that take a separate argument: `git -C repo commit`.
+_GIT_OPTIONS_WITH_VALUE = {"-C", "-c", "--git-dir", "--work-tree", "--namespace"}
+
+
+def _git_op(words):
+    head, rest = words[0], words[1:]
+    if head == "gh":
+        # gh pr create / gh pr merge publish the work, like a push.
+        if rest[:1] == ["pr"] and len(rest) > 1 and rest[1] in ("create", "merge"):
+            return "push"
+        return None
+    if head != "git":
+        return None
+    i = 0
+    while i < len(rest) and rest[i].startswith("-"):
+        i += 2 if rest[i] in _GIT_OPTIONS_WITH_VALUE else 1
+    sub = rest[i] if i < len(rest) else None
+    return sub if sub in ("commit", "push") else None
+
+
+def git_ops(command):
+    """The git steps a shell command takes, from a fixed list: "commit", "push".
+
+    Only these words leave the normalizer, never the command.
+    """
+    found = set()
+    for segment in _SEGMENT_SPLIT.split(command or ""):
+        words = _words(segment)
+        if words:
+            found.add(_git_op(words))
+    return [op for op in ("commit", "push") if op in found]
+
+
 def _count_patch(patch):
     added = removed = 0
     for hunk in patch or []:
@@ -367,6 +400,8 @@ class Normalizer:
             fields["category"] = bash_category(tool_input.get("command"))
             if fields["category"] == "search":
                 fields["action"] = "scout"  # games treat it like Read
+            if fields["category"] == "git":
+                fields["git"] = git_ops(tool_input.get("command"))
         if tool in FILE_TOOLS:
             path = tool_input.get("file_path") or tool_input.get("notebook_path")
             fields["file"] = _relative_file(path, payload.get("cwd"))

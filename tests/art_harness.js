@@ -29,6 +29,7 @@ load(DLC + "/sprites.js");
 load(DLC + "/font.js");
 load(DLC + "/game.js");
 load(DLC + "/render.js");
+load(DLC + "/codex.js");
 const balance = JSON.parse(readFile(DLC + "/balance.json"));
 
 // --- sprites and font ---------------------------------------------------------------
@@ -71,14 +72,21 @@ for (const call of readFile(DLC + "/game.js").match(/\btext\([^;]*\);/g) || []) 
     if (!value.startsWith("#")) texts.push(value);
   }
 }
-texts.push(/BOSS_NAME = "([^"]+)"/.exec(readFile(DLC + "/render.js"))[1]);
+const RENDER = readFile(DLC + "/render.js");
+for (const name of ["BOSS_NAME", "FINAL_NAME"]) {
+  const pair = new RegExp(name + " = \\[([^\\]]+)\\]").exec(RENDER)[1];
+  for (const m of pair.match(/"[^"]*"/g)) texts.push(m.slice(1, -1));
+}
+for (const g of balance.gear) texts.push(g.name, g.name_en);
+for (const e of Object.values(balance.enemies)) if (e.name) texts.push(e.name, e.name_en);
+for (const w of balance.weapons) texts.push(w.evolution.name, w.evolution.name_en);
 const missingInTexts = [...new Set(texts.join("").toUpperCase())].filter((ch) => !LCSFont.has(ch));
 
 // --- whole matches, drawn ----------------------------------------------------------
 
 const ACTIONS = ["attack", "scout", "cast", "scout_far", "summon", "generic"];
-function drawMatch(map, seed) {
-  const g = LCS.createGame(balance, {seed, map});
+function drawMatch(map, seed, mode) {
+  const g = LCS.createGame(balance, {seed, map, mode});
   const s = g.state;
   const r = LCSRender.createRenderer(fakeCanvas(), balance);
   const avatar = {width: 16};
@@ -87,13 +95,31 @@ function drawMatch(map, seed) {
   pic.height = 102;
   r.preview(map, pic);
   const ev = (o) => g.agentEvent(Object.assign({session: "a", project: "sidequest"}, o));
+  if (mode === "classic") s.stats.magazine = 16;  // rounds as a number, not marks
   g.dev.immortal();
+  // Four weapons; in classic all of them evolved.
+  for (let i = 0; i < 3; i++) g.dev.weapon(balance.weapons[(seed + i) % 7 + 1].id);
+  if (mode === "classic") g.dev.evolve();
   ev({kind: "prompt"});
   g.agentEvent({kind: "prompt", session: "b", project: "второй"});
   g.dev.wave();
   g.dev.boss();
   for (let i = 0; i < 6; i++) g.dev.item();
-  let error = null, frames = 0, sawItem = false, picked = 0;
+  g.dev.chest();
+  for (const type of ["leak", "race", "nullptr", "deprecated"]) g.dev.enemy(type);
+  for (const type of ["flaky", "spaghetti", "offbyone", "debt", "logspam", "regression", "scope", "monolith"]) {
+    g.dev.enemy(type);
+  }
+  for (const type of balance.bosses.order) g.dev.boss(type);
+  g.dev.elite("grunt", "shielded");
+  g.dev.elite("runner", "fast");
+  g.dev.elite("tank", "vampire");
+  g.dev.event(seed % 2 ? "deploy" : "incident");
+  if (mode === "classic") {
+    g.dev.final();
+    for (const e of s.enemies) if (e.final) e.hp = 1;
+  }
+  let error = null, frames = 0, sawItem = false, picked = 0, sawGem = false;
   const counted = new WeakSet();
   try {
     for (let i = 0; i < 60 * 90 && !s.over; i++) {
@@ -106,9 +132,18 @@ function drawMatch(map, seed) {
       if (i === 1200) ev({kind: "compact", phase: "start"});
       if (i === 1500) ev({kind: "compact", phase: "end"});
       if (i === 1600) ev({kind: "subagent_start", agent: "x"});
+      if (i === 1650) ev({kind: "subagent_start", agent: "e", agent_type: "Explore"});
+      if (i === 1700) ev({kind: "subagent_start", agent: "p", agent_type: "Plan"});
       if (i === 2400) ev({kind: "subagent_stop", agent: "x"});
-      if (i === 3000) g.dev.finale();
+      if (i === 700) ev({kind: "tool", tool: "Bash", action: "cast", category: "build"});
+      if (i === 750) ev({kind: "tool", tool: "Bash", action: "cast", category: "git", git: ["commit", "push"]});
+      if (i === 800) ev({kind: "tool_error", tool: "Bash", action: "cast", category: "test"});
+      if (i === 1000) ev({kind: "tool", tool: "Bash", action: "cast", category: "test"});
+      if (i === 1100) ev({kind: "waiting", tool: "Write", ts: 10});
+      if (i === 1300) ev({kind: "resumed", ts: 12});
+      if (i === 3000 && mode !== "classic") g.dev.finale();
       if (s.items.length) sawItem = true;
+      if (s.gems.length) sawGem = true;
       for (const fx of s.effects) {
         if (fx.type === "pickup" && !counted.has(fx)) { counted.add(fx); picked++; }
       }
@@ -118,10 +153,36 @@ function drawMatch(map, seed) {
   } catch (e) {
     error = String(e) + "\n" + e.stack;
   }
-  return {error, frames, over: s.over, sawItem, picked};
+  return {error, frames, over: s.over, sawItem, picked, sawGem, reason: s.over && s.results.reason};
 }
+
+// Which sprites the matches below actually draw.
+const drawn = new Set();
+const decode = LCSSprites.decode;
+LCSSprites.decode = (name, o) => { drawn.add(name); return decode(name, o); };
 
 const maps = {};
 LCS_MAPS.forEach((m, i) => { maps[m.id] = drawMatch(m, 11 + i); });
+LCS_MAPS.forEach((m, i) => { maps["classic " + m.id] = drawMatch(m, 31 + i, "classic"); });
 
-print(JSON.stringify({spriteErrors, sizes, fontErrors, missing, missingInTexts, texts, maps, calls, badCall}));
+// The handbook: every entry has a real sprite (or none) and both texts, numbers filled in.
+const codexErrors = [], codexIds = {};
+for (const sec of LCSCodex.sections(balance)) {
+  codexIds[sec.id] = sec.entries.map((e) => e.id);
+  for (const e of sec.entries) {
+    if (e.icon !== null && !LCSSprites.SPRITES[e.icon]) codexErrors.push(`${e.id}: no sprite ${e.icon}`);
+    for (const pair of [e.name, e.text]) {
+      if (pair.length !== 2 || pair.some((x) => typeof x !== "string" || !x)) codexErrors.push(`${e.id}: empty text`);
+      else if (/undefined|NaN|null/.test(pair.join(" "))) codexErrors.push(`${e.id}: ${pair[0]}`);
+      else if (/[А-Яа-яЁё]/.test(pair[1])) codexErrors.push(`${e.id}: Russian in English`);
+    }
+  }
+}
+const hints = ["medkit", "coffee", "duck", "shield", "chest", "gem", "rage", "commit", "push",
+               "turret", "tests", "red_ci", "reviewer", "orchestra", "spirit_shooter",
+               "spirit_scout", "spirit_plan", "elite", "deploy", "incident"]
+  .concat(Object.keys(balance.enemies), ["final"])
+  .filter((id) => !LCSCodex.entry(balance, id));
+
+print(JSON.stringify({spriteErrors, sizes, fontErrors, missing, missingInTexts, texts, maps, calls, badCall,
+                      codexErrors, codexIds, hints, drawn: [...drawn]}));

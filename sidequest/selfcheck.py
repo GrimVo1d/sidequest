@@ -10,6 +10,7 @@ import threading
 import time
 
 from . import claude_settings
+from .i18n import t
 from .normalizer import HOOK_EVENTS
 
 SELFTEST_EVENT = "SidequestSelfTest"
@@ -66,31 +67,44 @@ def check_hooks(settings_path, emit_path, expected_hash):
     try:
         settings, raw = claude_settings.read_settings(settings_path)
     except claude_settings.SettingsError as e:
-        return Result("Хуки", False, str(e), "Исправьте settings.json вручную")
+        return Result(t("Хуки", "Hooks"), False, str(e),
+                      t("Исправьте settings.json вручную", "Fix settings.json by hand"))
     if raw is None:
-        return Result("Хуки", False, "settings.json нет",
-                      "Нажмите «Подключить к Claude Code»")
+        return Result(t("Хуки", "Hooks"), False, t("settings.json нет", "no settings.json"),
+                      t("Нажмите «Подключить к Claude Code»", "Press “Connect to Claude Code”"))
     if settings.get("disableAllHooks") is True:
-        return Result("Хуки", False, "в settings.json включено disableAllHooks",
-                      "Уберите disableAllHooks, иначе Claude Code не вызывает хуки")
+        return Result(t("Хуки", "Hooks"), False,
+                      t("в settings.json включено disableAllHooks",
+                        "disableAllHooks is on in settings.json"),
+                      t("Уберите disableAllHooks, иначе Claude Code не вызывает хуки",
+                        "Remove disableAllHooks, or Claude Code calls no hooks"))
     entries = claude_settings.find_entries(settings)
     missing = [e for e in HOOK_EVENTS if e not in entries]
     if missing and len(missing) == len(HOOK_EVENTS):
-        return Result("Хуки", False, "Sidequest не подключён к Claude Code",
-                      "Нажмите «Подключить к Claude Code»")
+        return Result(t("Хуки", "Hooks"), False,
+                      t("Sidequest не подключён к Claude Code", "Sidequest is not connected to Claude Code"),
+                      t("Нажмите «Подключить к Claude Code»", "Press “Connect to Claude Code”"))
     if missing:
-        return Result("Хуки", False, "нет записей для: " + ", ".join(missing),
-                      "Нажмите «Подключить» ещё раз")
+        return Result(t("Хуки", "Hooks"), False,
+                      t("нет записей для: ", "no entries for: ") + ", ".join(missing),
+                      t("Нажмите «Подключить» ещё раз", "Press “Connect” again"))
     paths = {p for ps in entries.values() for p in ps}
     if paths != {emit_path}:
-        return Result("Хуки", False, "записи указывают на другой путь — папку переместили?",
-                      "Нажмите «Подключить» ещё раз")
+        return Result(t("Хуки", "Hooks"), False,
+                      t("записи указывают на другой путь — папку переместили?",
+                        "the entries point to another path — was the folder moved?"),
+                      t("Нажмите «Подключить» ещё раз", "Press “Connect” again"))
     if not os.path.isfile(emit_path):
-        return Result("Хуки", False, f"нет файла {emit_path}", "Восстановите проект")
+        return Result(t("Хуки", "Hooks"), False, t(f"нет файла {emit_path}", f"no file {emit_path}"),
+                      t("Восстановите проект", "Restore the project"))
     if expected_hash and file_hash(emit_path) != expected_hash:
-        return Result("Хуки", False, "sidequest-emit.sh изменился после установки",
-                      "Проверьте скрипт и нажмите «Подключить» ещё раз")
-    return Result("Хуки", True, f"все {len(HOOK_EVENTS)} событий подключены")
+        return Result(t("Хуки", "Hooks"), False,
+                      t("sidequest-emit.sh изменился после установки",
+                        "sidequest-emit.sh changed after it was installed"),
+                      t("Проверьте скрипт и нажмите «Подключить» ещё раз",
+                        "Check the script and press “Connect” again"))
+    return Result(t("Хуки", "Hooks"), True, t(f"все {len(HOOK_EVENTS)} событий подключены",
+                                         f"all {len(HOOK_EVENTS)} events connected"))
 
 
 # --- b) Claude Code version ----------------------------------------------------------
@@ -122,13 +136,18 @@ def claude_version(timeout=3):
 def check_version(verified):
     version = claude_version()
     if version is None:
-        return Result("Версия Claude Code", False, "claude не найден или не ответил за 3 с",
-                      "Проверьте, что Claude Code установлен"), None
+        return Result(t("Версия Claude Code", "Claude Code version"), False,
+                      t("claude не найден или не ответил за 3 с",
+                        "claude not found or no answer in 3 s"),
+                      t("Проверьте, что Claude Code установлен",
+                        "Check that Claude Code is installed")), None
     if version == verified:
-        return Result("Версия Claude Code", True, f"{version}, проверена"), version
-    return Result("Версия Claude Code", True,
-                  f"{version} — новая (проверена {verified}); "
-                  "следующая сессия станет контрольной", warn=True), version
+        return Result(t("Версия Claude Code", "Claude Code version"), True,
+                      t(f"{version}, проверена", f"{version}, verified")), version
+    return Result(t("Версия Claude Code", "Claude Code version"), True,
+                  t(f"{version} — новая (проверена {verified}); следующая сессия станет контрольной",
+                    f"{version} is new (verified: {verified}); the next session is the control one"),
+                  warn=True), version
 
 
 # --- c) pipeline ---------------------------------------------------------------------
@@ -165,21 +184,26 @@ def check_pipeline(emit_path, probe, timeout=1.0):
         proc = subprocess.run(["/bin/sh", emit_path], input=payload,
                               capture_output=True, timeout=5)
     except (OSError, subprocess.TimeoutExpired) as e:
-        return Result("Конвейер", False, f"хук не запустился: {e}",
-                      "Проверьте hooks/sidequest-emit.sh")
+        return Result(t("Конвейер", "Pipeline"), False, t(f"хук не запустился: {e}", f"the hook did not run: {e}"),
+                      t("Проверьте hooks/sidequest-emit.sh", "Check hooks/sidequest-emit.sh"))
     elapsed_ms = (time.monotonic() - start) * 1000
     if proc.returncode != 0 or proc.stdout:
-        return Result("Конвейер", False,
-                      f"хук вышел с кодом {proc.returncode} или что-то напечатал",
-                      "Проверьте hooks/sidequest-emit.sh")
+        return Result(t("Конвейер", "Pipeline"), False,
+                      t(f"хук вышел с кодом {proc.returncode} или что-то напечатал",
+                        f"the hook exited with code {proc.returncode} or printed something"),
+                      t("Проверьте hooks/sidequest-emit.sh", "Check hooks/sidequest-emit.sh"))
     if not probe.wait(timeout):
-        return Result("Конвейер", False, "событие не дошло до сокета за 1 с",
-                      "Перезапустите Sidequest")
+        return Result(t("Конвейер", "Pipeline"), False,
+                      t("событие не дошло до сокета за 1 с", "the event did not reach the socket in 1 s"),
+                      t("Перезапустите Sidequest", "Restart Sidequest"))
     if elapsed_ms > SLOW_HOOK_MS:
-        return Result("Конвейер", True,
-                      f"работает, но хук занял {elapsed_ms:.0f} мс — на столько он "
-                      "задерживает каждое действие агента", warn=True)
-    return Result("Конвейер", True, f"работает, хук — {elapsed_ms:.0f} мс")
+        return Result(t("Конвейер", "Pipeline"), True,
+                      t(f"работает, но хук занял {elapsed_ms:.0f} мс — на столько он "
+                        "задерживает каждое действие агента",
+                        f"works, but the hook took {elapsed_ms:.0f} ms — it delays every "
+                        "agent action by that much"), warn=True)
+    return Result(t("Конвейер", "Pipeline"), True,
+                  t(f"работает, хук — {elapsed_ms:.0f} мс", f"works, the hook takes {elapsed_ms:.0f} ms"))
 
 
 # --- 2) control session --------------------------------------------------------------
@@ -217,9 +241,9 @@ class ControlSession:
         remarks = []
         for name in EXPECTED_EVENTS:
             if name not in self.fields:
-                remarks.append(f"не было {name}")
+                remarks.append(t(f"не было {name}", f"no {name}"))
         for name, expected in EXPECTED_FIELDS.items():
             if name in self.fields:
                 for field in sorted(expected - self.fields[name]):
-                    remarks.append(f"в {name} нет поля {field}")
+                    remarks.append(t(f"в {name} нет поля {field}", f"{name} has no field {field}"))
         return remarks

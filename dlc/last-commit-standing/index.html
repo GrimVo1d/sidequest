@@ -20,49 +20,100 @@
     <span id="ammo"></span>
     <span id="score"></span>
     <span id="multiplier"></span>
-    <span id="rage" hidden>ЯРОСТЬ</span>
+    <span id="rage" data-en="RAGE" hidden>ЯРОСТЬ</span>
+    <span id="red-ci" data-en="RED CI" hidden>КРАСНЫЙ CI</span>
+    <span id="orchestra" data-en="ORCHESTRA" hidden>ОРКЕСТР</span>
+    <span id="deploy" hidden></span>
+    <span id="incident" hidden></span>
   </div>
+  <div id="build"></div>
   <ul id="allies"></ul>
   <div id="notice" hidden></div>
+  <div id="tip" hidden>
+    <canvas id="tip-icon"></canvas>
+    <div><div id="tip-title"></div><div id="tip-text"></div></div>
+  </div>
 </div>
 
 <section id="menu" class="screen">
   <h1>Last Commit Standing</h1>
-  <canvas id="menu-avatar" class="avatar"></canvas>
-  <div id="menu-name"></div>
-  <dl id="records"></dl>
-  <div id="maps"></div>
-  <button id="btn-play" class="primary">Играть</button>
-  <p class="hint">WASD или стрелки — ходить, стреляешь сам. Esc — меню.<br>
-    Союзники — твои агенты: их действия становятся атаками.<br>
-    Матч заканчивается, когда все агенты закончили задачу.</p>
+  <div class="menu-cols">
+    <div class="menu-col">
+      <canvas id="menu-avatar" class="avatar"></canvas>
+      <div id="menu-name"></div>
+      <h3 id="records-title"></h3>
+      <dl id="records"></dl>
+      <h3 data-en="Overall">Всего</h3>
+      <dl id="totals"></dl>
+    </div>
+    <div class="menu-col">
+      <div id="modes"></div>
+      <p id="mode-text" class="hint"></p>
+      <div id="ghosts" hidden></div>
+      <p id="daily-text" hidden></p>
+      <div id="maps"></div>
+      <h3><span data-en="Modifiers">Модификаторы</span> <span id="mods-mul"></span></h3>
+      <div id="mods"></div>
+      <p id="mods-text" class="hint"></p>
+      <div class="menu-buttons">
+        <button id="btn-play" class="primary" data-en="Play">Играть</button>
+        <button id="btn-codex" data-en="Handbook">Справочник</button>
+        <button id="btn-hub" data-en="To the hub">В хаб</button>
+      </div>
+      <p class="hint" data-en="WASD or arrows to move, you shoot by yourself. Esc for the menu.">WASD или стрелки — ходить, стреляешь сам. Esc — меню.</p>
+    </div>
+    <div class="menu-col">
+      <h3><span data-en="Achievements">Ачивки</span> <span id="achievements-count"></span></h3>
+      <ul id="achievements" class="achievements"></ul>
+    </div>
+  </div>
 </section>
 
 <section id="levelup" class="screen" hidden>
-  <h2>Новый уровень</h2>
+  <h2 id="choices-title"></h2>
   <div id="choices"></div>
-  <p class="hint">1, 2, 3 или клик</p>
+  <div id="choice-actions">
+    <button id="btn-reroll"></button>
+    <button id="btn-banish"></button>
+  </div>
+  <p class="hint" data-en="1, 2, 3 or a click">1, 2, 3 или клик</p>
 </section>
 
 <section id="esc" class="screen" hidden>
-  <h2>Пауза</h2>
-  <button id="btn-resume" class="primary">Продолжить</button>
-  <button id="btn-quit">Завершить матч</button>
+  <h2 data-en="Pause">Пауза</h2>
+  <button id="btn-resume" class="primary" data-en="Resume">Продолжить</button>
+  <button id="btn-esc-codex" data-en="Handbook">Справочник</button>
+  <button id="btn-quit" data-en="End the match">Завершить матч</button>
+</section>
+
+<section id="codex" class="screen" hidden>
+  <h2 data-en="Handbook">Справочник</h2>
+  <div id="codex-tabs"></div>
+  <ul id="codex-list"></ul>
+  <button id="btn-codex-back" class="primary" data-en="Back">Назад</button>
 </section>
 
 <section id="results" class="screen" hidden>
   <h2 id="results-title"></h2>
   <dl id="results-list"></dl>
-  <p id="results-note" class="note" hidden>Матч не засчитан: повтор или панель разработчика.</p>
-  <button id="btn-again" class="primary">В меню</button>
+  <p id="results-note" class="note" hidden
+   data-en="The match is not counted: a replay or the developer panel.">Матч не засчитан: повтор или панель разработчика.</p>
+  <div id="results-new" hidden>
+    <h3 data-en="New achievements">Новые ачивки</h3>
+    <ul id="results-achievements" class="achievements"></ul>
+  </div>
+  <button id="btn-again" class="primary" data-en="To the menu">В меню</button>
 </section>
 
+<script src="../../sdk/i18n.js"></script>
 <script src="../../sdk/sidequest-sdk.js"></script>
 <script src="../../sdk/avatar.js"></script>
 <script src="maps.js"></script>
 <script src="sprites.js"></script>
 <script src="font.js"></script>
 <script src="game.js"></script>
+<script src="progress.js"></script>
+<script src="codex.js"></script>
 <script src="render.js"></script>
 <script src="main.js"></script>
 </body>

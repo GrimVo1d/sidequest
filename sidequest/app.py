@@ -10,12 +10,15 @@ import re
 import threading
 import time
 
-from . import avatar, claude_settings, paths, replay, selfcheck
+from . import avatar, claude_settings, i18n, paths, replay, selfcheck
 from .core import Core
 from .db import DEFAULT_SETTINGS
+from .i18n import t
 
 WAKE_JS = "window.__sidequestWake && window.__sidequestWake()"
 MAX_QUEUE = 5000
+GHOST_MIN_ACTIONS = 10       # shorter sessions make no match
+GHOST_MAX_EVENTS = 20000
 _ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
 
 
@@ -196,12 +199,12 @@ class Bridge:
     def profile(self):
         store = self._core.store
         # avatar None means the default one (SidequestAvatar.DEFAULT in sdk/avatar.js).
-        return {"name": store.get_meta("profile.name", "Игрок"),
+        return {"name": store.get_meta("profile.name", t("Игрок", "Player")),
                 "avatar": store.get_meta("profile.avatar"),
                 "stats": store.stats()}
 
     def set_profile_name(self, name):
-        name = str(name).strip()[:32] or "Игрок"
+        name = str(name).strip()[:32] or t("Игрок", "Player")
         self._core.store.set_meta("profile.name", name)
         return name
 
@@ -216,13 +219,18 @@ class Bridge:
 
     def get_settings(self):
         store = self._core.store
-        return {name: store.get_setting(name) for name in DEFAULT_SETTINGS}
+        settings = {name: store.get_setting(name) for name in DEFAULT_SETTINGS}
+        settings["lang"] = i18n.language()  # "auto" resolved: what the window shows
+        return settings
 
     def set_setting(self, name, value):
         if name == "silence_pause_seconds":
             value = max(10, min(3600, int(value)))
         elif name == "fps_limit":
             value = 30 if int(value) <= 30 else 60
+        elif name == "language":
+            value = value if value in i18n.LANGS else "auto"
+            i18n.set_language(i18n.resolve(value))
         self._core.store.set_setting(name, value)
         return value
 
@@ -252,8 +260,28 @@ class Bridge:
                 entry = os.path.join(root, name, data.get("entry", "index.html"))
                 found.append({"id": name, "name": str(data.get("name", name)),
                               "dev_only": root != roots[0],
+                              "card": self._card(name),
                               "url": _file_url(entry)})
         return found
+
+    def _card(self, dlc_id):
+        """A few "label: value" rows the DLC wrote for its card in the hub (Sidequest.card).
+
+        A label is a string or {"ru": .., "en": ..}."""
+        try:
+            rows = self.dlc_load(dlc_id, "card")
+        except (OSError, ValueError):
+            return []
+        if not isinstance(rows, list):
+            return []
+        card = []
+        for row in rows[:4]:
+            if isinstance(row, list) and len(row) == 2:
+                label = row[0]
+                if isinstance(label, dict):  # {"ru": .., "en": ..}: shown in the chosen language
+                    label = label.get(i18n.language(), label.get("ru", ""))
+                card.append([str(label)[:24], str(row[1])[:16]])
+        return card
 
     def dlc_balance(self, dlc_id):
         """The DLC's balance.json (read-only numbers that ship with the DLC)."""
@@ -297,6 +325,28 @@ class Bridge:
             self.dlc_save(dlc_id, "stats", stats)
         self._tainted = False
         return {"counted": counted}
+
+    # --- past sessions: a DLC replays one by itself, on its own clock (a "ghost") ------
+
+    def dlc_sessions(self, dlc_id=None):
+        """Past sessions to replay: when, which project, how long and how busy."""
+        rows = self._core.store.session_summaries(30, GHOST_MIN_ACTIONS)
+        return [{"session": r["id"], "project": r["project"], "started_at": r["started_at"],
+                 "duration": round(max(0.0, r["last_ts"] - r["started_at"]), 1),
+                 "actions": r["actions"]} for r in rows]
+
+    def dlc_session_events(self, dlc_id, session):
+        """One past session's events, already normalized, with "t" in seconds from its start."""
+        events = self._core.store.session_events(str(session))[:GHOST_MAX_EVENTS]
+        if not events:
+            return []
+        start = events[0]["ts"]
+        out = []
+        for event in events:
+            e = {k: v for k, v in event.items() if k not in ("ts", "replay")}
+            e["t"] = round(event["ts"] - start, 3)
+            out.append(e)
+        return out
 
     def _dlc_file(self, dlc_id, key):
         if not _ID_RE.match(str(dlc_id)) or not _ID_RE.match(str(key)):
@@ -377,6 +427,8 @@ class Bridge:
         for key, value in (fields or {}).items():
             if isinstance(value, (str, int, float, bool)) or value is None:
                 event[str(key)[:32]] = value
+            elif isinstance(value, list) and all(isinstance(v, str) for v in value):
+                event[str(key)[:32]] = [v[:32] for v in value[:4]]  # git: ["commit"]
         self._core.publish(event)
 
     def dev_export(self, session, name=None):
@@ -395,6 +447,7 @@ def run(dev=False, settings_path=paths.CLAUDE_SETTINGS):
     paths.ensure_data_dir()
     core = Core()
     core.start()
+    i18n.set_language(i18n.resolve(core.store.get_setting("language")))
     bridge = Bridge(core, dev, settings_path)
     window = webview.create_window(
         "Sidequest", _file_url(os.path.join(paths.PROJECT_DIR, "hub", "index.html")),

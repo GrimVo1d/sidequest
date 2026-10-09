@@ -11,6 +11,7 @@ import shutil
 import tempfile
 
 from . import paths
+from .i18n import t
 from .normalizer import HOOK_EVENTS
 
 EMIT_NAME = "sidequest-emit.sh"
@@ -56,16 +57,19 @@ def read_settings(path):
     try:
         data = json.loads(raw.decode("utf-8")) if raw.strip() else {}
     except (ValueError, UnicodeDecodeError) as e:
-        raise SettingsError(f"{path} содержит невалидный JSON, ничего не меняю: {e}")
+        raise SettingsError(t(f"{path} содержит невалидный JSON, ничего не меняю: {e}",
+                              f"{path} is not valid JSON, nothing changed: {e}"))
     if not isinstance(data, dict):
-        raise SettingsError(f"{path}: ожидался JSON-объект, ничего не меняю")
+        raise SettingsError(t(f"{path}: ожидался JSON-объект, ничего не меняю",
+                              f"{path}: a JSON object was expected, nothing changed"))
     return data, raw
 
 
 def _hooks_section(settings):
     hooks = settings.get("hooks", {})
     if not isinstance(hooks, dict):
-        raise SettingsError("поле hooks в settings.json не объект, ничего не меняю")
+        raise SettingsError(t("поле hooks в settings.json не объект, ничего не меняю",
+                              "hooks in settings.json is not an object, nothing changed"))
     return hooks
 
 
@@ -79,7 +83,8 @@ def plan_install(settings, emit_path):
         if groups is None:
             groups = []
         if not isinstance(groups, list):
-            raise SettingsError(f"hooks.{event} в settings.json не массив, ничего не меняю")
+            raise SettingsError(t(f"hooks.{event} в settings.json не массив, ничего не меняю",
+                                  f"hooks.{event} in settings.json is not an array, nothing changed"))
         ours = [(g, h) for g in groups if isinstance(g, dict)
                 for h in g.get("hooks") or [] if is_sidequest_hook(h)]
         if not ours:
@@ -194,12 +199,15 @@ def apply(path, planner, confirm, attempts=3, backup_dir=None):
         if not changes:
             return [], None
         if not confirm(changes):
-            raise SettingsError("отменено, settings.json не изменён")
+            raise SettingsError(t("отменено, settings.json не изменён",
+                                  "cancelled, settings.json not changed"))
         backup_path = backup(path, backup_dir) if raw is not None else None
         if write_atomic(path, new, raw):
             written, _ = read_settings(path)
             if written != new:
-                raise SettingsError("после записи settings.json не совпал с ожидаемым")
+                raise SettingsError(t("после записи settings.json не совпал с ожидаемым",
+                                      "settings.json differs from what was written"))
             return changes, backup_path
         confirm = lambda _changes: True  # already confirmed; the file just changed
-    raise SettingsError("settings.json всё время меняется во время записи, попробуйте позже")
+    raise SettingsError(t("settings.json всё время меняется во время записи, попробуйте позже",
+                          "settings.json keeps changing while being written, try again later"))

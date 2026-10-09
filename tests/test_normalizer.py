@@ -1,7 +1,7 @@
 import json
 import unittest
 
-from sidequest.normalizer import Normalizer, bash_category
+from sidequest.normalizer import Normalizer, bash_category, git_ops
 
 from .helpers import SID, batch, post, pre, raw
 
@@ -47,6 +47,24 @@ class BashCategoryTest(unittest.TestCase):
         for command, expected in cases.items():
             with self.subTest(command=command):
                 self.assertEqual(bash_category(command), expected)
+
+    def test_git_ops(self):
+        cases = {
+            'git commit -m "x"': ["commit"],
+            "git add . && git commit -qm wip && git push": ["commit", "push"],
+            "git -C repo push origin main": ["push"],
+            "git -c user.name=x commit --amend": ["commit"],
+            "gh pr create --fill": ["push"],
+            "gh pr merge 12": ["push"],
+            "gh pr view 12": [],
+            "git status": [],
+            "git log --grep commit": [],
+            "echo push | git commit -F -": ["commit"],
+            "": [],
+        }
+        for command, expected in cases.items():
+            with self.subTest(command=command):
+                self.assertEqual(git_ops(command), expected)
 
 
 class NormalizerTest(unittest.TestCase):
@@ -112,8 +130,8 @@ class NormalizerTest(unittest.TestCase):
                                tool_input=tool_input, is_interrupt=False, duration_ms=5,
                                error="Exit code 128\nfatal: " + SECRET))
         e = events[0]
-        self.assertEqual((e["kind"], e["category"], e["exit_code"], e["ok"]),
-                         ("tool_error", "git", 128, False))
+        self.assertEqual((e["kind"], e["category"], e["git"], e["exit_code"], e["ok"]),
+                         ("tool_error", "git", ["push"], 128, False))
         self.assertNotIn(SECRET, json.dumps(events))
         self.assertNotIn("git push", json.dumps(events))
 
@@ -125,6 +143,10 @@ class NormalizerTest(unittest.TestCase):
         self.assertNotIn(SECRET, json.dumps(e))
         e = self.feed(post("Bash", "t2", {"command": "make"}, {}))[0]
         self.assertEqual((e["action"], e["category"]), ("cast", "build"))
+        self.assertNotIn("git", e)
+        e = self.feed(post("Bash", "t3", {"command": "git commit -m " + SECRET}, {}))[0]
+        self.assertEqual((e["category"], e["git"]), ("git", ["commit"]))
+        self.assertNotIn(SECRET, json.dumps(e))
 
     def test_deny_rule_is_blocked_via_batch(self):
         self.start()

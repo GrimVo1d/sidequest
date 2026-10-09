@@ -34,6 +34,8 @@ DEFAULT_SETTINGS = {
     # Seconds without events before the "agent is silent" pause (PLAN.md 3.4).
     "silence_pause_seconds": 90,
     "fps_limit": 60,
+    # "auto" follows the system language (sidequest/i18n.py).
+    "language": "auto",
 }
 
 # Last Claude Code version whose events were verified (stage 0, docs/events.md).
@@ -88,6 +90,19 @@ class Store:
                 " ORDER BY started_at DESC LIMIT ?", (limit,)
             ).fetchall()
         keys = ("id", "project", "started_at", "ended_at", "joined")
+        return [dict(zip(keys, row)) for row in rows]
+
+    def session_summaries(self, limit=30, min_actions=1):
+        """Past sessions with how long they ran and how many actions the agent took."""
+        with self._lock:
+            rows = self._db.execute(
+                "SELECT s.id, s.project, s.started_at, MAX(e.ts),"
+                " SUM(e.kind IN ('tool', 'tool_error')) AS actions"
+                " FROM sessions s JOIN events e ON e.session = s.id"
+                " GROUP BY s.id HAVING actions >= ?"
+                " ORDER BY s.started_at DESC LIMIT ?", (min_actions, limit)
+            ).fetchall()
+        keys = ("id", "project", "started_at", "last_ts", "actions")
         return [dict(zip(keys, row)) for row in rows]
 
     def recent_events(self, limit=100):

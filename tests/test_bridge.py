@@ -4,7 +4,7 @@ import os
 import unittest
 from unittest import mock
 
-from sidequest import app, paths
+from sidequest import app, i18n, paths
 from sidequest.core import Core
 
 from .helpers import SID, raw, temp_dir
@@ -52,10 +52,65 @@ class BridgeTest(unittest.TestCase):
         sent = bridge.drain()[-1]
         self.assertTrue(sent["replay"])
         self.assertNotIn("nested", sent)
+        bridge.dev_send("tool", {"tool": "Bash", "git": ["commit", "push"], "bad": [1]})
+        sent = bridge.drain()[-1]
+        self.assertEqual(sent["git"], ["commit", "push"])
+        self.assertNotIn("bad", sent)
         self.assertEqual(core.store.session_events("dev"), [])
         self.assertEqual(bridge.match_end("arena", {"score": 1}), {"counted": False})
         with self.assertRaises(ValueError):
             bridge.dev_send("session_end")
+
+    def test_past_sessions_for_a_ghost(self):
+        core, bridge = self.make()
+        core.on_payload(raw("SessionStart", source="startup"), 100.0)
+        for i in range(app.GHOST_MIN_ACTIONS):
+            core.on_payload(raw("PreToolUse", tool_name="Read", tool_use_id=f"t{i}",
+                                tool_input={"file_path": "/x/a.py"}), 101.0 + i)
+            core.on_payload(raw("PostToolUse", tool_name="Read", tool_use_id=f"t{i}",
+                                tool_input={"file_path": "/x/a.py"}, tool_response={}), 101.5 + i)
+        other = "99999999-2222-3333-4444-555555555555"
+        core.on_payload(raw("SessionStart", sid=other, source="startup"), 200.0)
+        sessions = bridge.dlc_sessions("arena")
+        self.assertEqual([s["session"] for s in sessions], [SID])  # too short: not listed
+        self.assertEqual(sessions[0]["actions"], app.GHOST_MIN_ACTIONS)
+        self.assertEqual(sessions[0]["duration"], 10.5)
+        events = bridge.dlc_session_events("arena", SID)
+        self.assertEqual(events[0]["t"], 0)
+        self.assertEqual(events[-1]["t"], 10.5)
+        self.assertTrue(all("ts" not in e for e in events))
+        self.assertEqual(bridge.dlc_session_events("arena", "nope"), [])
+        json.dumps(sessions + events)
+
+    def test_dlc_card_rows_are_plain_and_short(self):
+        _, bridge = self.make()
+        bridge.dlc_save("last-commit-standing", "card",
+                        [["Лучший счёт", 1200], ["x" * 50, "y" * 50], ["bad"], {"a": 1},
+                         ["4", 4], ["5", 5]])
+        found = {d["id"]: d for d in bridge.list_dlc()}
+        card = found["last-commit-standing"]["card"]
+        self.assertEqual(card[0], ["Лучший счёт", "1200"])
+        self.assertEqual(card[1], ["x" * 24, "y" * 16])
+        self.assertEqual(len(card), 2)  # only the first 4 rows are read; broken ones are dropped
+        bridge.dlc_save("last-commit-standing", "card", "not a list")
+        found = {d["id"]: d for d in bridge.list_dlc()}
+        self.assertEqual(found["last-commit-standing"]["card"], [])
+
+    def test_language_setting(self):
+        _, bridge = self.make()
+        self.addCleanup(i18n.set_language, i18n.language())
+        self.assertEqual(bridge.get_settings()["language"], "auto")
+        self.assertEqual(bridge.set_setting("language", "fr"), "auto")  # unknown -> auto
+        self.assertEqual(bridge.set_setting("language", "en"), "en")
+        self.assertEqual(bridge.get_settings()["lang"], "en")
+        self.assertEqual(bridge.profile()["name"], "Player")
+        bridge.dlc_save("last-commit-standing", "card", [[{"ru": "Матчей", "en": "Matches"}, 3]])
+        found = {d["id"]: d for d in bridge.list_dlc()}
+        self.assertEqual(found["last-commit-standing"]["card"], [["Matches", "3"]])
+        bridge.set_setting("language", "ru")
+        self.assertEqual(bridge.get_settings()["lang"], "ru")
+        found = {d["id"]: d for d in bridge.list_dlc()}
+        self.assertEqual(found["last-commit-standing"]["card"], [["Матчей", "3"]])
 
     def test_dlc_storage_is_confined(self):
         _, bridge = self.make()

@@ -3,7 +3,9 @@
 
 (function () {
   const $ = (id) => document.getElementById(id);
+  const t = SidequestI18n.t, tf = SidequestI18n.field;
   const STEP = 1 / 60;
+  const TIP_SECONDS = 6;
   const MAX_STEPS = 5;  // per frame; after a long stall the game slows down instead of jumping
 
   let balance = null;
@@ -12,9 +14,21 @@
   let fpsLimit = 60;
   let game = null;
   let escOpen = false;
+  let codexFrom = null;      // the screen the handbook was opened from, while it is open
+  let codexTab = "items";
+  let seen = {};             // codex ids the player has met in any match: no second hint
+  let tips = [], tip = null;
   let lastDraw = 0, acc = 0, hudAt = 0;
   let choicesKey = "";
+  let banishing = false;     // the next card picked is banished instead of taken
+  let buildKey = "";
   let mapId = LCS_MAPS[0].id;
+  let mode = "agent";
+  let mods = [];             // modifiers picked for the next match (not for the daily task)
+  let ghostId = null;        // the past session picked for a ghost match
+  let ghostList = [];        // past sessions, from the core
+  let ghostRecords = {};
+  let days = {};             // the daily task: best score per day
   const keys = new Set();
   const sprite = document.createElement("canvas");
   let stopSprite = () => {};
@@ -30,12 +44,25 @@
   function clear(node) { while (node.firstChild) node.removeChild(node.firstChild); }
 
   function show(id) {
-    for (const s of ["menu", "levelup", "esc", "results"]) $(s).hidden = s !== id;
+    for (const s of ["menu", "levelup", "esc", "results", "codex"]) $(s).hidden = s !== id;
   }
 
   function clock(seconds) {
     const m = Math.floor(seconds / 60), s = Math.floor(seconds % 60);
     return `${m}:${String(s).padStart(2, "0")}`;
+  }
+
+  // A sprite from render.js scaled up whole: at most `size` px on its longer side and at
+  // most 4 times, so tiny sprites (a spark) stay small. `gold`: an evolved weapon.
+  function iconCanvas(name, size, gold) {
+    const src = renderer.icon(name, gold), pic = el("canvas", null, "icon");
+    const k = Math.max(1, Math.min(4, Math.floor(size / Math.max(src.width, src.height))));
+    pic.width = src.width;
+    pic.height = src.height;
+    pic.getContext("2d").drawImage(src, 0, 0);
+    pic.style.width = src.width * k + "px";
+    pic.style.height = src.height * k + "px";
+    return pic;
   }
 
   function fillList(dl, rows) {
@@ -44,6 +71,53 @@
   }
 
   // --- menu and records -------------------------------------------------------------
+
+  const MODES = {
+    agent: {name: "С агентом", name_en: "With an agent",
+            text: "Союзники — твои агенты: их действия становятся атаками. "
+                  + "Матч заканчивается, когда все агенты закончили задачу.",
+            text_en: "Your allies are your agents: what they do turns into attacks. "
+                     + "The match ends when every agent has finished its task."},
+    classic: {name: "Классика", name_en: "Classic",
+              text: "Один, 20 минут: опыт — кристаллы с врагов, в конце — финальный босс. "
+                    + "Смерть заканчивает забег. Агент, начавший работу, придёт на помощь.",
+              text_en: "Alone, 20 minutes: experience comes as crystals from enemies, the "
+                       + "final boss comes at the end. Death ends the run. An agent that "
+                       + "starts working joins in to help."},
+    ghost: {name: "Призрак сессии", name_en: "Session ghost",
+            text: "Союзник — твоя прошлая сессия Claude Code: её действия повторяются, "
+                  + "долгие паузы сжаты. Живые агенты в этом режиме не участвуют.",
+            text_en: "Your ally is one of your past Claude Code sessions: its actions play "
+                     + "again, long pauses squeezed. Live agents stay out of this mode."},
+    daily: {name: "Задача дня", name_en: "Daily task",
+            text: "«Классика» с картой, модификаторами и случайностью дня — одинаковыми весь "
+                  + "день. Рекорд дня и серия дней подряд. Без агентов.",
+            text_en: "Classic with the day's map, modifiers and luck, the same all day long. "
+                     + "A record for the day and a streak of days. No agents."},
+  };
+
+  // The local date as "2026-10-09": the daily task changes at the player's midnight.
+  function today() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }
+  const todayTask = () => LCS.daily(balance, LCS_MAPS, today());
+  const modifier = (id) => balance.modifiers.find((m) => m.id === id);
+
+  async function savePrefs() {
+    await Sidequest.storage.set("prefs", {map: mapId, mode, mods, ghost: ghostId});
+  }
+
+  async function progress() {
+    const records = LCSProgress.migrate(await Sidequest.storage.get("records"));
+    const got = (await Sidequest.storage.get("achievements")) || {};
+    return {records, got};
+  }
+
+  function updateCard(records, got) {
+    const n = balance.achievements.filter((a) => got[a.id]).length;
+    return Sidequest.card(LCSProgress.card(records, n, balance.achievements.length));
+  }
 
   async function openMenu() {
     game = null;
@@ -56,58 +130,216 @@
     stopMenuAvatar = SidequestAvatar.animate($("menu-avatar"), profile.avatar);
     stopSprite();
     stopSprite = SidequestAvatar.animate(sprite, profile.avatar);
-    const r = (await Sidequest.storage.get("records")) || {};
-    fillList($("records"), [
-      ["Лучший счёт", r.best_score || 0],
-      ["Дольше всего", clock(r.best_time || 0)],
-      ["Лучший уровень", r.best_level || 0],
-      ["Матчей", r.matches || 0],
-      ["Убито всего", r.kills || 0],
-    ]);
     const prefs = (await Sidequest.storage.get("prefs")) || {};
     if (LCS_MAPS.some((m) => m.id === prefs.map)) mapId = prefs.map;
-    renderMaps();
-    $("btn-play").focus();
+    if (MODES[prefs.mode]) mode = prefs.mode;
+    if (Array.isArray(prefs.mods)) mods = prefs.mods.filter((id) => modifier(id));
+    if (typeof prefs.ghost === "string") ghostId = prefs.ghost;
+    const {records, got} = await progress();
+    seen = (await Sidequest.storage.get("seen")) || {};
+    ghostRecords = LCSProgress.addGhost(await Sidequest.storage.get("ghosts"), {});
+    days = LCSProgress.addDay(await Sidequest.storage.get("days"), {});
+    try { ghostList = await Sidequest.history.sessions(); } catch (e) { ghostList = []; }
+    if (!ghostList.some((g) => g.session === ghostId)) ghostId = ghostList.length ? ghostList[0].session : null;
+    menuRecords = records;
+    renderModes();
+    renderAchievements(got);
+    await updateCard(records, got);
+    $("menu").scrollTop = 0;
+    $("btn-play").focus({preventScroll: true});
   }
 
-  function renderMaps() {
-    const box = $("maps");
+  let menuRecords = LCSProgress.migrate(null);
+
+  function renderRecords() {
+    const r = menuRecords[mode], all = menuRecords.totals;
+    $("records-title").textContent = t("Рекорды: ", "Records: ") + tf(MODES[mode], "name").toLowerCase();
+    const rows = [[t("Лучший счёт", "Best score"), r.best_score],
+                  [t("Дольше всего", "Longest"), clock(r.best_time)],
+                  [t("Лучший уровень", "Best level"), r.best_level],
+                  [t("Матчей", "Matches"), r.matches], [t("Убито", "Kills"), r.kills]];
+    if (mode === "classic" || mode === "daily") rows.push([t("Побед", "Wins"), r.wins]);
+    if (mode === "daily") {
+      rows.push([t("Рекорд дня", "Today's best"), days[today()] || 0],
+                [t("Дней подряд", "Days in a row"), LCSProgress.streak(days, today())]);
+    }
+    fillList($("records"), rows);
+    fillList($("totals"), [[t("Матчей", "Matches"), all.matches], [t("Убито", "Kills"), all.kills],
+                           [t("Боссов", "Bosses"), all.bosses]]);
+  }
+
+  function renderModes() {
+    const box = $("modes");
     clear(box);
-    for (const m of LCS_MAPS) {
-      const b = el("button", null, "map" + (m.id === mapId ? " on" : ""));
-      const pic = el("canvas", null, "preview");
-      pic.width = 136;
-      pic.height = Math.round(136 * m.height / m.width);
-      renderer.preview(m, pic);
-      b.appendChild(pic);
-      b.appendChild(el("span", m.name, "name"));
-      b.appendChild(el("span", m.text, "text"));
+    for (const [id, m] of Object.entries(MODES)) {
+      const b = el("button", tf(m, "name"), "mode" + (id === mode ? " on" : ""));
       b.addEventListener("click", () => {
-        mapId = m.id;
-        renderMaps();
-        Sidequest.storage.set("prefs", {map: mapId});
+        mode = id;
+        renderModes();
+        savePrefs();
+      });
+      box.appendChild(b);
+    }
+    $("mode-text").textContent = tf(MODES[mode], "text");
+    renderRecords();
+    renderGhosts();
+    renderDaily();
+    renderMaps();
+    renderMods();
+    $("btn-play").disabled = mode === "ghost" && !ghostId;
+  }
+
+  function dateText(seconds) {
+    const d = new Date(seconds * 1000);
+    return `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")} `
+      + `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  }
+
+  // Past sessions to play as a ghost; the project name is shown as text only.
+  function renderGhosts() {
+    const box = $("ghosts");
+    clear(box);
+    box.hidden = mode !== "ghost";
+    if (mode !== "ghost") return;
+    if (!ghostList.length) {
+      box.appendChild(el("p", t("Прошлых сессий пока нет: поиграй с агентом, и его сессия появится здесь.",
+                                "No past sessions yet: play with an agent and its session shows up here."),
+                         "hint"));
+      return;
+    }
+    for (const g of ghostList) {
+      const b = el("button", null, "ghost" + (g.session === ghostId ? " on" : ""));
+      b.appendChild(el("span", g.project || "?", "name"));
+      const best = ghostRecords[g.session] ? ghostRecords[g.session].best_score : null;
+      b.appendChild(el("span", `${dateText(g.started_at)} · ${clock(g.duration)} · `
+        + `${t("действий", "actions")} ${g.actions}`
+        + (best !== null ? ` · ${t("рекорд", "best")} ${best}` : ""), "text"));
+      b.addEventListener("click", () => {
+        ghostId = g.session;
+        renderGhosts();
+        savePrefs();
       });
       box.appendChild(b);
     }
   }
 
-  async function saveRecords(res) {
-    const r = (await Sidequest.storage.get("records")) || {};
-    await Sidequest.storage.set("records", {
-      best_score: Math.max(r.best_score || 0, res.score),
-      best_time: Math.max(r.best_time || 0, res.time),
-      best_level: Math.max(r.best_level || 0, res.level),
-      matches: (r.matches || 0) + 1,
-      kills: (r.kills || 0) + res.kills,
-    });
+  function renderDaily() {
+    const p = $("daily-text");
+    p.hidden = mode !== "daily";
+    if (mode !== "daily") return;
+    const task = todayTask(), map = LCS_MAPS.find((m) => m.id === task.map);
+    p.textContent = t(`Сегодня: ${tf(map, "name")}, `, `Today: ${tf(map, "name")}, `)
+      + task.modifiers.map((id) => tf(modifier(id), "name")).join(", ") + ".";
+  }
+
+  // The modifiers of the next match; the daily task has its own, fixed.
+  function renderMods() {
+    const box = $("mods");
+    clear(box);
+    const fixed = mode === "daily", on = fixed ? todayTask().modifiers : mods;
+    for (const m of balance.modifiers) {
+      const b = el("button", tf(m, "name"), "mod" + (on.includes(m.id) ? " on" : ""));
+      b.title = `${tf(m, "text")} · ${t("счёт", "score")} ×${m.score}`;
+      b.disabled = fixed;
+      b.addEventListener("click", () => {
+        mods = mods.includes(m.id) ? mods.filter((id) => id !== m.id) : mods.concat(m.id);
+        renderMods();
+        savePrefs();
+      });
+      box.appendChild(b);
+    }
+    const k = on.reduce((x, id) => x * modifier(id).score, 1);
+    $("mods-mul").textContent = on.length ? `· ${t("счёт", "score")} ×${Math.round(k * 100) / 100}` : "";
+    $("mods-text").textContent = on.map((id) => `${tf(modifier(id), "name")}: ${tf(modifier(id), "text")}`).join("; ");
+  }
+
+  function renderAchievements(got) {
+    const list = $("achievements");
+    clear(list);
+    let n = 0;
+    for (const a of balance.achievements) {
+      const li = el("li", null, got[a.id] ? "got" : "");
+      li.appendChild(el("span", tf(a, "name"), "name"));
+      li.appendChild(el("span", tf(a, "text"), "text"));
+      list.appendChild(li);
+      if (got[a.id]) n++;
+    }
+    $("achievements-count").textContent = `${n}/${balance.achievements.length}`;
+  }
+
+  function renderMaps() {
+    const box = $("maps");
+    clear(box);
+    const daily = mode === "daily" ? todayTask().map : null;
+    for (const m of LCS_MAPS) {
+      const b = el("button", null, "map" + ((daily || mapId) === m.id ? " on" : ""));
+      b.disabled = daily !== null && daily !== m.id;
+      const pic = el("canvas", null, "preview");
+      pic.width = 136;
+      pic.height = Math.round(136 * m.height / m.width);
+      renderer.preview(m, pic);
+      b.appendChild(pic);
+      b.appendChild(el("span", tf(m, "name"), "name"));
+      b.appendChild(el("span", tf(m, "text"), "text"));
+      b.addEventListener("click", () => {
+        mapId = m.id;
+        renderMaps();
+        savePrefs();
+      });
+      box.appendChild(b);
+    }
+  }
+
+  // Records and achievements: only for counted matches. Returns the new achievements.
+  async function saveProgress(res) {
+    const before = await progress();
+    const records = LCSProgress.addMatch(before.records, res);
+    await Sidequest.storage.set("records", records);
+    // The daily streak and the ghost's record live apart from the records by mode.
+    res = Object.assign({}, res);
+    if (res.mode === "daily") {
+      days = LCSProgress.addDay(await Sidequest.storage.get("days"), res);
+      await Sidequest.storage.set("days", days);
+      res.daily_streak = LCSProgress.streak(days, res.day);
+    }
+    if (res.mode === "ghost") {
+      ghostRecords = LCSProgress.addGhost(await Sidequest.storage.get("ghosts"),
+                                          Object.assign({at: Date.now() / 1000}, res));
+      await Sidequest.storage.set("ghosts", ghostRecords);
+    }
+    const got = before.got;
+    const fresh = LCSProgress.earned(balance.achievements, res, records, LCS_MAPS.map((m) => m.id))
+      .filter((id) => !got[id]);
+    for (const id of fresh) got[id] = Date.now();
+    if (fresh.length) await Sidequest.storage.set("achievements", got);
+    await updateCard(records, got);
+    return balance.achievements.filter((a) => fresh.includes(a.id));
   }
 
   // --- a match ----------------------------------------------------------------------
 
-  function startMatch() {
-    game = LCS.createGame(balance, {seed: Date.now(), map: LCS_MAPS.find((m) => m.id === mapId)});
+  async function startMatch() {
+    let options = {seed: Date.now(), map: LCS_MAPS.find((m) => m.id === mapId), mode, modifiers: mods};
+    if (mode === "daily") {
+      const task = todayTask();
+      options = {seed: task.seed, map: LCS_MAPS.find((m) => m.id === task.map), mode,
+                 modifiers: task.modifiers, day: task.date};
+    } else if (mode === "ghost") {
+      if (!ghostId) return;
+      const events = await Sidequest.history.events(ghostId);
+      options.ghost = {session: ghostId, events};
+    }
+    game = LCS.createGame(balance, options);
+    const v = renderer.view();
+    game.setView(v.width, v.height);
     escOpen = false;
+    codexFrom = null;
+    tips = [];
+    tip = null;
+    $("tip").hidden = true;
     choicesKey = "";
+    banishing = false;
+    buildKey = "";
     acc = 0;
     keys.clear();
     show(null);
@@ -116,23 +348,60 @@
     window.focus();
   }
 
+  const TITLES = {done: ["Последний коммит выстоял", "The last commit stands"],
+                  win: ["Конфликт разрешён", "Conflict resolved"],
+                  dead: ["Забег окончен", "The run is over"], quit: ["Матч завершён", "Match over"]};
+
   async function endMatch() {
     const res = game.state.results;
     $("hud").hidden = true;
-    $("results-title").textContent = res.reason === "done"
-      ? "Последний коммит выстоял" : "Матч завершён";
-    fillList($("results-list"), [
-      ["Карта", game.state.map.name],
-      ["Счёт", res.score], ["Время", clock(res.time)], ["Уровень", res.level],
-      ["Убито", res.kills], ["Лучшая серия", res.best_streak], ["Смертей", res.deaths],
-      ["Получено урона", res.damage_taken], ["Агентов", res.allies],
-    ]);
+    codexFrom = null;
+    $("results-title").textContent = t(...(TITLES[res.reason] || TITLES.quit));
+    const rows = [
+      [t("Режим", "Mode"), tf(MODES[res.mode], "name")
+        + (res.mode === "classic" && res.with_agent ? t(" с агентом", " with an agent") : "")],
+      [t("Карта", "Map"), tf(game.state.map, "name")],
+      [t("Счёт", "Score"), res.score], [t("Время", "Time"), clock(res.time)],
+      [t("Уровень", "Level"), res.level], [t("Убито", "Kills"), res.kills],
+      [t("Боссов", "Bosses"), res.bosses], [t("Лучшая серия", "Best streak"), res.best_streak],
+      [t("Получено урона", "Damage taken"), res.damage_taken], [t("Снаряжение", "Gear"), res.gear],
+      [t("Оружие", "Weapons"), res.weapons], [t("Эволюций", "Evolutions"), res.evolutions],
+    ];
+    if (res.mode === "agent") {
+      rows.push([t("Смертей", "Deaths"), res.deaths], [t("Агентов", "Agents"), res.allies]);
+    }
+    if (res.modifiers) {
+      rows.push([t("Модификаторы", "Modifiers"),
+                 res.modifier_ids.map((id) => tf(modifier(id), "name")).join(", ") + ` (×${res.score_mul})`]);
+    }
+    // The agent's real work, when there was any.
+    for (const [ru, en, key] of [["Коммитов", "Commits", "commits"], ["Пушей", "Pushes", "pushes"],
+                                 ["Турелей", "Turrets", "turrets"],
+                                 ["Быстрых ответов", "Fast answers", "reviews"],
+                                 ["Элитных врагов", "Elite enemies", "elites"],
+                                 ["Инцидентов закрыто", "Incidents closed", "incidents"],
+                                 ["Деплоев пережито", "Deploys survived", "deploys"]]) {
+      if (res[key]) rows.push([t(ru, en), res[key]]);
+    }
+    fillList($("results-list"), rows);
     $("results-note").hidden = true;
+    $("results-new").hidden = true;
     show("results");
     $("btn-again").focus();
     const {counted} = await Sidequest.match.end(res);
-    if (counted) await saveRecords(res);
-    else $("results-note").hidden = false;
+    if (!counted) { $("results-note").hidden = false; return; }
+    const fresh = await saveProgress(res);
+    if (fresh.length) {
+      const list = $("results-achievements");
+      clear(list);
+      for (const a of fresh) {
+        const li = el("li");
+        li.appendChild(el("span", tf(a, "name"), "name"));
+        li.appendChild(el("span", tf(a, "text"), "text"));
+        list.appendChild(li);
+      }
+      $("results-new").hidden = false;
+    }
   }
 
   function quit() {
@@ -156,19 +425,44 @@
   }
 
   function pick(index) {
-    if (game && game.choose(index)) choicesKey = "";
+    if (!game) return;
+    if (banishing) {
+      banishing = false;
+      game.banish(index);
+      choicesKey = "";
+    } else if (game.choose(index)) {
+      choicesKey = "";
+    }
+  }
+
+  function reroll() {
+    banishing = false;
+    if (game) game.reroll();
+    choicesKey = "";
+  }
+
+  function toggleBanish() {
+    banishing = !banishing && game.state.banishes > 0;
+    choicesKey = "";
   }
 
   // e.code, not e.key: WASD works on any keyboard layout.
   addEventListener("keydown", (e) => {
+    if (codexFrom && e.code === "Escape") { closeCodex(); e.preventDefault(); return; }
+    if (codexFrom) return;
     if (!game || game.state.over) return;
     if (e.code === "Escape") {
-      if (!game.state.choices) escOpen = !escOpen;
+      if (banishing) { banishing = false; choicesKey = ""; }
+      else if (!game.state.choices) escOpen = !escOpen;
       e.preventDefault();
       return;
     }
     const digit = /^Digit([1-3])$/.exec(e.code) || /^Numpad([1-3])$/.exec(e.code);
     if (digit && game.state.choices && !escOpen) { pick(Number(digit[1]) - 1); return; }
+    if (game.state.choiceKind === "level" && !escOpen) {
+      if (e.code === "KeyR") { reroll(); return; }
+      if (e.code === "KeyX") { toggleBanish(); return; }
+    }
     if (MOVE[e.code]) { keys.add(e.code); e.preventDefault(); }
   });
   addEventListener("keyup", (e) => keys.delete(e.code));
@@ -177,21 +471,36 @@
 
   // --- HUD and overlays -------------------------------------------------------------
 
-  const ALLY_STATE = (a) => a.state === "leaving" || a.state === "gone" ? "задача готова"
-    : a.stun > 0 ? "ошибка" : a.blocked > 0 ? "запрет" : a.meditate > 0 ? "сжимает контекст"
-    : a.spirits.size ? `духов: ${a.spirits.size}` : "";
+  const ALLY_STATE = (a) => a.state === "leaving" || a.state === "gone" ? t("задача готова", "task done")
+    : a.stun > 0 ? t("ошибка", "error") : a.blocked > 0 ? t("запрет", "blocked")
+    : a.meditate > 0 ? t("сжимает контекст", "compacting")
+    : a.waiting ? t("ждёт ответа", "waiting for you")
+    : a.spirits.size ? t("духов: ", "spirits: ") + a.spirits.size : "";
 
   function updateHud() {
     const s = game.state, p = s.player;
     $("hp-fill").style.width = Math.max(0, p.hp / s.stats.max_hp * 100) + "%";
-    $("hp-text").textContent = p.dead > 0 ? "воскрешение…" : `${Math.ceil(p.hp)} / ${Math.round(s.stats.max_hp)}`;
+    $("hp-text").textContent = p.dead > 0 ? t("воскрешение…", "reviving…") : `${Math.ceil(p.hp)} / ${Math.round(s.stats.max_hp)}`;
     $("xp-fill").style.width = Math.min(100, s.xp / s.xpNext * 100) + "%";
-    $("xp-text").textContent = `ур. ${s.level}`;
-    $("time").textContent = clock(s.time);
-    $("ammo").textContent = p.reload > 0 ? "перезарядка…" : `патроны ${p.ammo}/${Math.round(s.stats.magazine)}`;
-    $("score").textContent = `счёт ${Math.floor(s.score)}`;
+    $("xp-text").textContent = t("ур. ", "lv. ") + s.level;
+    $("time").textContent = s.solo
+      ? `${clock(s.time)} / ${clock(balance.classic.seconds)}` : clock(s.time);
+    $("ammo").textContent = p.reload > 0 ? t("перезарядка…", "reloading…")
+      : `${t("патроны", "ammo")} ${p.ammo}/${p.magazine}`;
+    $("score").textContent = `${t("счёт", "score")} ${Math.floor(s.score * s.scoreMul)}`;
     $("multiplier").textContent = s.multiplier > 1 ? `×${s.multiplier}` : "";
     $("rage").hidden = s.rage <= 0;
+    $("red-ci").hidden = s.redCi <= 0;
+    $("orchestra").hidden = !s.orchestra;
+    $("deploy").hidden = !s.deploy;
+    if (s.deploy) $("deploy").textContent = t("ДЕПЛОЙ ", "DEPLOY ") + Math.ceil(s.deploy.left);
+    $("incident").hidden = !s.incident;
+    if (s.incident) {
+      $("incident").textContent = t("ИНЦИДЕНТ ", "INCIDENT ")
+        + `${Math.floor(s.incident.held)}/${balance.events.incident.hold} · ${Math.ceil(s.incident.left)}`;
+    }
+
+    updateBuild(s);
 
     const list = $("allies");
     clear(list);
@@ -207,33 +516,167 @@
 
     const notice = $("notice");
     let message = "";
-    if (s.finaleAt !== null) message = `Все задачи готовы — финал через ${Math.ceil(s.finaleAt - s.time)}`;
-    else if (!s.everAlly) message = "Ждём агента: дай Claude Code задачу";
+    if (s.finaleAt !== null) {
+      message = t("Все задачи готовы — финал через ", "All tasks done — the finale in ")
+        + Math.ceil(s.finaleAt - s.time);
+    } else if (!s.everAlly && s.mode === "ghost") {
+      message = t("Призрак сессии вот-вот появится", "The session ghost is about to appear");
+    } else if (!s.everAlly && s.mode === "agent") {
+      message = t("Ждём агента: дай Claude Code задачу", "Waiting for an agent: give Claude Code a task");
+    }
     notice.textContent = message;
     notice.hidden = !message;
   }
 
+  // Weapons and passives held, with their levels; redrawn only when they change.
+  function updateBuild(s) {
+    const key = JSON.stringify([s.weapons.map((w) => [w.id, w.level, w.evolved]), s.taken]);
+    if (key === buildKey) return;
+    buildKey = key;
+    const box = $("build");
+    clear(box);
+    const slot = (icon, level, gold, title) => {
+      const item = el("span", null, "slot" + (gold ? " gold" : ""));
+      item.appendChild(iconCanvas(icon, 24, gold));
+      item.appendChild(el("span", gold ? "★" : String(level), "lv"));
+      item.title = title;
+      return item;
+    };
+    const weapons = el("span", null, "slots");
+    for (const w of s.weapons) {
+      const cfg = balance.weapons.find((x) => x.id === w.id);
+      weapons.appendChild(slot(w.id, w.level, w.evolved, w.evolved ? tf(cfg.evolution, "name") : tf(cfg, "name")));
+    }
+    const passives = el("span", null, "slots");
+    for (const [id, level] of Object.entries(s.taken)) {
+      passives.appendChild(slot(id, level, false, tf(balance.upgrades.find((u) => u.id === id), "name")));
+    }
+    box.appendChild(weapons);
+    box.appendChild(passives);
+  }
+
+  const KIND_TAGS = {evolution: ["ЭВОЛЮЦИЯ", "EVOLUTION"], filler: ["ВСЁ СОБРАНО", "ALL MAXED"]};
+
+  function choiceCard(c, i, chest) {
+    const b = el("button", null, "choice " + c.kind + (banishing && !chest ? " banishing" : ""));
+    const head = el("span", null, "head");
+    head.appendChild(el("span", String(i + 1), "key"));
+    const tag = KIND_TAGS[c.kind] ? t(...KIND_TAGS[c.kind])
+      : c.fresh ? t("НОВОЕ", "NEW")
+      : c.kind === "weapon" || c.kind === "passive" ? t("ур. ", "lv. ") + c.level : "";
+    head.appendChild(el("span", tag, "tag"));
+    b.appendChild(head);
+    b.appendChild(iconCanvas(c.icon, 48, c.kind === "evolution"));
+    b.appendChild(el("span", tf(c, "name"), "name"));
+    b.appendChild(el("span", tf(c, "text"), "text"));
+    b.addEventListener("click", () => pick(i));
+    return b;
+  }
+
   function updateOverlays() {
     const s = game.state;
+    if (codexFrom) return;
     if (s.choices && !escOpen) {
-      const key = JSON.stringify(s.choices) + s.level;
+      const key = JSON.stringify(s.choices) + s.level + s.choiceKind + banishing + s.rerolls
+        + s.banishes;
       if (key !== choicesKey) {
         choicesKey = key;
+        const chest = s.choiceKind === "chest";
+        $("choices-title").textContent = chest ? t("Сундук: выбери вещь", "Chest: pick an item")
+          : banishing ? t("Что исключить до конца матча?", "Banish what for the rest of the match?")
+          : t("Новый уровень", "Level up");
         const box = $("choices");
         clear(box);
-        s.choices.forEach((c, i) => {
-          const b = el("button", null, "choice");
-          b.appendChild(el("span", String(i + 1), "key"));
-          b.appendChild(el("span", c.level > 1 ? `${c.name} ${c.level}` : c.name, "name"));
-          b.appendChild(el("span", c.text, "text"));
-          b.addEventListener("click", () => pick(i));
-          box.appendChild(b);
-        });
+        s.choices.forEach((c, i) => box.appendChild(choiceCard(c, i, chest)));
+        const canBanish = s.choices.some((c) => c.kind === "weapon" || c.kind === "passive");
+        $("choice-actions").hidden = chest;
+        $("btn-reroll").textContent = t("Перебросить", "Reroll") + ` (R) ×${s.rerolls}`;
+        $("btn-reroll").disabled = s.rerolls <= 0;
+        $("btn-banish").textContent = banishing ? t("Отмена (X)", "Cancel (X)")
+          : t("Исключить", "Banish") + ` (X) ×${s.banishes}`;
+        $("btn-banish").disabled = !banishing && (s.banishes <= 0 || !canBanish);
       }
       show("levelup");
     } else {
       show(escOpen ? "esc" : null);
     }
+  }
+
+  // --- handbook and first-time hints ----------------------------------------------
+
+  function openCodex(from) {
+    codexFrom = from;
+    renderCodex();
+    show("codex");
+    $("codex-list").scrollTop = 0;
+  }
+
+  function closeCodex() {
+    const from = codexFrom;
+    codexFrom = null;
+    if (from === "menu") {
+      show("menu");
+      $("btn-codex").focus({preventScroll: true});
+    } else {
+      show("esc");   // the match stays paused under the handbook
+    }
+  }
+
+  function renderCodex() {
+    const sections = LCSCodex.sections(balance);
+    const tabs = $("codex-tabs");
+    clear(tabs);
+    for (const sec of sections) {
+      const b = el("button", t(...sec.name), sec.id === codexTab ? "on" : "");
+      b.addEventListener("click", () => { codexTab = sec.id; renderCodex(); });
+      tabs.appendChild(b);
+    }
+    const list = $("codex-list");
+    clear(list);
+    const sec = sections.find((x) => x.id === codexTab) || sections[0];
+    for (const e of sec.entries) {
+      const li = el("li");
+      const icon = el("div", null, "icon");
+      if (e.icon) icon.appendChild(iconCanvas(e.icon, 48, e.gold));
+      li.appendChild(icon);
+      const body = el("div");
+      body.appendChild(el("div", t(...e.name), "name"));
+      body.appendChild(el("div", t(...e.text), "text"));
+      li.appendChild(body);
+      list.appendChild(li);
+    }
+  }
+
+  // The first time ever the player meets an item or an enemy: a hint for a few seconds of
+  // game time, one after another. What was shown is remembered in the DLC storage.
+  function updateTips() {
+    const s = game.state;
+    let fresh = false;
+    for (const id of Object.keys(s.met)) {
+      if (seen[id]) continue;
+      seen[id] = Date.now();
+      const entry = LCSCodex.entry(balance, id);
+      if (!entry) continue;
+      tips.push(entry);
+      fresh = true;
+    }
+    if (fresh) Sidequest.storage.set("seen", seen);
+    if (tip && s.time >= tip.until) tip = null;
+    if (!tip && tips.length) {
+      const e = tips.shift();
+      tip = {until: s.time + TIP_SECONDS};
+      const icon = $("tip-icon"), src = iconCanvas(e.icon, 40);
+      icon.width = src.width;
+      icon.height = src.height;
+      icon.getContext("2d").drawImage(src, 0, 0);
+      icon.style.width = src.style.width;
+      icon.style.height = src.style.height;
+      $("tip-title").textContent = (e.kind === "enemy" ? t("Новый враг: ", "New enemy: ")
+                                    : e.kind === "event" ? t("Событие: ", "Event: ")
+                                    : t("Новое: ", "New: ")) + t(...e.name);
+      $("tip-text").textContent = t(...e.text);
+    }
+    $("tip").hidden = !tip;
   }
 
   // --- the loop ---------------------------------------------------------------------
@@ -256,12 +699,14 @@
         steps++;
       }
       if (steps === MAX_STEPS) acc = 0;
+      const v = renderer.view();
+      game.setView(v.width, v.height);
     } else {
       acc = 0;
     }
     renderer.draw(game.state, sprite);
     updateOverlays();
-    if (now - hudAt > 100) { hudAt = now; updateHud(); }
+    if (now - hudAt > 100) { hudAt = now; updateHud(); updateTips(); }
     if (game.state.over) endMatch();
   }
 
@@ -277,17 +722,41 @@
   dev("immortal", "Бессмертие", (d) => d.immortal());
   dev("level", "+уровень", (d) => d.level());
   dev("upgrade", "Улучшение", (d) => d.upgrade());
+  dev("weapon", "Оружие", (d) => d.weapon());
+  dev("evolve", "Эволюция", (d) => d.evolve());
   dev("wave", "Волна", (d) => d.wave());
   dev("boss", "Босс", (d) => d.boss());
+  dev("boss_oom", "Босс: Out of memory", (d) => d.boss("boss_oom"));
+  dev("boss_loop", "Босс: Бесконечный цикл", (d) => d.boss("boss_loop"));
+  dev("boss_race", "Босс: Data race", (d) => d.boss("boss_race"));
+  dev("boss_fire", "Босс: Прод упал", (d) => d.boss("boss_fire"));
+  dev("bestiary", "Все новые враги", (d) => {
+    for (const type of ["flaky", "spaghetti", "offbyone", "debt", "logspam", "regression", "scope", "monolith"]) {
+      d.enemy(type);
+    }
+  });
+  dev("elite", "Элитный враг", (d) => d.elite());
+  dev("deploy", "Пятничный деплой", (d) => d.event("deploy"));
+  dev("incident", "Инцидент", (d) => d.event("incident"));
   dev("item", "Предмет", (d) => d.item());
+  dev("chest", "Сундук", (d) => d.chest());
+  dev("enemy", "Враг карты", (d) => d.enemy());
+  dev("final", "Финальный босс", (d) => d.final());
   dev("finale", "Финал", (d) => d.finale());
 
   $("btn-play").addEventListener("click", startMatch);
   $("btn-resume").addEventListener("click", () => { escOpen = false; window.focus(); });
   $("btn-quit").addEventListener("click", () => { escOpen = false; quit(); });
   $("btn-again").addEventListener("click", openMenu);
+  $("btn-hub").addEventListener("click", () => Sidequest.exit());
+  $("btn-codex").addEventListener("click", () => openCodex("menu"));
+  $("btn-esc-codex").addEventListener("click", () => openCodex("esc"));
+  $("btn-codex-back").addEventListener("click", closeCodex);
+  $("btn-reroll").addEventListener("click", reroll);
+  $("btn-banish").addEventListener("click", toggleBanish);
 
   Sidequest.ready().then(async () => {
+    SidequestI18n.apply(document);  // the SDK has set the language from the hub
     balance = await Sidequest.balance();
     const settings = await Sidequest.settings();
     fpsLimit = settings.fps_limit === 30 ? 30 : 60;

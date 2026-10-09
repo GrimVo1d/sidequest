@@ -20,6 +20,7 @@ Sidequest.onPause((paused, sessions) => {
   p.className = paused ? "paused" : "";
 });
 
+document.getElementById("exit").addEventListener("click", () => Sidequest.exit());
 click("save", () => Sidequest.storage.set("save", {at: Date.now()}));
 click("load", () => Sidequest.storage.get("save"));
 click("start", () => Sidequest.match.start());

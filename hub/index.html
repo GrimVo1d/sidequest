@@ -11,61 +11,58 @@
 <body>
 <header class="bar">
   <div class="logo">SIDEQUEST</div>
-  <div class="indicator" id="indicator"><span class="dot"></span><span id="indicator-text">Проверка…</span></div>
+  <div class="indicator" id="indicator"><span class="dot"></span><span id="indicator-text" data-en="Checking…">Проверка…</span></div>
   <div class="spacer"></div>
-  <button id="btn-check">Проверить</button>
+  <button id="btn-check" data-en="Check">Проверить</button>
   <button id="btn-connect">Подключить к Claude Code</button>
-  <button id="btn-settings">Настройки</button>
+  <button id="btn-settings" data-en="Settings">Настройки</button>
 </header>
 
 <main id="hub">
   <section class="col left">
     <div class="panel profile">
-      <canvas id="avatar" class="avatar" title="Сменить аватарку"></canvas>
-      <button id="btn-avatar" class="small">Сменить аватарку</button>
+      <canvas id="avatar" class="avatar" title="Сменить аватарку" data-en-title="Change the avatar"></canvas>
+      <button id="btn-avatar" class="small" data-en="Change the avatar">Сменить аватарку</button>
       <input id="profile-name" maxlength="32" spellcheck="false">
       <dl id="stats"></dl>
     </div>
     <div class="panel">
-      <h2>Сессии</h2>
+      <h2 data-en="Sessions">Сессии</h2>
       <ul id="sessions" class="list"></ul>
-      <p id="first-event" class="hint">Ждём первое событие от Claude Code</p>
+      <p id="first-event" class="hint" data-en="Waiting for the first event from Claude Code">Ждём первое событие от Claude Code</p>
     </div>
   </section>
 
   <section class="col center">
     <div class="panel">
-      <h2>Режимы</h2>
+      <h2 data-en="Modes">Режимы</h2>
       <div id="dlc-list" class="dlc-grid"></div>
     </div>
     <div class="panel" id="check-panel">
-      <h2>Самопроверка</h2>
+      <h2 data-en="Self-check">Самопроверка</h2>
       <ul id="checks" class="list"></ul>
     </div>
   </section>
 
   <section class="col right">
     <div class="panel journal">
-      <h2>Журнал</h2>
+      <h2 data-en="Journal">Журнал</h2>
       <ul id="journal" class="list mono"></ul>
     </div>
   </section>
 </main>
 
+<!-- A DLC takes the whole window; it goes back to the hub with Sidequest.exit(). -->
 <section id="game" hidden>
-  <div class="bar small">
-    <button id="btn-back">← В хаб</button>
-    <span id="game-title"></span>
-    <span id="game-flag" class="flag" hidden>не засчитывается</span>
-  </div>
   <iframe id="game-frame" aria-label="DLC"></iframe>
+  <span id="game-flag" class="flag" data-en="not counted" hidden>не засчитывается</span>
 </section>
 
 <div id="pause" class="overlay" hidden>
   <div class="banner">
     <div id="pause-title"></div>
     <ul id="pause-list"></ul>
-    <div class="actions"><button id="btn-resume">Продолжить</button></div>
+    <div class="actions"><button id="btn-resume" data-en="Resume">Продолжить</button></div>
   </div>
 </div>
 
@@ -98,6 +95,7 @@
   </div>
 </aside>
 
+<script src="../sdk/i18n.js"></script>
 <script src="../sdk/avatar.js"></script>
 <script src="avatar-import.js"></script>
 <script src="avatar-ui.js"></script>
