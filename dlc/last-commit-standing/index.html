@@ -11,23 +11,17 @@
 <canvas id="arena"></canvas>
 
 <div id="hud" hidden>
-  <div class="hud-row">
-    <div class="bar hp"><div id="hp-fill"></div><span id="hp-text"></span></div>
-    <div class="bar xp"><div id="xp-fill"></div><span id="xp-text"></span></div>
-  </div>
-  <div class="hud-row">
+  <div id="xp"><div id="xp-fill"></div><span id="xp-text"></span></div>
+  <div id="top" class="hud-row">
     <span id="time"></span>
-    <span id="ammo"></span>
     <span id="score"></span>
     <span id="multiplier"></span>
-    <span id="rage" data-en="RAGE" hidden>ЯРОСТЬ</span>
-    <span id="red-ci" data-en="RED CI" hidden>КРАСНЫЙ CI</span>
-    <span id="orchestra" data-en="ORCHESTRA" hidden>ОРКЕСТР</span>
-    <span id="deploy" hidden></span>
-    <span id="incident" hidden></span>
   </div>
-  <div id="build"></div>
   <ul id="allies"></ul>
+  <div id="panel">
+    <div id="build"></div>
+    <div id="buffs"></div>
+  </div>
   <div id="notice" hidden></div>
   <div id="tip" hidden>
     <canvas id="tip-icon"></canvas>

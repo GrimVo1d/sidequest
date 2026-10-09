@@ -744,13 +744,26 @@
         }
       }
       if (s.immortal) pixelRing(p.x, p.y - 2, 12, "#e8c14a", 0.6);
+      drawHealth(p, s);
       drawAmmo(p);
     }
 
-    // Under the player: a bar while reloading, otherwise one mark per round; a big
+    // Right under the player, where the eyes are: the health, blinking when it runs low.
+    function drawHealth(p, s) {
+      const k = Math.max(0, Math.min(1, p.hp / s.stats.max_hp)), y = px(p.y + 10);
+      ctx.fillStyle = DARK;
+      ctx.fillRect(px(p.x - 11), y - 2, 22, 5);
+      ctx.fillStyle = "#4a2030";
+      ctx.fillRect(px(p.x - 10), y - 1, 20, 3);
+      const low = k < 0.3 && Math.floor(s.time * 4) % 2 === 0;
+      ctx.fillStyle = low ? "#ff8080" : "#d9534f";
+      ctx.fillRect(px(p.x - 10), y - 1, Math.round(20 * k), 3);
+    }
+
+    // Under the health: a bar while reloading, otherwise one mark per round; a big
     // magazine would be too wide for marks, so it shows the rounds left as a number.
     function drawAmmo(p) {
-      const y = px(p.y + 10);
+      const y = px(p.y + 15);
       if (p.reload > 0) {
         ctx.fillStyle = DARK;
         ctx.fillRect(px(p.x - 10), y - 2, 20, 4);
@@ -1015,31 +1028,6 @@
       ctx.fillRect(x, y, fill, 1);
     }
 
-    function drawBuffs(s) {
-      const p = s.player, list = [];
-      if (s.buffs.coffee > 0) list.push(["coffee", Math.min(1, s.buffs.coffee / balance.items.coffee.seconds)]);
-      if (s.buffs.duck > 0) list.push(["duck", s.buffs.duck / balance.items.duck.seconds]);
-      if (s.redCi > 0) list.push(["red_ci", s.redCi / balance.agent.red_ci.seconds]);
-      if (p.shield > 0) list.push(["shield", null, "×" + p.shield]);
-      if (s.orchestra) list.push(["orchestra", null, ""]);
-      let x = 6;
-      for (const [name, left, note] of list) {
-        const c = sprite(name, {});
-        const y = VH - c.height - 8;
-        if (left === null || left > 0.25 || Math.floor(s.time * 8) & 1) ctx.drawImage(c, x, y);
-        if (left === null) {
-          if (note) label(x + c.width + 4, y + c.height / 2, note, "#8fb3e0");
-          x += c.width + (note ? 14 : 4);
-        } else {
-          ctx.fillStyle = DARK;
-          ctx.fillRect(x, VH - 6, c.width, 3);
-          ctx.fillStyle = ITEM_COLORS[name] || "#d9534f";
-          ctx.fillRect(x + 1, VH - 5, Math.round((c.width - 2) * left), 1);
-          x += c.width + 4;
-        }
-      }
-    }
-
     // A small head of each agent that is off screen, at the edge, pointing at it.
     function drawAllyMarkers(s, camX, camY) {
       for (const a of s.allies) {
@@ -1166,7 +1154,6 @@
       drawAllyMarkers(s, camX, camY);
       if (s.incident) drawIncidentMarker(s.incident, camX, camY, s);
       drawBossBar(s);
-      drawBuffs(s);
       if (s.rage > 0) frameBorder("#ff3030", 0.35 + Math.sin(s.time * 8) * 0.15, 3);
       else if (s.redCi > 0) frameBorder("#d9534f", 0.3, 2);
       if (hurtFlash > 0) frameBorder("#ff3030", hurtFlash * 2.5, 6);

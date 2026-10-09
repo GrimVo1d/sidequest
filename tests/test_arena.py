@@ -537,8 +537,8 @@ class ArenaArtTest(unittest.TestCase):
         self.assertEqual(self.result["spriteErrors"], [])
 
     def test_agent_work_is_drawn(self):
-        for name in ("ask", "turret", "spirit", "spirit_scout", "spirit_plan", "red_ci", "orchestra",
-                     "shield"):
+        # Red CI and the orchestra are icons in the HUD panel now, not on the canvas.
+        for name in ("ask", "turret", "spirit", "spirit_scout", "spirit_plan", "shield"):
             self.assertIn(name, self.result["drawn"])
 
     def test_bestiary_is_drawn(self):
