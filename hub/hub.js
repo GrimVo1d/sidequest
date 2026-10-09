@@ -193,6 +193,7 @@ function renderPause(paused) {
     if (!wasHidden && !$("game").hidden) $("game-frame").focus();
     return;
   }
+  $("btn-quit-game").hidden = !currentDlc;
   const anyWaiting = paused.some((p) => p.reason === "waiting");
   $("pause-title").textContent = anyWaiting
     ? t("Claude ждёт ответа в терминале", "Claude is waiting for an answer in the terminal")
@@ -377,6 +378,7 @@ function closeDlc() {
   $("game").hidden = true;
   document.body.classList.remove("playing");
   $("hub").hidden = false;
+  $("btn-quit-game").hidden = true;
   loadProfile();
   loadDlc();  // the card may show new records
 }
@@ -574,6 +576,11 @@ window.addEventListener("pywebviewready", async () => {
   $("btn-connect").addEventListener("click", connectFlow);
   $("btn-settings").addEventListener("click", settingsFlow);
   $("btn-resume").addEventListener("click", () => api.resume(null).then(refreshStatus));
+  // Leaving the game is enough of an answer: the pause goes away with it.
+  $("btn-quit-game").addEventListener("click", () => {
+    closeDlc();
+    api.resume(null).then(refreshStatus);
+  });
   const editAvatar = () => openAvatarEditor(profile && profile.avatar, loadProfile);
   $("avatar").addEventListener("click", editAvatar);
   $("btn-avatar").addEventListener("click", editAvatar);
