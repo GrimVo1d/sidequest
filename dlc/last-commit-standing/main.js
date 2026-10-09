@@ -22,7 +22,7 @@
   let lastDraw = 0, acc = 0, hudAt = 0;
   let choicesKey = "";
   let banishing = false;     // the next card picked is banished instead of taken
-  let buildKey = "";
+  let buildKey = "", buffsKey = "";
   let mapId = LCS_MAPS[0].id;
   let mode = "agent";
   let mods = [];             // modifiers picked for the next match (not for the daily task)
@@ -354,6 +354,7 @@
     choicesKey = "";
     banishing = false;
     buildKey = "";
+    buffsKey = "";
     acc = 0;
     keys.clear();
     show(null);
@@ -497,28 +498,15 @@
 
   function updateHud() {
     const s = game.state, p = s.player;
-    $("hp-fill").style.width = Math.max(0, p.hp / s.stats.max_hp * 100) + "%";
-    $("hp-text").textContent = p.dead > 0 ? t("воскрешение…", "reviving…") : `${Math.ceil(p.hp)} / ${Math.round(s.stats.max_hp)}`;
     $("xp-fill").style.width = Math.min(100, s.xp / s.xpNext * 100) + "%";
     $("xp-text").textContent = t("ур. ", "lv. ") + s.level;
     $("time").textContent = s.solo
       ? `${clock(s.time)} / ${clock(balance.classic.seconds)}` : clock(s.time);
-    $("ammo").textContent = p.reload > 0 ? t("перезарядка…", "reloading…")
-      : `${t("патроны", "ammo")} ${p.ammo}/${p.magazine}`;
     $("score").textContent = `${t("счёт", "score")} ${Math.floor(s.score * s.scoreMul)}`;
     $("multiplier").textContent = s.multiplier > 1 ? `×${s.multiplier}` : "";
-    $("rage").hidden = s.rage <= 0;
-    $("red-ci").hidden = s.redCi <= 0;
-    $("orchestra").hidden = !s.orchestra;
-    $("deploy").hidden = !s.deploy;
-    if (s.deploy) $("deploy").textContent = t("ДЕПЛОЙ ", "DEPLOY ") + Math.ceil(s.deploy.left);
-    $("incident").hidden = !s.incident;
-    if (s.incident) {
-      $("incident").textContent = t("ИНЦИДЕНТ ", "INCIDENT ")
-        + `${Math.floor(s.incident.held)}/${balance.events.incident.hold} · ${Math.ceil(s.incident.left)}`;
-    }
 
     updateBuild(s);
+    updateBuffs(s);
 
     const list = $("allies");
     clear(list);
@@ -547,6 +535,45 @@
   }
 
   // Weapons and passives held, with their levels; redrawn only when they change.
+  // What is on right now, with the seconds left; one about to end blinks.
+  function activeBuffs(s) {
+    const I = balance.items, AG = balance.agent, p = s.player, list = [];
+    const timed = (id, icon, name, left, total, cls) =>
+      list.push({id, icon, cls, text: `${name} ${Math.ceil(left)}`, ending: left / total < 0.25});
+    if (s.buffs.coffee > 0) timed("coffee", "coffee", t("кофе", "coffee"), s.buffs.coffee, I.coffee.seconds);
+    if (s.buffs.duck > 0) timed("duck", "duck", t("уточка", "duck"), s.buffs.duck, I.duck.seconds);
+    if (p.shield > 0) list.push({id: "shield", icon: "shield", cls: "blue", text: "×" + p.shield});
+    if (s.rage > 0) timed("rage", null, t("ЯРОСТЬ", "RAGE"), s.rage, balance.rage.seconds, "red");
+    if (s.redCi > 0) timed("red-ci", "red_ci", t("КРАСНЫЙ CI", "RED CI"), s.redCi, AG.red_ci.seconds, "red");
+    if (s.orchestra) list.push({id: "orchestra", icon: "orchestra", cls: "violet", text: t("ОРКЕСТР", "ORCHESTRA")});
+    if (s.deploy) list.push({id: "deploy", cls: "orange", text: t("ДЕПЛОЙ ", "DEPLOY ") + Math.ceil(s.deploy.left)});
+    if (s.incident) {
+      list.push({id: "incident", cls: "red", text: t("ИНЦИДЕНТ ", "INCIDENT ")
+        + `${Math.floor(s.incident.held)}/${balance.events.incident.hold} · ${Math.ceil(s.incident.left)}`});
+    }
+    return list;
+  }
+
+  function updateBuffs(s) {
+    const list = activeBuffs(s), box = $("buffs");
+    const key = list.map((b) => b.id).join(" ");
+    if (key !== buffsKey) {
+      buffsKey = key;
+      clear(box);
+      for (const b of list) {
+        const chip = el("span", null, "buff" + (b.cls ? " " + b.cls : ""));
+        if (b.icon) chip.appendChild(iconCanvas(b.icon, 22));
+        chip.appendChild(el("span"));
+        box.appendChild(chip);
+      }
+    }
+    list.forEach((b, i) => {
+      const chip = box.children[i];
+      chip.lastChild.textContent = b.text;
+      chip.classList.toggle("ending", !!b.ending);
+    });
+  }
+
   function updateBuild(s) {
     const key = JSON.stringify([s.weapons.map((w) => [w.id, w.level, w.evolved]), s.taken]);
     if (key === buildKey) return;
