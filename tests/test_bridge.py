@@ -67,6 +67,14 @@ class BridgeTest(unittest.TestCase):
             with self.assertRaises(ValueError):
                 bridge.dlc_save(dlc_id, key, 1)
 
+    def test_balance_is_read_from_the_dlc_folder(self):
+        _, bridge = self.make(dev=True)
+        self.assertIsNone(bridge.dlc_balance("sdk-test"))
+        arena = bridge.dlc_balance("last-commit-standing")
+        self.assertIn("player", arena)
+        with self.assertRaises(ValueError):
+            bridge.dlc_balance("../sidequest")
+
     def test_match_counted_normally(self):
         _, bridge = self.make()
         bridge.match_start("arena")

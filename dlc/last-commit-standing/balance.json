@@ -1,0 +1,90 @@
+{
+  "view": {"width": 480, "height": 300},
+  "arena": {"width": 1600, "height": 1200},
+
+  "player": {
+    "hp": 100, "speed": 90, "radius": 6,
+    "hit_invulnerable": 0.5,
+    "respawn_seconds": 3, "respawn_invulnerable": 3, "respawn_clear_radius": 140,
+    "death_penalty": 500,
+    "weapon": {"cooldown": 0.7, "damage": 12, "speed": 220, "range": 170,
+               "projectiles": 1, "pierce": 0, "radius": 2}
+  },
+
+  "ally": {
+    "radius": 5, "speed": 140, "follow_distance": 26,
+    "stun_seconds": 2, "blocked_seconds": 1.5, "compact_max_seconds": 300
+  },
+
+  "abilities": {
+    "attack":    {"damage": 18, "per_line": 1.2, "max_damage": 90, "missiles": 1,
+                  "speed": 240, "turn": 6},
+    "scout":     {"radius": 100, "slow": 0.45, "seconds": 4},
+    "cast":      {"radius": 45, "damage": 28, "range": 150},
+    "cast_test": {"radius": 75, "damage": 55},
+    "scout_far": {"damage": 45, "width": 10},
+    "summon":    {"damage": 8, "cooldown": 0.7, "orbit": 22, "range": 140,
+                  "max_seconds": 600},
+    "generic":   {"radius": 35, "damage": 12},
+    "ult":       {"damage": 100000}
+  },
+
+  "xp": {
+    "per_action": {"attack": 6, "scout": 2, "cast": 5, "scout_far": 4, "summon": 8,
+                   "todo": 3, "generic": 2},
+    "error": 2,
+    "first_level": 20,
+    "growth": 1.22
+  },
+
+  "enemies": {
+    "grunt":  {"hp": 20,   "speed": 34, "radius": 5,  "damage": 10, "score": 10},
+    "runner": {"hp": 10,   "speed": 58, "radius": 4,  "damage": 6,  "score": 15,
+               "from_minute": 1},
+    "tank":   {"hp": 90,   "speed": 22, "radius": 9,  "damage": 20, "score": 40,
+               "from_minute": 3},
+    "boss":   {"hp": 800,  "speed": 26, "radius": 18, "damage": 30, "score": 1000}
+  },
+
+  "spawn": {
+    "base_per_second": 0.6, "per_minute": 0.02, "per_level": 0.1, "max_per_second": 3,
+    "max_alive": 250,
+    "hp_growth_per_minute": 0.02, "hp_growth_per_level": 0.06,
+    "speed_growth_per_minute": 0.03, "max_speed_growth": 0.35,
+    "damage_growth_per_minute": 0.03,
+    "boss_every_minutes": 5,
+    "weights": {"grunt": 6, "runner": 3, "tank": 1},
+    "no_ally_factor": 0.6,
+    "wave_size": 30
+  },
+
+  "rage": {"seconds": 8, "speed": 1.3, "damage": 1.3},
+
+  "score": {"per_second": 1, "streak_window": 2.0, "streak_step": 15,
+            "multiplier_step": 0.5, "max_multiplier": 5},
+
+  "finale": {"seconds": 6},
+
+  "upgrades": [
+    {"id": "damage",     "name": "Острее",        "text": "+25% урона",
+     "stat": "damage", "mul": 1.25, "max_level": 8},
+    {"id": "rate",       "name": "Быстрее",       "text": "−15% перезарядки",
+     "stat": "cooldown", "mul": 0.85, "max_level": 6},
+    {"id": "multishot",  "name": "Залп",          "text": "+1 снаряд",
+     "stat": "projectiles", "add": 1, "max_level": 5},
+    {"id": "pierce",     "name": "Насквозь",      "text": "снаряд пробивает ещё одного врага",
+     "stat": "pierce", "add": 1, "max_level": 4},
+    {"id": "speed",      "name": "Лёгкие ноги",   "text": "+12% скорости",
+     "stat": "speed", "mul": 1.12, "max_level": 4},
+    {"id": "vitality",   "name": "Живучесть",     "text": "+25 к здоровью и полное лечение",
+     "stat": "max_hp", "add": 25, "heal": true, "max_level": 6},
+    {"id": "regen",      "name": "Регенерация",   "text": "+1 здоровья в секунду",
+     "stat": "regen", "add": 1, "max_level": 5},
+    {"id": "ally_power", "name": "Код-ревью",     "text": "+30% урона союзников",
+     "stat": "ally_damage", "mul": 1.3, "max_level": 6},
+    {"id": "ally_area",  "name": "Широкий diff",  "text": "+20% радиуса взрывов и разведки",
+     "stat": "ally_area", "mul": 1.2, "max_level": 4},
+    {"id": "missiles",   "name": "Мультиправка",  "text": "+1 снаряд союзника за правку",
+     "stat": "ally_missiles", "add": 1, "max_level": 4}
+  ]
+}

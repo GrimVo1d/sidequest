@@ -304,6 +304,7 @@ const DLC_METHODS = {
   save: (id, args) => api.dlc_save(id, String(args[0]), args[1]),
   match_start: (id) => api.match_start(id),
   match_end: (id, args) => api.match_end(id, args[0]),
+  balance: (id) => api.dlc_balance(id),
   profile: () => api.profile(),
   settings: () => api.get_settings(),
 };
@@ -315,13 +316,17 @@ function openDlc(d) {
   $("hub").hidden = true;
   $("game").hidden = false;
   $("game-title").textContent = d.name;
-  $("game-frame").src = d.url;
+  const frame = $("game-frame");
+  // Keys go to the game right away, without a click into it first.
+  frame.onload = () => frame.contentWindow && frame.focus();
+  frame.src = d.url;
 }
 
 function closeDlc() {
   currentDlc = null;
   dlcDevCommands = [];
   renderDlcDev();
+  $("game-frame").onload = null;
   $("game-frame").src = "about:blank";
   $("game").hidden = true;
   $("hub").hidden = false;

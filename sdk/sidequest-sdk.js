@@ -5,6 +5,7 @@
 //   Sidequest.on("tool", (e) => ...)       // one kind of game event ("*" for all)
 //   Sidequest.onPause((paused, sessions) => ...)
 //   await Sidequest.profile()               // {name, avatar, stats}; avatar: sdk/avatar.js
+//   await Sidequest.balance()               // the DLC's own balance.json
 //   await Sidequest.storage.get("save")     // the DLC's own data (data/dlc/<id>/)
 //   await Sidequest.storage.set("save", {...})
 //   await Sidequest.match.start(); await Sidequest.match.end({score: 120})
@@ -73,6 +74,7 @@
     get info() { return info; },
     ready() { post({kind: "ready"}); return hello; },
     profile: () => call("profile"),
+    balance: () => call("balance"),
     settings: () => call("settings"),
     storage: {
       get: (key) => call("load", key),

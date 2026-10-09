@@ -228,10 +228,14 @@ class Bridge:
 
     # --- DLC --------------------------------------------------------------------
 
-    def list_dlc(self):
+    def _dlc_roots(self):
         roots = [os.path.join(paths.PROJECT_DIR, "dlc")]
         if self._dev:
             roots.append(os.path.join(paths.PROJECT_DIR, "dev", "dlc"))
+        return roots
+
+    def list_dlc(self):
+        roots = self._dlc_roots()
         found = []
         for root in roots:
             if not os.path.isdir(root):
@@ -250,6 +254,17 @@ class Bridge:
                               "dev_only": root != roots[0],
                               "url": _file_url(entry)})
         return found
+
+    def dlc_balance(self, dlc_id):
+        """The DLC's balance.json (read-only numbers that ship with the DLC)."""
+        if not _ID_RE.match(str(dlc_id)):
+            raise ValueError("bad dlc id")
+        for root in self._dlc_roots():
+            path = os.path.join(root, dlc_id, "balance.json")
+            if os.path.isfile(path):
+                with open(path, encoding="utf-8") as f:
+                    return json.load(f)
+        return None
 
     def dlc_load(self, dlc_id, key):
         path = self._dlc_file(dlc_id, key)

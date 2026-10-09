@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'">
+<title>Last Commit Standing</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<canvas id="arena"></canvas>
+
+<div id="hud" hidden>
+  <div class="hud-row">
+    <div class="bar hp"><div id="hp-fill"></div><span id="hp-text"></span></div>
+    <div class="bar xp"><div id="xp-fill"></div><span id="xp-text"></span></div>
+  </div>
+  <div class="hud-row">
+    <span id="time"></span>
+    <span id="score"></span>
+    <span id="multiplier"></span>
+    <span id="rage" hidden>ЯРОСТЬ</span>
+  </div>
+  <ul id="allies"></ul>
+  <div id="notice" hidden></div>
+</div>
+
+<section id="menu" class="screen">
+  <h1>Last Commit Standing</h1>
+  <canvas id="menu-avatar" class="avatar"></canvas>
+  <div id="menu-name"></div>
+  <dl id="records"></dl>
+  <button id="btn-play" class="primary">Играть</button>
+  <p class="hint">WASD или стрелки — ходить, стреляешь сам. Esc — меню.<br>
+    Союзники — твои агенты: их действия становятся атаками.<br>
+    Матч заканчивается, когда все агенты закончили задачу.</p>
+</section>
+
+<section id="levelup" class="screen" hidden>
+  <h2>Новый уровень</h2>
+  <div id="choices"></div>
+  <p class="hint">1, 2, 3 или клик</p>
+</section>
+
+<section id="esc" class="screen" hidden>
+  <h2>Пауза</h2>
+  <button id="btn-resume" class="primary">Продолжить</button>
+  <button id="btn-quit">Завершить матч</button>
+</section>
+
+<section id="results" class="screen" hidden>
+  <h2 id="results-title"></h2>
+  <dl id="results-list"></dl>
+  <p id="results-note" class="note" hidden>Матч не засчитан: повтор или панель разработчика.</p>
+  <button id="btn-again" class="primary">В меню</button>
+</section>
+
+<script src="../../sdk/sidequest-sdk.js"></script>
+<script src="../../sdk/avatar.js"></script>
+<script src="game.js"></script>
+<script src="render.js"></script>
+<script src="main.js"></script>
+</body>
+</html>
