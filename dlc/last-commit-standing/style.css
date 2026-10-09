@@ -45,6 +45,13 @@ dl { display: grid; grid-template-columns: auto auto; gap: 2px 16px; margin: 4px
 dt { color: var(--dim); }
 dd { margin: 0; text-align: right; }
 
+#maps { display: flex; gap: 8px; }
+.map { width: 150px; display: flex; flex-direction: column; gap: 4px; text-align: left;
+  box-shadow: none; }
+.map.on { border-color: var(--accent); box-shadow: 3px 3px 0 var(--edge); }
+.map .name { color: var(--accent); }
+.map .text { font-size: 11px; color: var(--dim); }
+
 #choices { display: flex; gap: 12px; }
 .choice { width: 170px; min-height: 96px; display: flex; flex-direction: column; gap: 6px;
   text-align: left; }

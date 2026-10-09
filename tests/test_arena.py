@@ -25,7 +25,9 @@ class ArenaTest(unittest.TestCase):
             cls.balance = json.load(f)
 
     def matches(self):
-        return {k: v for k, v in self.result.items() if isinstance(v, dict)}
+        found = {k: v for k, v in self.result.items() if isinstance(v, dict) and "over" in v}
+        found.update({"map " + k: v for k, v in self.result["maps"].items()})
+        return found
 
     def test_no_broken_numbers(self):
         for name, match in self.matches().items():
@@ -54,6 +56,23 @@ class ArenaTest(unittest.TestCase):
         for name, match in self.matches().items():
             with self.subTest(name):
                 self.assertEqual(match["leaked"], 0)
+
+    def test_every_map_plays_to_the_end(self):
+        self.assertGreaterEqual(len(self.result["maps"]), 4)
+        for name, match in self.result["maps"].items():
+            with self.subTest(name):
+                self.assertTrue(match["over"])
+                self.assertEqual(match["results"]["map"], name)
+
+    def test_nothing_stands_inside_walls(self):
+        for name, match in self.matches().items():
+            with self.subTest(name):
+                self.assertEqual(match["in_walls"], 0)
+
+    def test_enemies_find_the_way_around_walls(self):
+        path = self.result["pathfinding"]
+        self.assertIsNotNone(path["reached"])
+        self.assertLess(path["reached"], path["straight"] * 2)
 
     def test_no_agent_no_finale(self):
         idle = self.result["idle"]

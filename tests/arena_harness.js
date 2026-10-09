@@ -4,6 +4,7 @@
 "use strict";
 const [project] = arguments;
 const DLC = project + "/dlc/last-commit-standing";
+load(DLC + "/maps.js");
 load(DLC + "/game.js");
 const balance = JSON.parse(readFile(DLC + "/balance.json"));
 const DT = 1 / 60;
@@ -27,11 +28,13 @@ function bot(s) {
   return {x: x / len, y: y / len};
 }
 
-function play(events, maxTime, seed) {
-  const game = LCS.createGame(balance, {seed});
+const inWall = (s, o) => s.map.walls.some((w) => o.x > w.x && o.x < w.x + w.w && o.y > w.y && o.y < w.y + w.h);
+
+function play(events, maxTime, seed, map) {
+  const game = LCS.createGame(balance, {seed, map});
   const s = game.state;
   let i = 0, steps = 0, maxEnemies = 0, bad = null, choicesSeen = 0, firstLevelAt = null;
-  let reloads = 0, leaked = 0;
+  let reloads = 0, leaked = 0, inWalls = 0;
   const start = Date.now();
   while (!s.over && s.time < maxTime) {
     while (i < events.length && events[i].t <= s.time) game.agentEvent(events[i++]);
@@ -43,6 +46,7 @@ function play(events, maxTime, seed) {
     // Damage "in flight" must belong to a shot that is still flying.
     if (steps % 600 === 0) {
       leaked += s.enemies.filter((e) => e.incoming > 0.001 && !s.shots.some((sh) => sh.aim === e)).length;
+      inWalls += s.enemies.filter((e) => inWall(s, e)).length + (inWall(s, s.player) ? 1 : 0);
     }
     if (s.level > 1 && firstLevelAt === null) firstLevelAt = s.time;
     maxEnemies = Math.max(maxEnemies, s.enemies.length);
@@ -55,7 +59,7 @@ function play(events, maxTime, seed) {
   return {over: s.over, results: s.results, time: Math.round(s.time), level: s.level,
           choices: choicesSeen, max_enemies: maxEnemies, bad, kills: s.kills,
           allies: s.allies.map((a) => a.state), deaths: s.deaths, first_level_at: firstLevelAt,
-          ms_per_step: (Date.now() - start) / steps, taken: s.taken, reloads, leaked};
+          ms_per_step: (Date.now() - start) / steps, taken: s.taken, reloads, leaked, in_walls: inWalls};
 }
 
 // A busy agent: an action every ~2.5 s, some errors and a subagent.
@@ -98,5 +102,26 @@ result.busy_two_mid = play(two.filter((e) => e.t < 400), 400, 3);
 const again = play(readScenario("error-streak"), 80, 7);
 result.repeatable = JSON.stringify(again.results) === JSON.stringify(result["error-streak"].results);
 result.idle = play([{t: 0, kind: "prompt", session: "z", project: "z"}], 600, 5);
+
+// Every map: two busy agents for ten minutes.
+result.maps = {};
+for (const map of LCS_MAPS) result.maps[map.id] = play(two, 700, 9, map);
+
+// On "legacy" an enemy in the far room must find its way through the doors.
+{
+  const game = LCS.createGame(balance, {seed: 4, map: LCS_MAPS.find((m) => m.id === "legacy")});
+  const s = game.state;
+  game.dev.immortal();
+  Object.assign(s.player, {x: 200, y: 600});
+  const e = {type: "tank", x: 1400, y: 300, r: 9, hp: 1e9, maxHp: 1e9, speed: 40, damage: 0, score: 0,
+             slow: 0, slowFactor: 1, flash: 0, dead: false, incoming: 0};
+  s.enemies.push(e);
+  let reached = null;
+  while (s.time < 90 && reached === null) {
+    game.step(DT, {x: 0, y: 0});
+    if (Math.hypot(e.x - s.player.x, e.y - s.player.y) < e.r + s.player.r + 2) reached = s.time;
+  }
+  result.pathfinding = {reached, straight: Math.hypot(1400 - 200, 300 - 600) / 40};
+}
 
 print(JSON.stringify(result));

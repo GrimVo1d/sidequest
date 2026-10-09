@@ -1,5 +1,5 @@
 // Last Commit Standing: the simulation. No DOM here, so tests run it in jsc.
-//   const game = LCS.createGame(balance, {seed: 1});
+//   const game = LCS.createGame(balance, {seed: 1, map: LCS_MAPS[0]});   // maps.js
 //   game.agentEvent(event)        // a game event from Sidequest.on("*")
 //   game.step(1 / 60, {x, y})      // input: movement direction, each -1..1
 //   game.state                     // everything render.js draws
@@ -27,12 +27,16 @@
 
   function createGame(B, options) {
     const random = makeRandom((options && options.seed) || Date.now());
-    const W = B.arena.width, H = B.arena.height;
+    const map = (options && options.map)
+      || {id: "open", name: "Open space", width: B.arena.width, height: B.arena.height, walls: []};
+    const W = map.width, H = map.height;
+    const WALLS = map.walls.map(([x, y, w, h]) => ({x, y, w, h}));
     const A = B.abilities;
     const CELL = 32;
 
     const s = {
       time: 0, over: false, finaleAt: null, results: null, immortal: false,
+      map: {id: map.id, name: map.name, width: W, height: H, walls: WALLS},
       player: {x: W / 2, y: H / 2, r: B.player.radius, hp: B.player.hp, invulnerable: 0,
                dead: 0, cooldown: 0, ammo: B.player.weapon.magazine, reload: 0, reloadTotal: 0},
       stats: {damage: B.player.weapon.damage, interval: B.player.weapon.interval,
@@ -83,6 +87,88 @@
         .sort((a, b) => dist2(a, from) - dist2(b, from)).slice(0, n);
     }
 
+    // --- walls -------------------------------------------------------------------
+
+    const inWall = (x, y, r) => WALLS.some((w) => x > w.x - r && x < w.x + w.w + r
+                                                && y > w.y - r && y < w.y + w.h + r);
+
+    // Moves a circle out of every wall it overlaps, so it slides along them.
+    function pushOut(o, r) {
+      for (const w of WALLS) {
+        const nx = clamp(o.x, w.x, w.x + w.w), ny = clamp(o.y, w.y, w.y + w.h);
+        const dx = o.x - nx, dy = o.y - ny, d2 = dx * dx + dy * dy;
+        if (d2 >= r * r) continue;
+        if (d2 > 1e-6) {
+          const d = Math.sqrt(d2);
+          o.x = nx + dx / d * r;
+          o.y = ny + dy / d * r;
+        } else {
+          // The centre is inside the wall: leave by the nearest side.
+          const sides = [[o.x - w.x, w.x - r, o.y], [w.x + w.w - o.x, w.x + w.w + r, o.y],
+                         [o.y - w.y, o.x, w.y - r], [w.y + w.h - o.y, o.x, w.y + w.h + r]];
+          const best = sides.reduce((a, b) => (b[0] < a[0] ? b : a));
+          o.x = best[1];
+          o.y = best[2];
+        }
+      }
+    }
+
+    // Enemies find their way around walls along a distance field: a breadth-first search
+    // over 16 px cells from the player's cell, redone when the player changes cell.
+    const FCELL = 16, FW = Math.ceil(W / FCELL), FH = Math.ceil(H / FCELL);
+    const blocked = new Uint8Array(FW * FH);
+    for (let c = 0; c < FW * FH; c++) {
+      blocked[c] = inWall((c % FW + 0.5) * FCELL, (Math.floor(c / FW) + 0.5) * FCELL, 6) ? 1 : 0;
+    }
+    const flow = new Int32Array(FW * FH).fill(-1);
+    const queue = new Int32Array(FW * FH);
+    let flowFrom = -1;
+    const cellOf = (o) => clamp(Math.floor(o.x / FCELL), 0, FW - 1)
+      + clamp(Math.floor(o.y / FCELL), 0, FH - 1) * FW;
+    const STEPS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+
+    // A diagonal step is allowed only if both straight steps next to it are open.
+    function open(cx, cy, dx, dy) {
+      const x = cx + dx, y = cy + dy;
+      if (x < 0 || y < 0 || x >= FW || y >= FH || blocked[x + y * FW]) return false;
+      return !dx || !dy || (!blocked[cx + dx + cy * FW] && !blocked[cx + (cy + dy) * FW]);
+    }
+
+    function updateFlow() {
+      const start = cellOf(s.player);
+      if (start === flowFrom) return;
+      flowFrom = start;
+      flow.fill(-1);
+      flow[start] = 0;
+      let head = 0, tail = 0;
+      queue[tail++] = start;
+      while (head < tail) {
+        const c = queue[head++], cx = c % FW, cy = (c - cx) / FW;
+        for (const [dx, dy] of STEPS) {
+          if (!open(cx, cy, dx, dy)) continue;
+          const n = cx + dx + (cy + dy) * FW;
+          if (flow[n] < 0) { flow[n] = flow[c] + 1; queue[tail++] = n; }
+        }
+      }
+    }
+
+    // Where an enemy should head: the player, or the next cell towards the player.
+    function waypoint(e) {
+      const p = s.player;
+      if (!WALLS.length) return p;
+      const c = cellOf(e);
+      if (flow[c] >= 0 && flow[c] <= 2) return p;
+      const cx = c % FW, cy = (c - cx) / FW;
+      let best = -1, bestFlow = flow[c] >= 0 ? flow[c] : Infinity;
+      for (const [dx, dy] of STEPS) {
+        if (!open(cx, cy, dx, dy)) continue;
+        const n = cx + dx + (cy + dy) * FW;
+        if (flow[n] >= 0 && flow[n] < bestFlow) { bestFlow = flow[n]; best = n; }
+      }
+      if (best < 0) return p;
+      return {x: (best % FW + 0.5) * FCELL, y: (Math.floor(best / FW) + 0.5) * FCELL};
+    }
+
     // --- enemies -----------------------------------------------------------------
 
     function spawn(type, at) {
@@ -92,10 +178,15 @@
       if (at) {
         ({x, y} = at);
       } else {
-        const angle = random() * Math.PI * 2;
-        const d = Math.hypot(B.view.width, B.view.height) / 2 + 20 + random() * 40;
-        x = clamp(s.player.x + Math.cos(angle) * d, cfg.radius, W - cfg.radius);
-        y = clamp(s.player.y + Math.sin(angle) * d, cfg.radius, H - cfg.radius);
+        // Just off screen, outside walls; give up after a few tries.
+        let tries = 0;
+        do {
+          const angle = random() * Math.PI * 2;
+          const d = Math.hypot(B.view.width, B.view.height) / 2 + 20 + random() * 40;
+          x = clamp(s.player.x + Math.cos(angle) * d, cfg.radius, W - cfg.radius);
+          y = clamp(s.player.y + Math.sin(angle) * d, cfg.radius, H - cfg.radius);
+        } while (inWall(x, y, cfg.radius) && ++tries < 10);
+        if (tries >= 10) return;
       }
       // Difficulty follows both the clock and the player's level, so a busy agent
       // (many level-ups) and a slow one both keep the arena tense.
@@ -177,6 +268,7 @@
           const angle = d > 0.5 ? Math.atan2(dy, dx) : random() * Math.PI * 2;
           e.x = clamp(p.x + Math.cos(angle) * clear, e.r, W - e.r);
           e.y = clamp(p.y + Math.sin(angle) * clear, e.r, H - e.r);
+          pushOut(e, e.r);
         }
       }
       effect({type: "ring", x: p.x, y: p.y, r: clear, color: "#e8c14a", life: 0.5});
@@ -479,6 +571,7 @@
       if (len > 1) { ix /= len; iy /= len; }
       p.x = clamp(p.x + ix * s.stats.speed * dt, p.r, W - p.r);
       p.y = clamp(p.y + iy * s.stats.speed * dt, p.r, H - p.r);
+      pushOut(p, p.r);
       p.hp = Math.min(s.stats.max_hp, p.hp + s.stats.regen * dt);
       updateWeapon(dt);
     }
@@ -505,14 +598,16 @@
     function updateEnemies(dt) {
       const p = s.player;
       const rageSpeed = s.rage > 0 ? B.rage.speed : 1, rageDamage = s.rage > 0 ? B.rage.damage : 1;
+      if (WALLS.length) updateFlow();
       for (const e of s.enemies) {
         e.flash = Math.max(0, e.flash - dt);
         if (e.slow > 0) e.slow -= dt;
         const k = (e.slow > 0 ? e.slowFactor : 1) * rageSpeed;
-        const d = Math.hypot(p.x - e.x, p.y - e.y) || 1;
-        e.x += (p.x - e.x) / d * e.speed * k * dt;
-        e.y += (p.y - e.y) / d * e.speed * k * dt;
-        if (!p.dead && d < e.r + p.r) hurtPlayer(e.damage * rageDamage);
+        const to = waypoint(e);
+        const d = Math.hypot(to.x - e.x, to.y - e.y) || 1;
+        e.x += (to.x - e.x) / d * e.speed * k * dt;
+        e.y += (to.y - e.y) / d * e.speed * k * dt;
+        if (!p.dead && Math.hypot(p.x - e.x, p.y - e.y) < e.r + p.r) hurtPlayer(e.damage * rageDamage);
       }
       // Keep enemies from collapsing into one blob.
       rebuildGrid();
@@ -528,6 +623,7 @@
         });
       }
       for (const e of s.enemies) {
+        pushOut(e, e.r);
         e.x = clamp(e.x, e.r, W - e.r);
         e.y = clamp(e.y, e.r, H - e.r);
       }
@@ -556,6 +652,8 @@
         sh.x += sh.vx * dt;
         sh.y += sh.vy * dt;
         if (sh.x < 0 || sh.y < 0 || sh.x > W || sh.y > H) sh.life = 0;
+        // Bullets stop at walls; the allies' homing missiles are magic and fly through.
+        if (!sh.target && WALLS.length && inWall(sh.x, sh.y, 0)) sh.life = 0;
         if (sh.life <= 0) continue;
         nearby(sh.x, sh.y, sh.r + 20, (e) => {
           if (sh.life <= 0 || sh.hit.has(e)) return;
@@ -599,7 +697,7 @@
       if (s.over) return s.results;
       s.over = true;
       s.choices = null;
-      s.results = {reason, time: Math.round(s.time), score: Math.floor(s.score), kills: s.kills,
+      s.results = {reason, map: map.id, time: Math.round(s.time), score: Math.floor(s.score), kills: s.kills,
                    damage_taken: Math.round(s.damageTaken), deaths: s.deaths, level: s.level,
                    best_streak: s.bestStreak, allies: s.allies.length};
       return s.results;

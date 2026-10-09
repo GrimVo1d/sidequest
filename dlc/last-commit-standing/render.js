@@ -7,7 +7,6 @@
 
   function createRenderer(canvas, balance) {
     const VW = balance.view.width, VH = balance.view.height;
-    const W = balance.arena.width, H = balance.arena.height;
     canvas.width = VW;
     canvas.height = VH;
     const ctx = canvas.getContext("2d");
@@ -69,7 +68,7 @@
     }
 
     function draw(s, avatar) {
-      const p = s.player;
+      const p = s.player, W = s.map.width, H = s.map.height;
       const camX = Math.max(0, Math.min(W - VW, p.x - VW / 2));
       const camY = Math.max(0, Math.min(H - VH, p.y - VH / 2));
       ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -84,6 +83,17 @@
       ctx.strokeStyle = "#3f3f7a";
       ctx.lineWidth = 2;
       ctx.strokeRect(0, 0, W, H);
+
+      // Walls: a dark outline, a body and a lighter top edge.
+      for (const w of s.map.walls) {
+        if (w.x > camX + VW || w.y > camY + VH || w.x + w.w < camX || w.y + w.h < camY) continue;
+        ctx.fillStyle = "#0d0d1a";
+        ctx.fillRect(w.x - 1, w.y - 1, w.w + 2, w.h + 2);
+        ctx.fillStyle = "#34345e";
+        ctx.fillRect(w.x, w.y, w.w, w.h);
+        ctx.fillStyle = "#4a4a80";
+        ctx.fillRect(w.x, w.y, w.w, 3);
+      }
 
       const visible = (o, m) => o.x > camX - m && o.x < camX + VW + m && o.y > camY - m && o.y < camY + VH + m;
 

@@ -14,6 +14,7 @@
   let escOpen = false;
   let lastDraw = 0, acc = 0, hudAt = 0;
   let choicesKey = "";
+  let mapId = LCS_MAPS[0].id;
   const keys = new Set();
   const sprite = document.createElement("canvas");
   let stopSprite = () => {};
@@ -63,7 +64,26 @@
       ["Матчей", r.matches || 0],
       ["Убито всего", r.kills || 0],
     ]);
+    const prefs = (await Sidequest.storage.get("prefs")) || {};
+    if (LCS_MAPS.some((m) => m.id === prefs.map)) mapId = prefs.map;
+    renderMaps();
     $("btn-play").focus();
+  }
+
+  function renderMaps() {
+    const box = $("maps");
+    clear(box);
+    for (const m of LCS_MAPS) {
+      const b = el("button", null, "map" + (m.id === mapId ? " on" : ""));
+      b.appendChild(el("span", m.name, "name"));
+      b.appendChild(el("span", m.text, "text"));
+      b.addEventListener("click", () => {
+        mapId = m.id;
+        renderMaps();
+        Sidequest.storage.set("prefs", {map: mapId});
+      });
+      box.appendChild(b);
+    }
   }
 
   async function saveRecords(res) {
@@ -80,7 +100,7 @@
   // --- a match ----------------------------------------------------------------------
 
   function startMatch() {
-    game = LCS.createGame(balance, {seed: Date.now()});
+    game = LCS.createGame(balance, {seed: Date.now(), map: LCS_MAPS.find((m) => m.id === mapId)});
     escOpen = false;
     choicesKey = "";
     acc = 0;
@@ -97,6 +117,7 @@
     $("results-title").textContent = res.reason === "done"
       ? "Последний коммит выстоял" : "Матч завершён";
     fillList($("results-list"), [
+      ["Карта", game.state.map.name],
       ["Счёт", res.score], ["Время", clock(res.time)], ["Уровень", res.level],
       ["Убито", res.kills], ["Лучшая серия", res.best_streak], ["Смертей", res.deaths],
       ["Получено урона", res.damage_taken], ["Агентов", res.allies],
