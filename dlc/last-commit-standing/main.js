@@ -18,6 +18,7 @@
   let codexTab = "items";
   let seen = {};             // codex ids the player has met in any match: no second hint
   let tips = [], tip = null;
+  let shownEvents = {};      // the deploy and the incident whose hint has been shown
   let lastDraw = 0, acc = 0, hudAt = 0;
   let choicesKey = "";
   let banishing = false;     // the next card picked is banished instead of taken
@@ -348,6 +349,7 @@
     codexFrom = null;
     tips = [];
     tip = null;
+    shownEvents = {};
     $("tip").hidden = true;
     choicesKey = "";
     banishing = false;
@@ -665,18 +667,26 @@
 
   // The first time ever the player meets an item or an enemy: a hint for a few seconds of
   // game time, one after another. What was shown is remembered in the DLC storage.
+  // An arena event gets its hint every time it starts, right away: it is easy to forget
+  // what a deploy or an incident wants from you.
   function updateTips() {
     const s = game.state;
     let fresh = false;
     for (const id of Object.keys(s.met)) {
       if (seen[id]) continue;
       seen[id] = Date.now();
-      const entry = LCSCodex.entry(balance, id);
-      if (!entry) continue;
-      tips.push(entry);
       fresh = true;
+      const entry = LCSCodex.entry(balance, id);
+      if (entry && entry.kind !== "event") tips.push(entry);
     }
     if (fresh) Sidequest.storage.set("seen", seen);
+    for (const id of ["deploy", "incident"]) {
+      if (s[id] && s[id] !== shownEvents[id]) {
+        tips.unshift(LCSCodex.entry(balance, id));
+        tip = null;
+      }
+      shownEvents[id] = s[id];
+    }
     if (tip && s.time >= tip.until) tip = null;
     if (!tip && tips.length) {
       const e = tips.shift();
