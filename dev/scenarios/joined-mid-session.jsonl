@@ -1,0 +1,5 @@
+// Игру открыли посреди работы агента: сессия «присоединилась» на первом же событии.
+{"t": 0, "kind": "session_start", "joined": true, "source": null, "session": "a1", "project": "demo"}
+{"t": 0.1, "kind": "tool", "tool": "Edit", "action": "attack", "ok": true, "agent": null, "file": "src/app.py", "lines_added": 4, "lines_removed": 1, "session": "a1", "project": "demo"}
+{"t": 5, "kind": "tool", "tool": "Bash", "action": "cast", "ok": true, "agent": null, "category": "test", "session": "a1", "project": "demo"}
+{"t": 9, "kind": "stop", "ok": true, "background": 0, "final": true, "session": "a1", "project": "demo"}

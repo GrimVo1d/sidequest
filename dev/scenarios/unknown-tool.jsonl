@@ -1,0 +1,7 @@
+// Незнакомый инструмент (generic) и незнакомое событие (unknown).
+{"t": 0, "kind": "session_start", "joined": false, "source": "startup", "session": "a1", "project": "demo"}
+{"t": 1, "kind": "prompt", "session": "a1", "project": "demo"}
+{"t": 3, "kind": "tool", "tool": "mcp__figma__get_design", "action": "generic", "ok": true, "agent": null, "session": "a1", "project": "demo"}
+{"t": 6, "kind": "unknown", "event": "SomeFutureEvent", "session": "a1", "project": "demo"}
+{"t": 9, "kind": "tool", "tool": "Edit", "action": "attack", "ok": true, "agent": null, "file": "src/app.py", "lines_added": 1, "lines_removed": 0, "session": "a1", "project": "demo"}
+{"t": 12, "kind": "stop", "ok": true, "background": 0, "final": true, "session": "a1", "project": "demo"}

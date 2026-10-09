@@ -1,0 +1,7 @@
+{
+  "id": "sdk-test",
+  "name": "Тест SDK",
+  "entry": "index.html",
+  "events": ["*"],
+  "sdk": 1
+}

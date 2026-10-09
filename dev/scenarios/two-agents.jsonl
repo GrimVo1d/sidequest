@@ -1,0 +1,30 @@
+// Два агента в разных проектах, у второго сабагент; первый заканчивает раньше.
+{"t": 0, "kind": "session_start", "joined": false, "source": "startup", "session": "a1", "project": "api"}
+{"t": 2, "kind": "session_start", "joined": false, "source": "startup", "session": "b2", "project": "web"}
+{"t": 3, "kind": "prompt", "session": "a1", "project": "api"}
+{"t": 4, "kind": "prompt", "session": "b2", "project": "web"}
+{"t": 6, "kind": "tool", "tool": "Edit", "action": "attack", "ok": true, "agent": null, "file": "api.py", "lines_added": 3, "lines_removed": 1, "session": "a1", "project": "api"}
+{"t": 8, "kind": "tool", "tool": "Read", "action": "scout", "ok": true, "agent": null, "file": "page.tsx", "session": "b2", "project": "web"}
+{"t": 11, "kind": "tool", "tool": "Edit", "action": "attack", "ok": true, "agent": null, "file": "api.py", "lines_added": 3, "lines_removed": 1, "session": "a1", "project": "api"}
+{"t": 13, "kind": "tool", "tool": "Read", "action": "scout", "ok": true, "agent": null, "file": "page.tsx", "session": "b2", "project": "web"}
+{"t": 16, "kind": "tool", "tool": "Edit", "action": "attack", "ok": true, "agent": null, "file": "api.py", "lines_added": 3, "lines_removed": 1, "session": "a1", "project": "api"}
+{"t": 18, "kind": "tool", "tool": "Read", "action": "scout", "ok": true, "agent": null, "file": "page.tsx", "session": "b2", "project": "web"}
+{"t": 20, "kind": "subagent_start", "agent": "x1", "agent_type": "general-purpose", "session": "b2", "project": "web"}
+{"t": 21, "kind": "tool", "tool": "Edit", "action": "attack", "ok": true, "agent": null, "file": "api.py", "lines_added": 3, "lines_removed": 1, "session": "a1", "project": "api"}
+{"t": 22, "kind": "tool", "tool": "Bash", "action": "cast", "ok": true, "agent": "x1", "category": "other", "session": "b2", "project": "web"}
+{"t": 23, "kind": "tool", "tool": "Read", "action": "scout", "ok": true, "agent": null, "file": "page.tsx", "session": "b2", "project": "web"}
+{"t": 26, "kind": "tool", "tool": "Edit", "action": "attack", "ok": true, "agent": null, "file": "api.py", "lines_added": 3, "lines_removed": 1, "session": "a1", "project": "api"}
+{"t": 28, "kind": "tool", "tool": "Read", "action": "scout", "ok": true, "agent": null, "file": "page.tsx", "session": "b2", "project": "web"}
+{"t": 30, "kind": "subagent_stop", "agent": "x1", "agent_type": "general-purpose", "session": "b2", "project": "web"}
+{"t": 31, "kind": "tool", "tool": "Edit", "action": "attack", "ok": true, "agent": null, "file": "api.py", "lines_added": 3, "lines_removed": 1, "session": "a1", "project": "api"}
+{"t": 33, "kind": "tool", "tool": "Read", "action": "scout", "ok": true, "agent": null, "file": "page.tsx", "session": "b2", "project": "web"}
+{"t": 36, "kind": "tool", "tool": "Edit", "action": "attack", "ok": true, "agent": null, "file": "api.py", "lines_added": 3, "lines_removed": 1, "session": "a1", "project": "api"}
+{"t": 38, "kind": "tool", "tool": "Read", "action": "scout", "ok": true, "agent": null, "file": "page.tsx", "session": "b2", "project": "web"}
+{"t": 40, "kind": "stop", "ok": true, "background": 0, "final": true, "session": "a1", "project": "api"}
+{"t": 41, "kind": "tool", "tool": "Edit", "action": "attack", "ok": true, "agent": null, "file": "api.py", "lines_added": 3, "lines_removed": 1, "session": "a1", "project": "api"}
+{"t": 43, "kind": "tool", "tool": "Read", "action": "scout", "ok": true, "agent": null, "file": "page.tsx", "session": "b2", "project": "web"}
+{"t": 46, "kind": "tool", "tool": "Edit", "action": "attack", "ok": true, "agent": null, "file": "api.py", "lines_added": 3, "lines_removed": 1, "session": "a1", "project": "api"}
+{"t": 48, "kind": "tool", "tool": "Read", "action": "scout", "ok": true, "agent": null, "file": "page.tsx", "session": "b2", "project": "web"}
+{"t": 51, "kind": "tool", "tool": "Edit", "action": "attack", "ok": true, "agent": null, "file": "api.py", "lines_added": 3, "lines_removed": 1, "session": "a1", "project": "api"}
+{"t": 53, "kind": "tool", "tool": "Read", "action": "scout", "ok": true, "agent": null, "file": "page.tsx", "session": "b2", "project": "web"}
+{"t": 60, "kind": "stop", "ok": true, "background": 0, "final": true, "session": "b2", "project": "web"}

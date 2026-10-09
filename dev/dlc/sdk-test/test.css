@@ -1,0 +1,7 @@
+body { background: #101020; color: #e8e6f0; font: 13px/1.4 Menlo, monospace; margin: 12px; }
+h1 { font-size: 16px; color: #e8d36a; }
+button { font: inherit; background: #26264a; color: #e8e6f0; border: 2px solid #000; padding: 3px 8px; }
+.row { display: flex; gap: 6px; margin: 8px 0; }
+pre { background: #1f1f3d; padding: 6px; min-height: 1.4em; }
+ul { list-style: none; padding: 0; max-height: 60vh; overflow-y: auto; }
+.paused { color: #d9534f; }

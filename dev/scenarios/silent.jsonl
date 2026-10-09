@@ -1,0 +1,9 @@
+// Пользователь прервал агента (Esc): 90 с тишины, пауза «агент молчит», потом новый промпт.
+{"t": 0, "kind": "session_start", "joined": false, "source": "startup", "session": "a1", "project": "demo"}
+{"t": 1, "kind": "prompt", "session": "a1", "project": "demo"}
+{"t": 4, "kind": "tool", "tool": "Edit", "action": "attack", "ok": true, "agent": null, "file": "src/app.py", "lines_added": 2, "lines_removed": 0, "session": "a1", "project": "demo"}
+{"t": 94, "kind": "silent", "seconds": 90, "session": "a1", "project": "demo"}
+{"t": 120, "kind": "resumed", "source": "activity", "session": "a1", "project": "demo"}
+{"t": 120, "kind": "prompt", "session": "a1", "project": "demo"}
+{"t": 124, "kind": "tool", "tool": "Read", "action": "scout", "ok": true, "agent": null, "file": "src/app.py", "session": "a1", "project": "demo"}
+{"t": 130, "kind": "stop", "ok": true, "background": 0, "final": true, "session": "a1", "project": "demo"}

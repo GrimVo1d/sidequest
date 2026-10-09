@@ -1,0 +1,11 @@
+// Три вида запрета: правило, отказ автомода, отказ «No» в диалоге (виден на следующем промпте).
+{"t": 0, "kind": "session_start", "joined": false, "source": "startup", "session": "a1", "project": "demo"}
+{"t": 1, "kind": "prompt", "session": "a1", "project": "demo"}
+{"t": 4, "kind": "blocked", "tool": "Bash", "reason": "rule", "agent": null, "session": "a1", "project": "demo"}
+{"t": 8, "kind": "blocked", "tool": "Bash", "reason": "denied", "agent": null, "session": "a1", "project": "demo"}
+{"t": 10, "kind": "waiting", "tool": "Write", "session": "a1", "project": "demo"}
+{"t": 20, "kind": "blocked", "tool": "Write", "reason": "rejected", "agent": null, "session": "a1", "project": "demo"}
+{"t": 20, "kind": "resumed", "session": "a1", "project": "demo"}
+{"t": 20, "kind": "prompt", "session": "a1", "project": "demo"}
+{"t": 24, "kind": "tool", "tool": "Edit", "action": "attack", "ok": true, "agent": null, "file": "src/app.py", "lines_added": 3, "lines_removed": 3, "session": "a1", "project": "demo"}
+{"t": 28, "kind": "stop", "ok": true, "background": 0, "final": true, "session": "a1", "project": "demo"}
