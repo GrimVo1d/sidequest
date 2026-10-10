@@ -64,8 +64,9 @@ class Check:
 
     # --- input ---------------------------------------------------------------------
 
-    def key(self, code, kind="keydown"):
-        self.frame(f"w.dispatchEvent(new w.KeyboardEvent('{kind}', {{code: '{code}', bubbles: true}}))")
+    def key(self, code, kind="keydown", ctrl=False, shift=False):
+        self.frame(f"w.dispatchEvent(new w.KeyboardEvent('{kind}', {{code: '{code}', ctrlKey: {str(ctrl).lower()}, "
+                   f"shiftKey: {str(shift).lower()}, bubbles: true}}))")
 
     def hold(self, code, seconds):
         self.key(code, "keydown")
