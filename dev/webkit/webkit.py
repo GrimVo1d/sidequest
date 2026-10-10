@@ -14,11 +14,14 @@ Events go straight into the core, as if the hook had sent them.
 
 `.venv/bin/python dev/webkit/<script>.py <out> ru` prints what drive returned as JSON and
 saves the snapshots as <out>/<name>.png. A window that macOS considers hidden stops its
-animation frames: a blank snapshot or a clock stuck at 0:00 means run it again.
+animation frames: a blank snapshot or a clock stuck at 0:00 means run it again. While the
+window is open, `caffeinate -u` reports user activity every few seconds so an idle display
+does not hide it.
 """
 import json
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
 import threading
@@ -157,6 +160,13 @@ def _front(window):
     AppHelper.callAfter(go)
 
 
+def _awake(stop):
+    """Report user activity until `stop` is set: an idle display hides the window."""
+    while not stop.is_set():
+        subprocess.run(["caffeinate", "-u", "-t", "1"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        stop.wait(3)
+
+
 def run(drive, argv=None, width=1200, height=800):
     """Open the hub on throwaway data, call drive(Check), print its result as JSON."""
     import webview
@@ -169,6 +179,8 @@ def run(drive, argv=None, width=1200, height=800):
     os.makedirs(os.path.join(ROOT, ".tmp"), exist_ok=True)
     tmp = tempfile.mkdtemp(dir=os.path.join(ROOT, ".tmp"))
     result = {}
+    stop = threading.Event()
+    threading.Thread(target=_awake, args=(stop,), daemon=True).start()
     try:
         with mock.patch.object(paths, "DLC_DATA_DIR", os.path.join(tmp, "dlc")):
             core = Core(db_path=os.path.join(tmp, "check.db"), socket_path=os.path.join(tmp, "s.sock"))
@@ -192,6 +204,7 @@ def run(drive, argv=None, width=1200, height=800):
             webview.start(go, window, http_server=False, private_mode=True)
             core.store.close()
     finally:
+        stop.set()
         shutil.rmtree(tmp, True)
     print(json.dumps(result, ensure_ascii=False, indent=1), flush=True)
     os._exit(0)
