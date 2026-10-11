@@ -307,6 +307,22 @@ result.enemies = {};
   result.enemies.deprecated = {crossed, reached, straight: 300 / e.speed};
 }
 
+// Guns do not aim at an enemy behind a wall: their bullets would stop in it.
+{
+  const shoot = (withOpen) => {
+    const game = arena("hotfix", 31), s = game.state;
+    s.enemies.length = 0;
+    s.weapons = [{id: "pistol", level: 1, evolved: false, timer: 0}];
+    Object.assign(s.player, {x: 270, y: 180});
+    const hidden = crowd(game, 1, 0, 1e6)[0];
+    Object.assign(hidden, {x: 360, y: 180});
+    const open = withOpen ? Object.assign(crowd(game, 1, 0, 1e6)[0], {x: 270, y: 300}) : null;
+    stepFor(game, 2, () => ({x: 0, y: 0}));
+    return {hidden: 1e6 - hidden.hp, open: open ? 1e6 - open.hp : null, ammo: s.player.ammo};
+  };
+  result.sight = {alone: shoot(false), both: shoot(true)};
+}
+
 // --- the arsenal: weapons, passives, evolutions --------------------------------------------
 
 // A crowd around the player, slowly closing in; returns its enemies.

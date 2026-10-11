@@ -362,6 +362,15 @@ class ArenaTest(unittest.TestCase):
         self.assertTrue(e["deprecated"]["crossed"])
         self.assertLess(e["deprecated"]["reached"], e["deprecated"]["straight"] * 1.2)
 
+    def test_guns_do_not_shoot_into_walls(self):
+        r = self.result["sight"]
+        pistol = next(w for w in self.balance["weapons"] if w["id"] == "pistol")["base"]
+        # Only an enemy behind a wall: the pistol holds its fire and keeps the magazine.
+        self.assertEqual(r["alone"], {"hidden": 0, "open": None, "ammo": pistol["magazine"]})
+        # A farther one in the open is shot instead.
+        self.assertEqual(r["both"]["hidden"], 0)
+        self.assertGreater(r["both"]["open"], 0)
+
     def test_bestiary_enemies(self):
         b, E = self.result["bestiary"], self.balance["enemies"]
         self.assertAlmostEqual(b["flaky"], 1 - E["flaky"]["miss"], delta=0.15)

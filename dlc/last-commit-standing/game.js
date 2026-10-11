@@ -199,10 +199,12 @@
       }
     }
 
-    function nearestEnemies(from, n, range) {
+    // `sight`: only enemies with no wall in between, for bullets that stop at walls.
+    function nearestEnemies(from, n, range, sight) {
       const r2 = range * range;
-      return s.enemies.filter((e) => !e.dead && dist2(e, from) <= r2)
-        .sort((a, b) => dist2(a, from) - dist2(b, from)).slice(0, n);
+      const near = s.enemies.filter((e) => !e.dead && dist2(e, from) <= r2)
+        .sort((a, b) => dist2(a, from) - dist2(b, from));
+      return sight ? firstInSight(near, from, n) : near.slice(0, n);
     }
 
     const I = B.items;
@@ -241,6 +243,19 @@
         if (inWall(o.x + (x - o.x) * i / n, o.y + (y - o.y) * i / n, r)) return false;
       }
       return true;
+    }
+
+    const inSight = (from, e) => !WALLS.length || clearPath(from, e.x, e.y, 0);
+
+    // The first `n` of the sorted enemies with no wall in between: the path is checked
+    // only until enough are found.
+    function firstInSight(sorted, from, n) {
+      const out = [];
+      for (const e of sorted) {
+        if (out.length >= n) break;
+        if (inSight(from, e)) out.push(e);
+      }
+      return out;
     }
 
     // Enemies find their way around walls along a distance field: a breadth-first search
@@ -798,8 +813,9 @@
     // spreads over the crowd instead of piling into one enemy that is already done for.
     function firePistol(o) {
       const p = s.player, n = o.count, r2 = o.range * o.range;
-      const targets = s.enemies.filter((e) => !e.dead && e.incoming < e.hp && dist2(e, p) <= r2)
-        .sort((a, b) => dist2(a, p) - dist2(b, p)).slice(0, n);
+      const near = s.enemies.filter((e) => !e.dead && e.incoming < e.hp && dist2(e, p) <= r2)
+        .sort((a, b) => dist2(a, p) - dist2(b, p));
+      const targets = firstInSight(near, p, n);
       if (!targets.length) return false;
       p.aim = Math.atan2(targets[0].y - p.y, targets[0].x - p.x);
       p.firedAt = s.time;
@@ -817,7 +833,7 @@
 
     // `--force`: a fan of pellets at the nearest enemy.
     function fireShotgun(w, o) {
-      const p = s.player, t = nearestEnemies(p, 1, o.range)[0];
+      const p = s.player, t = nearestEnemies(p, 1, o.range, true)[0];
       if (!t) return false;
       const base = Math.atan2(t.y - p.y, t.x - p.x), n = o.count;
       for (let i = 0; i < n; i++) {
@@ -1341,7 +1357,7 @@
       for (const t of s.turrets) {
         t.cooldown -= dt;
         if (t.cooldown > 0) continue;
-        const target = nearestEnemies(t, 1, AG.turret.range)[0];
+        const target = nearestEnemies(t, 1, AG.turret.range, true)[0];
         if (!target) continue;
         t.aim = Math.atan2(target.y - t.y, target.x - t.x);
         t.firedAt = s.time;
@@ -1561,7 +1577,7 @@
         text(p.x, p.y - 14, `+${Math.round(p.hp - before)}`, "#4fbf6f", 0.8);
         effect({type: "beam", x: sp.x, y: sp.y, x2: p.x, y2: p.y, r: 1, color: "#4fbf6f", life: 0.25});
       } else {
-        const t = nearestEnemies(sp, 1, A.summon.range)[0];
+        const t = nearestEnemies(sp, 1, A.summon.range, true)[0];
         if (!t) return;
         const angle = Math.atan2(t.y - sp.y, t.x - sp.x);
         s.shots.push({x: sp.x, y: sp.y, vx: Math.cos(angle) * 200, vy: Math.sin(angle) * 200,
