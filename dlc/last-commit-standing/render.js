@@ -188,7 +188,7 @@
         }
         shadows.set(w, c);
       }
-      ctx.drawImage(c, px(x - c.width / 2), px(y - c.height / 2));
+      ctx.drawImage(c, px(x) - (c.width >> 1), px(y) - (c.height >> 1));
     }
 
     const texts = new Map();
@@ -210,7 +210,7 @@
     function label(x, y, value, color, alpha) {
       const c = textCanvas(value, color);
       ctx.globalAlpha = alpha === undefined ? 1 : Math.max(0, alpha);
-      ctx.drawImage(c, px(x - c.width / 2), px(y - c.height / 2));
+      ctx.drawImage(c, px(x) - (c.width >> 1), px(y) - (c.height >> 1));
       ctx.globalAlpha = 1;
     }
 
@@ -591,7 +591,7 @@
       const c = sprite(e.type, o);
       // Scope creep and out of memory grow in whole steps.
       const k = e.size || 1, cw = c.width * k, ch = c.height * k;
-      let x = e.x - cw / 2, y = e.y - ch / 2 - 2;
+      let x = px(e.x) - (cw >> 1), y = e.y - ch / 2 - 2;
       // Null pointer glitches: now and then it slips a pixel or two sideways.
       if (e.type === "nullptr" && hash(Math.floor(s.time * 10), e.born * 100, 3) < 0.15) x += 2;
       if (e.windupAt) x += Math.floor(s.time * 30) & 1 ? 1 : -1;
@@ -612,7 +612,7 @@
       if (e.shield > 0) pixelRing(e.x, e.y, e.r + 4, "#5b8bd0", 0.4 + 0.6 * e.shield / e.shieldMax, 1);
       if (e.elite) {
         const crown = sprite("elite", {});
-        ctx.drawImage(crown, px(e.x - crown.width / 2), px(y - crown.height - (e.hp < e.maxHp ? 4 : 1)));
+        ctx.drawImage(crown, px(e.x) - (crown.width >> 1), px(y - crown.height - (e.hp < e.maxHp ? 4 : 1)));
       }
       if ((BAR_TYPES.has(e.type) || e.elite) && e.hp < e.maxHp) {
         const w = Math.max(14, Math.min(30, Math.round(cw * 0.8))), x0 = px(e.x - w / 2), y0 = px(y - 3);
