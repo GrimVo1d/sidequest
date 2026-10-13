@@ -813,7 +813,7 @@
     balance = await Sidequest.balance();
     const settings = await Sidequest.settings();
     fpsLimit = settings.fps_limit === 30 ? 30 : 60;
-    renderer = LCSRender.createRenderer($("arena"), balance);
+    renderer = LCSRender.createRenderer($("arena"), balance, $("top"));
     await openMenu();
     requestAnimationFrame((now) => { lastDraw = now; frame(now); });
   });

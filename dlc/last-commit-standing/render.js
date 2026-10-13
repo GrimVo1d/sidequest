@@ -113,7 +113,8 @@
 
   const faceHeight = (w) => Math.min(8, Math.floor(w.h / 2));
 
-  function createRenderer(canvas, balance) {
+  // `hud`: the page's top row of the HUD; the boss bar goes under it.
+  function createRenderer(canvas, balance, hud) {
     // The view is at least balance.view and fills the whole window: the scale goes in whole
     // steps of device pixels (1, 1.5, 2, ... on a Retina screen) so pixels stay sharp, and
     // the view grows to cover what is left, up to balance.view.max_*.
@@ -1000,6 +1001,14 @@
 
     // --- overlays in screen space ---------------------------------------------------
 
+    // Under the HUD's top row (time and score), in the canvas's pixels.
+    function bossBarTop() {
+      if (!hud) return 14;
+      const r = hud.getBoundingClientRect(), c = canvas.getBoundingClientRect();
+      if (!r.height || !c.height) return 14;
+      return Math.max(14, Math.ceil((r.bottom - c.top) * VH / c.height) + 10);
+    }
+
     function drawBossBar(s) {
       const boss = s.enemies.find((e) => e.final && !e.dead)
         || s.enemies.find((e) => e.boss && !e.dead);
@@ -1010,7 +1019,7 @@
       const pair = boss.partner ? [boss, boss.partner] : [boss];
       const hp = pair.reduce((sum, e) => sum + (e.dead ? 0 : Math.max(0, e.hp)), 0);
       const max = pair.reduce((sum, e) => sum + e.maxHp, 0);
-      const w = 160, x = Math.round((VW - w) / 2), y = 14;
+      const w = 160, x = Math.round((VW - w) / 2), y = bossBarTop();
       label(VW / 2, y - 6, tr(...name), "#e8c14a");
       ctx.fillStyle = DARK;
       ctx.fillRect(x - 1, y - 1, w + 2, 6);
@@ -1090,8 +1099,10 @@
       // A map smaller than the view sits in the middle.
       const cam = (pos, size, view) => (size <= view ? (size - view) / 2
         : Math.max(0, Math.min(size - view, pos - view / 2)));
-      const camX = Math.round(cam(p.x, W, VW)) + sx;
-      const camY = Math.round(cam(p.y, H, VH)) + sy;
+      // On the player's whole pixel: with an odd view the half pixel would round now one way,
+      // now the other, and the player would jitter on screen as it walks.
+      const camX = Math.round(cam(Math.round(p.x), W, VW)) + sx;
+      const camY = Math.round(cam(Math.round(p.y), H, VH)) + sy;
 
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.fillStyle = "#0d0d1a";
