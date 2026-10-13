@@ -245,6 +245,13 @@
       return true;
     }
 
+    // How far a line from (x, y) along (dx, dy) goes before a wall, up to `length`.
+    function toWall(x, y, dx, dy, length) {
+      if (!WALLS.length) return length;
+      for (let d = 6; d < length; d += 6) if (inWall(x + dx * d, y + dy * d, 0)) return d - 6;
+      return length;
+    }
+
     const inSight = (from, e) => !WALLS.length || clearPath(from, e.x, e.y, 0);
 
     // The first `n` of the sorted enemies with no wall in between: the path is checked
@@ -554,7 +561,7 @@
       if (p.dead || d > cfg.blink_range || d < 50) return;
       const k = Math.min(cfg.blink_distance, d - 30) / d;
       const x = e.x + (p.x - e.x) * k, y = e.y + (p.y - e.y) * k;
-      if (inWall(x, y, e.r)) return;
+      if (!clearPath(e, x, y, 0) || inWall(x, y, e.r)) return;   // never through a wall
       effect({type: "blink", x: e.x, y: e.y, x2: x, y2: y, life: 0.3});
       e.x = x;
       e.y = y;
@@ -847,9 +854,10 @@
       return true;
     }
 
-    // A straight beam that hurts everyone along it, walls or not.
+    // A straight beam that hurts everyone along it, up to the first wall.
     function beam(x, y, angle, length, width, damage, color) {
       const dx = Math.cos(angle), dy = Math.sin(angle);
+      length = toWall(x, y, dx, dy, length);
       effect({type: "beam", x, y, x2: x + dx * length, y2: y + dy * length, r: width, color,
               life: 0.3});
       for (const e of s.enemies) {
@@ -862,7 +870,7 @@
 
     // `grep`: a beam through everyone in line, one per target.
     function fireLaser(w, o) {
-      const p = s.player, targets = nearestEnemies(p, o.count, o.range);
+      const p = s.player, targets = nearestEnemies(p, o.count, o.range, true);
       if (!targets.length) return false;
       const first = Math.atan2(targets[0].y - p.y, targets[0].x - p.x);
       for (let i = 0; i < o.count; i++) {
@@ -933,10 +941,11 @@
       s.mines = s.mines.filter((m) => !m.done);
     }
 
-    // A regex: lightning hits an enemy and jumps to the nearest one not hit yet.
+    // A regex: lightning hits an enemy and jumps to the nearest one not hit yet; neither
+    // the strike nor a jump goes through a wall.
     function fireRegex(w, o) {
       const p = s.player, hit = new Set(), jump = o.jump * o.area;
-      const first = nearestEnemies(p, o.count, o.range);
+      const first = nearestEnemies(p, o.count, o.range, true);
       for (const start of first) {
         if (hit.has(start)) continue;
         const points = [{x: p.x, y: p.y - 4}];
@@ -948,7 +957,7 @@
           let best = null, bestD = jump * jump;
           nearby(target.x, target.y, jump, (e) => {
             const d = dist2(e, target);
-            if (!hit.has(e) && d < bestD) { bestD = d; best = e; }
+            if (!hit.has(e) && d < bestD && inSight(target, e)) { bestD = d; best = e; }
           });
           target = best;
         }

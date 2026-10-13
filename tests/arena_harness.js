@@ -321,6 +321,37 @@ result.enemies = {};
     return {hidden: 1e6 - hidden.hp, open: open ? 1e6 - open.hp : null, ammo: s.player.ammo};
   };
   result.sight = {alone: shoot(false), both: shoot(true)};
+  // No weapon at all hurts an enemy fully behind a wall: beams stop at it, lightning does
+  // not strike or jump through it.
+  result.sight.weapons = {};
+  for (const w of balance.weapons) {
+    const game = arena("hotfix", 41), s = game.state;
+    s.enemies.length = 0;
+    s.spawnAt = Infinity;
+    s.weapons = [{id: w.id, level: 1, evolved: false, timer: 0}];
+    Object.assign(s.player, {x: 270, y: 180});
+    const hidden = Object.assign(crowd(game, 1, 0, 1e6)[0], {x: 360, y: 180, speed: 0});
+    stepFor(game, 3, () => ({x: 0, y: 0}));
+    result.sight.weapons[w.id] = Math.round(1e6 - hidden.hp);
+  }
+  // The null pointer does not blink through a wall to the player on the other side.
+  {
+    const game = arena("hotfix", 29), s = game.state;
+    s.enemies.length = 0;
+    Object.assign(s.player, {x: 380, y: 180});
+    game.dev.enemy("nullptr");
+    const e = Object.assign(s.enemies[s.enemies.length - 1], {x: 250, y: 180, hp: 1e9, damage: 0});
+    // It may walk round the wall; a blink is a jump, and none goes from one side to the other.
+    let crossed = false;
+    for (let i = 0; i < 600; i++) {
+      e.blinkAt = Math.min(e.blinkAt, s.time);
+      s.enemies = [e];
+      const x0 = e.x;
+      game.step(DT, {x: 0, y: 0});
+      if (x0 < 300 && e.x > 324) crossed = true;
+    }
+    result.sight.blink_crossed = crossed;
+  }
 }
 
 // --- the arsenal: weapons, passives, evolutions --------------------------------------------

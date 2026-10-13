@@ -370,6 +370,11 @@ class ArenaTest(unittest.TestCase):
         # A farther one in the open is shot instead.
         self.assertEqual(r["both"]["hidden"], 0)
         self.assertGreater(r["both"]["open"], 0)
+        # No weapon hurts an enemy fully behind a wall, grep and regex included.
+        self.assertEqual(set(r["weapons"]), {w["id"] for w in self.balance["weapons"]})
+        self.assertEqual({k: v for k, v in r["weapons"].items() if v}, {})
+        # The null pointer stays on its side of the wall.
+        self.assertFalse(r["blink_crossed"])
 
     def test_bestiary_enemies(self):
         b, E = self.result["bestiary"], self.balance["enemies"]
