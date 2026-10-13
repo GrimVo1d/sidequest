@@ -10,10 +10,11 @@ Events go straight into the core, as if the hook had sent them.
         c.snapshot("start")
         return {"hud": c.frame("d.getElementById('top').textContent")}
 
-    run(drive)                         # argv: <out dir> [ru|en] [--no-dev]
+    run(drive)                         # argv: <out dir> [ru|en] [--no-dev] [--show]
 
 `.venv/bin/python dev/webkit/<script>.py <out> ru` prints what drive returned as JSON and
-saves the snapshots as <out>/<name>.png. A window that macOS considers hidden stops its
+saves the snapshots as <out>/<name>.png. The window is invisible and takes no focus, so
+checks run in the background; `--show` puts it in front to watch. A window that macOS considers hidden stops its
 animation frames: a blank snapshot or a clock stuck at 0:00 means run it again. While the
 window is open, `caffeinate -u` reports user activity every few seconds so an idle display
 does not hide it.
@@ -142,8 +143,9 @@ class Check:
         return out
 
 
-def _front(window):
-    """Keep the window in front and drawing: a hidden window stops its animation frames."""
+def _front(window, show):
+    """Keep the window drawing: a hidden window stops its animation frames. Unless `show`,
+    it stays out of the way: fully transparent, clicks pass through, no focus, no Dock icon."""
     import AppKit
     from PyObjCTools import AppHelper
     from webview.platforms.cocoa import BrowserView
@@ -151,8 +153,14 @@ def _front(window):
     def go():
         win = BrowserView.instances[window.uid].window
         win.setLevel_(AppKit.NSFloatingWindowLevel)
-        win.orderFrontRegardless()
-        AppKit.NSApp.activateIgnoringOtherApps_(True)
+        if show:
+            win.orderFrontRegardless()
+            AppKit.NSApp.activateIgnoringOtherApps_(True)
+        else:
+            AppKit.NSApp.setActivationPolicy_(AppKit.NSApplicationActivationPolicyAccessory)
+            win.setAlphaValue_(0.0)
+            win.setIgnoresMouseEvents_(True)
+            win.orderFrontRegardless()
         try:
             BrowserView.instances[window.uid].webview._setWindowOcclusionDetectionEnabled_(False)
         except Exception:
@@ -172,7 +180,8 @@ def run(drive, argv=None, width=1200, height=800):
     import webview
     args = list(sys.argv[1:] if argv is None else argv)
     with_dev = "--no-dev" not in args
-    args = [a for a in args if a != "--no-dev"]
+    show = "--show" in args
+    args = [a for a in args if a not in ("--no-dev", "--show")]
     out = os.path.abspath(args[0] if args else os.path.join(ROOT, ".tmp", "webkit"))
     lang = args[1] if len(args) > 1 else "ru"
     os.makedirs(out, exist_ok=True)
@@ -193,7 +202,7 @@ def run(drive, argv=None, width=1200, height=800):
 
             def go(window):
                 time.sleep(1)
-                _front(window)
+                _front(window, show)
                 time.sleep(1)
                 try:
                     result.update(drive(Check(window, core, bridge, out)) or {})
