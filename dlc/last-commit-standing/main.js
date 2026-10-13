@@ -469,7 +469,8 @@
     $("results-note").hidden = true;
     $("results-new").hidden = true;
     show("results");
-    $("btn-again").focus();
+    $("results").scrollTop = 0;
+    $("btn-again").focus({preventScroll: true});
     const {counted} = await Sidequest.match.end(res);
     if (!counted) { $("results-note").hidden = false; return; }
     const fresh = await saveProgress(res);
