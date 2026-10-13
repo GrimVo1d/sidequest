@@ -52,6 +52,8 @@ def drive(c, dlc):
     c.key("Escape")
     c.wait(0.4)
     c.snapshot("4-pause")
+    # A tip from the match must not show through the pause: "none" or hidden is right.
+    out["tip_in_pause"] = c.frame("getComputedStyle(d.getElementById('tip')).display")
     c.frame("d.getElementById('btn-quit').click()")
     c.wait(1)
     c.snapshot("5-results")

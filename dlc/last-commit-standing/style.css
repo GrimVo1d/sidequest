@@ -73,6 +73,8 @@ button.primary { background: #3d3270; border-color: var(--accent); }
 @media (max-height: 560px) {
   #tip { top: 64px; bottom: auto; }
 }
+/* The pause, the handbook and the results cover the match: the tip waits under them unseen. */
+body:has(.screen:not([hidden])) #tip { display: none; }
 #tip-icon { flex: none; }
 #tip-title { color: var(--accent); }
 #tip-text { font-size: 12px; }
