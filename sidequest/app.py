@@ -20,6 +20,7 @@ MAX_QUEUE = 5000
 GHOST_MIN_ACTIONS = 10       # shorter sessions make no match
 GHOST_MAX_EVENTS = 20000
 _ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
+_SCREEN_RE = re.compile(r"^[a-z][a-z-]{0,23}$")   # a DLC screen a hub card row may open
 
 
 def _file_url(path):
@@ -272,7 +273,8 @@ class Bridge:
     def _card(self, dlc_id):
         """A few "label: value" rows the DLC wrote for its card in the hub (Sidequest.card).
 
-        A label is a string or {"ru": .., "en": ..}."""
+        A label is a string or {"ru": .., "en": ..}. A third item names a screen of the DLC
+        (like "achievements"): the row becomes a link that opens the DLC on that screen."""
         try:
             rows = self.dlc_load(dlc_id, "card")
         except (OSError, ValueError):
@@ -281,11 +283,14 @@ class Bridge:
             return []
         card = []
         for row in rows[:4]:
-            if isinstance(row, list) and len(row) == 2:
+            if isinstance(row, list) and len(row) in (2, 3):
                 label = row[0]
                 if isinstance(label, dict):  # {"ru": .., "en": ..}: shown in the chosen language
                     label = label.get(i18n.language(), label.get("ru", ""))
-                card.append([str(label)[:24], str(row[1])[:16]])
+                item = [str(label)[:24], str(row[1])[:16]]
+                if len(row) == 3 and isinstance(row[2], str) and _SCREEN_RE.match(row[2]):
+                    item.append(row[2])
+                card.append(item)
         return card
 
     def dlc_balance(self, dlc_id):

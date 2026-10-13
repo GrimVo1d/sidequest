@@ -103,6 +103,7 @@ dd { margin: 0; text-align: right; }
   font-size: 12px; }
 .dlc .card-stats dt { color: var(--muted); }
 .dlc .card-stats dd { margin: 0; text-align: right; }
+.dlc .card-stats button.link { box-shadow: none; color: var(--accent); }
 .tag { font-size: 11px; color: var(--muted); }
 
 /* While a DLC runs it has the whole window; only the dev panel stays. */

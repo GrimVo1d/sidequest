@@ -4,7 +4,7 @@
 
 let api = null;
 let status = null;
-let currentDlc = null;          // {id, name, url} while a DLC is open
+let currentDlc = null;          // {id, name, url, screen} while a DLC is open
 let dlcDevCommands = [];
 let replayInfo = null;
 const JOURNAL_MAX = 200;
@@ -332,7 +332,14 @@ async function loadDlc() {
     card.appendChild(el("div", d.dev_only ? t("только --dev", "--dev only") : "", "tag"));
     if (d.card && d.card.length) {
       const dl = el("dl", null, "card-stats");
-      for (const [k, v] of d.card) { dl.appendChild(el("dt", k)); dl.appendChild(el("dd", v)); }
+      for (const [k, v, screen] of d.card) {
+        dl.appendChild(el("dt", k));
+        const dd = el("dd");
+        // A row that names a screen of the DLC opens the DLC right on it.
+        if (screen) dd.appendChild(button(v + " ›", () => openDlc(d, screen), "small link"));
+        else dd.textContent = v;
+        dl.appendChild(dd);
+      }
       card.appendChild(dl);
     }
     card.appendChild(button(t("Играть", "Play"), () => openDlc(d), "primary"));
@@ -356,8 +363,9 @@ const DLC_METHODS = {
   session_events: (id, args) => api.dlc_session_events(id, String(args[0])),
 };
 
-function openDlc(d) {
-  currentDlc = d;
+// `screen`: a screen of the DLC to open instead of its menu, passed on in "hello".
+function openDlc(d, screen) {
+  currentDlc = Object.assign({}, d, {screen: screen || null});
   dlcDevCommands = [];
   renderDlcDev();
   $("hub").hidden = true;
@@ -396,7 +404,7 @@ window.addEventListener("message", async (msg) => {
   if (!m || m.sidequest !== true) return;
   if (m.kind === "ready") {
     toGame({kind: "hello", dlc: currentDlc.id, dev: status ? status.dev : false,
-            lang: SidequestI18n.lang});
+            lang: SidequestI18n.lang, screen: currentDlc.screen});
     lastPauseKey = "";
     if (status) renderPause(status.paused);
   } else if (m.kind === "call") {

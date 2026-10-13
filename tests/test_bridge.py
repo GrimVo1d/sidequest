@@ -103,6 +103,13 @@ class BridgeTest(unittest.TestCase):
         found = {d["id"]: d for d in bridge.list_dlc()}
         self.assertEqual(found["last-commit-standing"]["card"], [])
 
+    def test_dlc_card_row_may_open_a_screen(self):
+        _, bridge = self.make()
+        bridge.dlc_save("last-commit-standing", "card",
+                        [["Ачивки", "3/9", "achievements"], ["a", 1, "Bad Screen!"], ["b", 2, 7]])
+        card = {d["id"]: d for d in bridge.list_dlc()}["last-commit-standing"]["card"]
+        self.assertEqual(card, [["Ачивки", "3/9", "achievements"], ["a", "1"], ["b", "2"]])
+
     def test_language_setting(self):
         _, bridge = self.make()
         self.addCleanup(i18n.set_language, i18n.language())

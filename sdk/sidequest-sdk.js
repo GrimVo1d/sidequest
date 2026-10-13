@@ -11,7 +11,10 @@
 //   await Sidequest.match.start(); await Sidequest.match.end({score: 120})
 //   await Sidequest.achievements.unlock("first-blood", "Первая кровь")
 //   await Sidequest.card([["Лучший счёт", 1200], ["Матчей", 5]])   // rows on the hub card, up to 4;
-//                                           // a label may be {ru: "Матчей", en: "Matches"}
+//                                           // a label may be {ru: "Матчей", en: "Matches"};
+//                                           // a third item, a screen ("achievements"), makes
+//                                           // the row a link: the hub opens the DLC with
+//                                           // info.screen set to it
 //   await Sidequest.history.sessions()      // past sessions: [{session, project, started_at,
 //                                           //   duration, actions}], newest first
 //   await Sidequest.history.events(session) // its normalized events, "t" — seconds from the start
@@ -20,7 +23,8 @@
 //   Sidequest.dev.command("wave", "Вызвать волну", () => ...)   // dev panel button
 //   Sidequest.exit()                        // back to the hub (the DLC has the whole window)
 //   Sidequest.ready()                       // call once the DLC is set up; resolves to
-//                                           // info {dlc, dev, lang} — lang is "ru" or "en"
+//                                           // info {dlc, dev, lang, screen} — lang is "ru"
+//                                           // or "en", screen the one to open or null
 "use strict";
 
 (function () {
@@ -30,7 +34,7 @@
   const pending = {};
   let nextId = 1;
   let paused = false;
-  let info = {dlc: null, dev: false, lang: "ru"};
+  let info = {dlc: null, dev: false, lang: "ru", screen: null};
   let helloResolve;
   const hello = new Promise((resolve) => { helloResolve = resolve; });
 
@@ -68,7 +72,8 @@
       delete pending[m.id];
       if (m.error) p.reject(new Error(m.error)); else p.resolve(m.result);
     } else if (m.kind === "hello") {
-      info = {dlc: m.dlc, dev: !!m.dev, lang: m.lang === "en" ? "en" : "ru"};
+      info = {dlc: m.dlc, dev: !!m.dev, lang: m.lang === "en" ? "en" : "ru",
+              screen: typeof m.screen === "string" ? m.screen : null};
       if (window.SidequestI18n) window.SidequestI18n.set(info.lang);
       helloResolve(info);
     } else if (m.kind === "dev_command" && devCommands[m.id]) {
