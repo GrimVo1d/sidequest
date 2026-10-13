@@ -15,6 +15,7 @@
   let game = null;
   let escOpen = false;
   let codexFrom = null;      // the screen the handbook was opened from, while it is open
+  let codexScreen = "codex"; // "codex" or "awards": both open over the menu or the pause
   let codexTab = "items";
   let seen = {};             // codex ids the player has met in any match: no second hint
   let tips = [], tip = null;
@@ -45,7 +46,7 @@
   function clear(node) { while (node.firstChild) node.removeChild(node.firstChild); }
 
   function show(id) {
-    for (const s of ["menu", "levelup", "esc", "results", "codex"]) $(s).hidden = s !== id;
+    for (const s of ["menu", "levelup", "esc", "results", "codex", "awards"]) $(s).hidden = s !== id;
   }
 
   function clock(seconds) {
@@ -112,7 +113,8 @@
   async function progress() {
     const records = LCSProgress.migrate(await Sidequest.storage.get("records"));
     const got = (await Sidequest.storage.get("achievements")) || {};
-    return {records, got};
+    const bests = LCSProgress.addBests(await Sidequest.storage.get("bests"), balance.achievements, {});
+    return {records, got, bests};
   }
 
   function updateCard(records, got) {
@@ -254,18 +256,81 @@
     $("mods-text").textContent = on.map((id) => `${tf(modifier(id), "name")}: ${tf(modifier(id), "text")}`).join("; ");
   }
 
+  // The menu shows the count and the latest three; all of them are on the achievements screen.
   function renderAchievements(got) {
     const list = $("achievements");
     clear(list);
-    let n = 0;
-    for (const a of balance.achievements) {
-      const li = el("li", null, got[a.id] ? "got" : "");
+    const earned = earnedList(got);
+    for (const a of earned.slice(0, 3)) {
+      const li = el("li", null, "got");
       li.appendChild(el("span", tf(a, "name"), "name"));
       li.appendChild(el("span", tf(a, "text"), "text"));
       list.appendChild(li);
-      if (got[a.id]) n++;
     }
-    $("achievements-count").textContent = `${n}/${balance.achievements.length}`;
+    $("achievements-none").hidden = earned.length > 0;
+    $("achievements-count").textContent = `${earned.length}/${balance.achievements.length}`;
+  }
+
+  // When an achievement was earned, in milliseconds: DLCs save Date.now(), the SDK's
+  // unlock() {at} in seconds. 0 when the save holds no time.
+  function earnedAt(v) {
+    if (typeof v === "number") return v;
+    return v && Number.isFinite(v.at) ? v.at * 1000 : 0;
+  }
+
+  // The earned achievements, the latest first.
+  function earnedList(got) {
+    return balance.achievements.filter((a) => got[a.id])
+      .sort((a, b) => earnedAt(got[b.id]) - earnedAt(got[a.id]));
+  }
+
+  const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  function earnedDay(v) {
+    const ms = earnedAt(v);
+    if (!ms) return t("получена", "earned");
+    const d = new Date(ms), day = String(d.getDate()).padStart(2, "0");
+    return t(`получена ${day}.${String(d.getMonth() + 1).padStart(2, "0")}.${d.getFullYear()}`,
+             `earned ${MONTHS[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`);
+  }
+
+  function progressText(p) {
+    const n = (v) => (p.field === "time" ? clock(v) : String(v));
+    const of = p.field === "daily_streak" ? t("дней подряд", "days in a row")
+      : p.of === "match" ? t("лучший матч", "best match") : t("всего", "so far");
+    return `${of}: ${n(p.have)} / ${n(p.need)}`;
+  }
+
+  // Every achievement with its icon: the earned ones first with the day, then the locked
+  // ones, the closest first, with how far they are when there is something to count.
+  function renderAwards({records, got, bests}) {
+    const list = $("awards-list");
+    clear(list);
+    const earned = earnedList(got);
+    const share = (x) => (x.p ? x.p.have / x.p.need : -1);
+    const locked = balance.achievements.filter((a) => !got[a.id])
+      .map((a) => ({a, p: LCSProgress.progressOf(a, records, bests, LCS_MAPS.map((m) => m.id))}))
+      .sort((x, y) => share(y) - share(x));
+    const item = (a, done, note, p) => {
+      const li = el("li", null, done ? "got" : "");
+      const icon = el("div", null, "icon");
+      icon.appendChild(iconCanvas(a.icon, 40));
+      li.appendChild(icon);
+      const body = el("div", null, "body");
+      body.appendChild(el("div", tf(a, "name"), "name"));
+      body.appendChild(el("div", tf(a, "text"), "text"));
+      body.appendChild(el("div", note, "when"));
+      if (p) {
+        const meter = el("div", null, "meter"), fill = el("div");
+        fill.style.width = Math.round(100 * p.have / p.need) + "%";
+        meter.appendChild(fill);
+        body.appendChild(meter);
+      }
+      li.appendChild(body);
+      list.appendChild(li);
+    };
+    for (const a of earned) item(a, true, earnedDay(got[a.id]), null);
+    for (const {a, p} of locked) item(a, false, p ? progressText(p) : t("ещё не получена", "not earned yet"), p);
+    $("awards-count").textContent = `${earned.length}/${balance.achievements.length}`;
   }
 
   function renderMaps() {
@@ -313,6 +378,7 @@
       .filter((id) => !got[id]);
     for (const id of fresh) got[id] = Date.now();
     if (fresh.length) await Sidequest.storage.set("achievements", got);
+    await Sidequest.storage.set("bests", LCSProgress.addBests(before.bests, balance.achievements, res));
     await updateCard(records, got);
     return balance.achievements.filter((a) => fresh.includes(a.id));
   }
@@ -465,7 +531,7 @@
   // e.code, not e.key: WASD works on any keyboard layout.
   addEventListener("keydown", (e) => {
     // A screen is open: the arrows and Enter work its buttons.
-    const screen = ["menu", "levelup", "esc", "codex", "results"].find((id) => !$(id).hidden);
+    const screen = ["menu", "levelup", "esc", "codex", "awards", "results"].find((id) => !$(id).hidden);
     if (screen && SidequestKeys.handle(e, $(screen))) return;
     if (codexFrom && e.code === "Escape") { closeCodex(); e.preventDefault(); return; }
     if (codexFrom) return;
@@ -649,11 +715,18 @@
 
   // --- handbook and first-time hints ----------------------------------------------
 
-  function openCodex(from) {
+  // The handbook and the achievements screen open over the menu or the pause and go back there.
+  function openCodex(from, screen = "codex") {
     codexFrom = from;
-    renderCodex();
-    show("codex");
-    $("codex-list").scrollTop = 0;
+    codexScreen = screen;
+    if (screen === "codex") renderCodex();
+    show(screen);
+    $(screen + "-list").scrollTop = 0;
+  }
+
+  async function openAwards(from) {
+    renderAwards(await progress());
+    openCodex(from, "awards");
   }
 
   function closeCodex() {
@@ -661,7 +734,7 @@
     codexFrom = null;
     if (from === "menu") {
       show("menu");
-      $("btn-codex").focus({preventScroll: true});
+      $(codexScreen === "codex" ? "btn-codex" : "btn-awards").focus({preventScroll: true});
     } else {
       show("esc");   // the match stays paused under the handbook
     }
@@ -805,6 +878,9 @@
   $("btn-codex").addEventListener("click", () => openCodex("menu"));
   $("btn-esc-codex").addEventListener("click", () => openCodex("esc"));
   $("btn-codex-back").addEventListener("click", closeCodex);
+  $("btn-awards").addEventListener("click", () => openAwards("menu"));
+  $("btn-esc-awards").addEventListener("click", () => openAwards("esc"));
+  $("btn-awards-back").addEventListener("click", closeCodex);
   $("btn-reroll").addEventListener("click", reroll);
   $("btn-banish").addEventListener("click", toggleBanish);
 
@@ -815,6 +891,8 @@
     fpsLimit = settings.fps_limit === 30 ? 30 : 60;
     renderer = LCSRender.createRenderer($("arena"), balance, $("top"));
     await openMenu();
+    // The hub's card links straight to the achievements.
+    if (Sidequest.info.screen === "achievements") await openAwards("menu");
     requestAnimationFrame((now) => { lastDraw = now; frame(now); });
   });
 })();

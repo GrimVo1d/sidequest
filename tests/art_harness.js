@@ -183,6 +183,8 @@ const hints = ["medkit", "coffee", "duck", "shield", "chest", "gem", "rage", "co
                "spirit_scout", "spirit_plan", "elite", "deploy", "incident"]
   .concat(Object.keys(balance.enemies), ["final"])
   .filter((id) => !LCSCodex.entry(balance, id));
+// The achievements screen draws each achievement's icon.
+const achievementIcons = balance.achievements.filter((a) => !LCSSprites.SPRITES[a.icon]).map((a) => a.id);
 
 print(JSON.stringify({spriteErrors, sizes, fontErrors, missing, missingInTexts, texts, maps, calls, badCall,
-                      codexErrors, codexIds, hints, drawn: [...drawn]}));
+                      codexErrors, codexIds, hints, achievementIcons, drawn: [...drawn]}));

@@ -137,6 +137,22 @@ dd { margin: 0; text-align: right; }
 #choice-actions { display: flex; gap: 8px; }
 button:disabled { opacity: 0.4; cursor: default; }
 
+#awards { justify-content: flex-start; padding: 16px 0; box-sizing: border-box; }
+#awards-list { list-style: none; margin: 0; padding: 0 4px; width: min(760px, 94vw);
+  flex: 0 1 auto; min-height: 0; overflow-y: auto;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 8px; }
+#awards-list li { display: flex; gap: 10px; align-items: center; padding: 8px;
+  background: var(--panel); border: 2px solid var(--edge); }
+#awards-list li.got { border-color: var(--accent); }
+#awards-list .icon { flex: none; width: 48px; display: flex; justify-content: center; }
+#awards-list li:not(.got) .icon canvas { filter: grayscale(1) brightness(0.55); }
+#awards-list .body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+#awards-list .name { color: var(--accent); }
+#awards-list li:not(.got) .name { color: var(--text); }
+#awards-list .text { font-size: 12px; }
+#awards-list .when { font-size: 11px; color: var(--dim); }
+#awards-list .meter { height: 4px; background: var(--bg); border: 1px solid var(--edge); }
+#awards-list .meter > div { height: 100%; background: var(--accent); }
 #codex { justify-content: flex-start; padding: 16px 0; box-sizing: border-box; }
 #codex-tabs { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
 #codex-tabs button { box-shadow: none; }

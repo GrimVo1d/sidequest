@@ -59,6 +59,9 @@
     <div class="menu-col">
       <h3><span data-en="Achievements">Ачивки</span> <span id="achievements-count"></span></h3>
       <ul id="achievements" class="achievements"></ul>
+      <p id="achievements-none" class="hint" hidden
+       data-en="None yet: the first one comes with the first match.">Пока ни одной: первая — за первый матч.</p>
+      <button id="btn-awards" data-en="All achievements">Все ачивки</button>
     </div>
   </div>
 </section>
@@ -77,6 +80,7 @@
   <h2 data-en="Pause">Пауза</h2>
   <button id="btn-resume" class="primary" data-en="Resume">Продолжить</button>
   <button id="btn-esc-codex" data-en="Handbook">Справочник</button>
+  <button id="btn-esc-awards" data-en="Achievements">Ачивки</button>
   <button id="btn-quit" data-en="End the match">Завершить матч</button>
 </section>
 
@@ -85,6 +89,13 @@
   <div id="codex-tabs"></div>
   <ul id="codex-list"></ul>
   <button id="btn-codex-back" class="primary" data-en="Back">Назад</button>
+</section>
+
+<!-- Every achievement: earned ones first, with the day; then how far the locked ones are. -->
+<section id="awards" class="screen" hidden>
+  <h2><span data-en="Achievements">Ачивки</span> <span id="awards-count"></span></h2>
+  <ul id="awards-list"></ul>
+  <button id="btn-awards-back" class="primary" data-en="Back">Назад</button>
 </section>
 
 <section id="results" class="screen" hidden>

@@ -493,11 +493,32 @@ class ArenaTest(unittest.TestCase):
     def test_card_rows_fit_the_hub(self):
         card = self.result["progress"]["card"]
         self.assertLessEqual(len(card), 4)
-        for label, value in card:
+        for label, value, *screen in card:
             self.assertEqual(set(label), {"ru", "en"})
             for text in label.values():
                 self.assertLessEqual(len(text), 24)
             self.assertLessEqual(len(str(value)), 16)
+        # The achievements row is a link to the achievements screen.
+        self.assertEqual([row[2] for row in card if len(row) == 3], ["achievements"])
+
+    def test_achievement_progress(self):
+        p = self.result["progress"]
+        # The best single match of each field an achievement asks of one match; nothing else.
+        fields = {k for a in self.balance["achievements"] for k in a["when"].get("min", {})}
+        self.assertEqual(set(p["bests"]), fields)
+        self.assertGreaterEqual(p["bests"]["kills"], 40)
+        self.assertEqual(p["bests"]["time"], 900)
+        of = p["of"]
+        self.assertEqual(of["marathon"], {"field": "time", "have": 900, "need": 1800, "of": "match"})
+        self.assertEqual(of["kills_total"]["of"], "total")
+        self.assertEqual(of["kills_total"]["have"], p["records"]["totals"]["kills"])
+        self.assertEqual(of["veteran"]["have"], p["records"]["totals"]["matches"])
+        # Every map played: done and capped; one map: one of them.
+        self.assertEqual(of["tourist"]["have"], of["tourist"]["need"])
+        self.assertEqual(p["half_maps"]["have"], 1)
+        # How the match ended, several conditions or one step: nothing to count.
+        for a in ("done", "classic_win", "clean_run", "untouched", "first", "boss", "hardcore"):
+            self.assertIsNone(of[a], a)
 
     def test_step_is_fast(self):
         # A frame has ~16 ms; the simulation must leave nearly all of it to drawing.
@@ -544,6 +565,9 @@ class ArenaArtTest(unittest.TestCase):
 
     def test_sprites_are_well_formed(self):
         self.assertEqual(self.result["spriteErrors"], [])
+
+    def test_every_achievement_has_an_icon(self):
+        self.assertEqual(self.result["achievementIcons"], [])
 
     def test_agent_work_is_drawn(self):
         # Red CI and the orchestra are icons in the HUD panel now, not on the canvas.

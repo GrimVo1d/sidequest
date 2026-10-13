@@ -5,6 +5,8 @@
 //   days = LCSProgress.addDay(days, results)            // the daily task: best score per day
 //   LCSProgress.streak(days, "2026-10-09")              // days in a row up to that day
 //   ghosts = LCSProgress.addGhost(ghosts, results)      // best score per replayed session
+//   bests = LCSProgress.addBests(bests, balance.achievements, results)   // best single match
+//   LCSProgress.progressOf(achievement, records, bests, mapIds)   // how far a locked one is
 "use strict";
 
 (function (root) {
@@ -123,15 +125,47 @@
     return list.filter((a) => holds(a.when, res, records, mapIds)).map((a) => a.id);
   }
 
-  // Rows for the card in the hub; the hub shows each label in its own language.
+  // The best of single matches, for the fields that achievements ask of one match: the
+  // achievements screen shows how close the player came. Counted matches only.
+  function addBests(saved, list, res) {
+    const bests = {};
+    for (const a of list) {
+      for (const k of Object.keys((a.when && a.when.min) || {})) {
+        const old = saved && Number.isFinite(saved[k]) ? saved[k] : 0;
+        bests[k] = Math.max(old, Number.isFinite(res[k]) ? res[k] : 0);
+      }
+    }
+    return bests;
+  }
+
+  // How far a locked achievement is: {field, have, need, of} with `of` "match" (the best
+  // match), "total" (all matches) or maps played, or null when there is nothing to count: a
+  // condition on how the match ended, several conditions at once, or a single step.
+  function progressOf(a, records, bests, mapIds) {
+    const w = a.when || {};
+    if (w.is || w.max) return null;
+    const parts = [
+      ...Object.entries(w.min || {}).map(([k, n]) => ({field: k, have: bests[k] || 0, need: n, of: "match"})),
+      ...Object.entries(w.total_min || {}).map(([k, n]) => ({field: k, have: records.totals[k] || 0, need: n, of: "total"}))];
+    if (w.maps_all) {
+      parts.push({field: "maps", have: mapIds.filter((id) => records.totals.maps[id] > 0).length,
+                  need: mapIds.length, of: "total"});
+    }
+    if (parts.length !== 1 || !(parts[0].need > 1)) return null;
+    const p = parts[0];
+    return Object.assign(p, {have: Math.min(p.have, p.need)});
+  }
+
+  // Rows for the card in the hub; the hub shows each label in its own language and
+  // makes the achievements row a link to the achievements screen.
   function card(records, unlocked, total) {
     const rows = [[{ru: "Лучший счёт", en: "Best score"},
                    Math.max(...MODES.map((m) => records[m].best_score))],
                   [{ru: "Матчей", en: "Matches"}, records.totals.matches],
-                  [{ru: "Ачивки", en: "Achievements"}, `${unlocked}/${total}`]];
+                  [{ru: "Ачивки", en: "Achievements"}, `${unlocked}/${total}`, "achievements"]];
     if (records.classic.wins) rows.push([{ru: "Побед в классике", en: "Classic wins"}, records.classic.wins]);
     return rows;
   }
 
-  root.LCSProgress = {migrate, addMatch, earned, card, addDay, streak, addGhost, MODES};
+  root.LCSProgress = {migrate, addMatch, earned, addBests, progressOf, card, addDay, streak, addGhost, MODES};
 })(typeof window !== "undefined" ? window : globalThis);

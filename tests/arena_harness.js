@@ -940,6 +940,12 @@ result.bestiary = {};
   result.progress = {migrated, junk, records: r, after_win: afterWin, tourist, busy: ach, worked,
                      card: P.card(r, 3, balance.achievements.length),
                      ids: balance.achievements.map((a) => a.id)};
+  // The achievements screen: the best single match and how far each locked one is.
+  const bests = P.addBests({kills: 40, junk: 3}, balance.achievements, Object.assign({}, won, {time: 900}));
+  result.progress.bests = bests;
+  result.progress.of = Object.fromEntries(balance.achievements.map((a) => [a.id, P.progressOf(a, r, bests, ids)]));
+  result.progress.half_maps = P.progressOf(balance.achievements.find((a) => a.id === "tourist"),
+                                           P.addMatch(null, won), bests, ids);
 }
 
 print(JSON.stringify(result));
