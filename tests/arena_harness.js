@@ -354,6 +354,27 @@ result.enemies = {};
   }
 }
 
+// Floating texts from a burst of events do not land on each other.
+{
+  const game = arena("open", 33), s = game.state;
+  game.agentEvent({kind: "prompt", session: "a", project: "demo"});
+  stepFor(game, 1, () => ({x: 0, y: 0}));
+  for (const kind of ["tool_error", "blocked", "tool_error"]) {
+    game.agentEvent({kind, session: "a", project: "demo", tool: "Bash", category: "test", ok: false});
+  }
+  game.agentEvent({kind: "tool", session: "a", project: "demo", tool: "Bash", action: "cast", category: "git",
+                   git: ["commit"], ok: true});
+  game.step(DT, {x: 0, y: 0});
+  const at = s.texts.map((t) => ({x: t.x, y: t.y - t.t * 14, text: t.text}));
+  let piled = 0;
+  for (let i = 0; i < at.length; i++) {
+    for (let j = i + 1; j < at.length; j++) {
+      if (Math.abs(at[i].x - at[j].x) < 48 && Math.abs(at[i].y - at[j].y) < 8) piled++;
+    }
+  }
+  result.texts = {count: at.length, piled, all: at.map((t) => t.text)};
+}
+
 // --- the arsenal: weapons, passives, evolutions --------------------------------------------
 
 // A crowd around the player, slowly closing in; returns its enemies.

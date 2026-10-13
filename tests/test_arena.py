@@ -376,6 +376,11 @@ class ArenaTest(unittest.TestCase):
         # The null pointer stays on its side of the wall.
         self.assertFalse(r["blink_crossed"])
 
+    def test_floating_texts_do_not_pile_up(self):
+        t = self.result["texts"]
+        self.assertGreaterEqual(t["count"], 4)
+        self.assertEqual(t["piled"], 0)
+
     def test_bestiary_enemies(self):
         b, E = self.result["bestiary"], self.balance["enemies"]
         self.assertAlmostEqual(b["flaky"], 1 - E["flaky"]["miss"], delta=0.15)

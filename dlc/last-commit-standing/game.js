@@ -173,7 +173,16 @@
 
     // --- helpers -----------------------------------------------------------------
 
+    // A floating text. One that would land on another still in the air (it rises 14 px a
+    // second) goes above it, so a burst of events stays readable.
     function text(x, y, value, color, life) {
+      for (let moved = true, i = 0; moved && i < 8; i++) {
+        moved = false;
+        for (const o of s.texts) {
+          const oy = o.y - o.t * 14;
+          if (Math.abs(o.x - x) < 48 && Math.abs(oy - y) < 9) { y = oy - 9; moved = true; }
+        }
+      }
       s.texts.push({x, y, text: value, color: color || "#e8e6f0", t: 0, life: life || 1.2});
     }
     function effect(e) { s.effects.push(Object.assign({t: 0, life: 0.4}, e)); }
@@ -1033,7 +1042,7 @@
         s.level++;
         s.pendingLevels++;
         s.xpNext = Math.round(s.xpNext * B.xp.growth);
-        text(s.player.x, s.player.y - 16, "LEVEL UP", "#e8c14a", 1.5);
+        text(s.player.x, s.player.y - 16, tr(`УРОВЕНЬ ${s.level}`, `LEVEL ${s.level}`), "#e8c14a", 1.5);
       }
       if (s.pendingLevels && !s.choices) offerChoices();
     }
