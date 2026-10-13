@@ -2,8 +2,9 @@
 agent doing everything an agent can (errors, blocks, questions, subagents, git, tests,
 compaction, a second agent), every DLC button of the developer panel one by one, walking in
 four directions, the pause, the handbook from the pause and the results. After each step:
-a snapshot, new JS errors, HUD elements that overlap or leave the window, clipped text and,
-in English, Russian letters left on screen.
+a snapshot, new JS errors, HUD elements that overlap or leave the window, clipped text,
+screens that do not fit the window and do not scroll and, in English, Russian letters left
+on screen. Text drawn on the canvas is not seen by any of these: look at the snapshots.
 
     .venv/bin/python dev/webkit/qa.py arena <out> [ru|en] [--size WxH] [--no-dev] [--show]
 
@@ -24,7 +25,7 @@ LOOK = """(() => {
     return r.width > 0 && r.height > 0 && st.visibility !== 'hidden' && st.display !== 'none'
       && !e.closest('[hidden]'); };
   const label = (e) => e.id ? '#' + e.id : e.tagName.toLowerCase() + (e.className ? '.' + String(e.className).split(' ')[0] : '');
-  const clipped = [], russian = [];
+  const clipped = [], russian = [], unfit = [];
   for (const e of d.body.querySelectorAll('*')) {
     if (!shown(e)) continue;
     const st = w.getComputedStyle(e);
@@ -33,11 +34,16 @@ LOOK = """(() => {
         && (e.scrollWidth > e.clientWidth + 1 || e.scrollHeight > e.clientHeight + 1)) {
       clipped.push([label(e), e.textContent.trim().slice(0, 60)]);
     }
+    // A screen taller or wider than the window that does not scroll: its ends are cut off.
+    if (e.classList.contains('screen') && st.overflowY !== 'auto' && st.overflowY !== 'scroll') {
+      const kids = [...e.children].filter(shown).map((k) => k.getBoundingClientRect());
+      if (kids.some((r) => r.top < 0 || r.bottom > w.innerHeight || r.left < 0 || r.right > w.innerWidth)) unfit.push(label(e));
+    }
     for (const n of e.childNodes) {
       if (n.nodeType === 3 && /[А-Яа-яЁё]/.test(n.nodeValue)) russian.push([label(e), n.nodeValue.trim().slice(0, 60)]);
     }
   }
-  return {clipped: clipped.slice(0, 20), russian: russian.slice(0, 20)};
+  return {clipped: clipped.slice(0, 20), russian: russian.slice(0, 20), unfit};
 })()"""
 
 
@@ -59,7 +65,7 @@ def drive(c, dlc, lang, with_dev):
         seen_errors[:] = errors
         look = c.frame(LOOK) or {}
         record = {"step": name, "errors": new, "overlaps": c.overlaps(dlc["hud"]),
-                  "clipped": look.get("clipped", [])}
+                  "clipped": look.get("clipped", []), "unfit": look.get("unfit", [])}
         if lang == "en":
             record["russian"] = look.get("russian", [])
         out["steps"].append({k: v for k, v in record.items() if v or k == "step"})

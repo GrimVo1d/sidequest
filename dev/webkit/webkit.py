@@ -92,8 +92,9 @@ class Check:
         self.hub("window.__sidequestWake && window.__sidequestWake()")
 
     def dev(self, command):
-        """A DLC command of the developer panel (only with the panel on)."""
-        self.hub(f"toGame({{kind: 'dev_command', id: {json.dumps(command)}}})")
+        """A DLC command of the developer panel (only with the panel on): like its button, it
+        marks the match as made with the panel, so it is not counted."""
+        self.hub(f"(api.dev_taint(), toGame({{kind: 'dev_command', id: {json.dumps(command)}}}))")
 
     # --- looking -------------------------------------------------------------------
 
