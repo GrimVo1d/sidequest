@@ -183,8 +183,23 @@ const hints = ["medkit", "coffee", "duck", "shield", "chest", "gem", "rage", "co
                "spirit_scout", "spirit_plan", "elite", "deploy", "incident"]
   .concat(Object.keys(balance.enemies), ["final"])
   .filter((id) => !LCSCodex.entry(balance, id));
+// Several live bosses: one bar each, stacked, so the bars end lower than with one boss.
+function bossBarsEnd(bosses) {
+  const g = LCS.createGame(balance, {seed: 5});
+  const canvas = fakeCanvas();
+  canvas.getBoundingClientRect = () => ({left: 0, top: 0, width: 1000, height: 700});
+  const r = LCSRender.createRenderer(canvas, balance);
+  g.dev.immortal();
+  g.agentEvent({kind: "prompt", session: "a", project: "sidequest"});
+  for (const type of bosses) g.dev.boss(type);
+  g.step(1 / 60, {x: 0, y: 0});
+  r.draw(g.state, {width: 16});
+  return Math.round(r.bossBarsBottom());
+}
+const bossBars = {none: bossBarsEnd([]), one: bossBarsEnd([balance.bosses.order[0]]),
+                  two: bossBarsEnd(balance.bosses.order.slice(0, 2)), all: bossBarsEnd(balance.bosses.order)};
 // The achievements screen draws each achievement's icon.
 const achievementIcons = balance.achievements.filter((a) => !LCSSprites.SPRITES[a.icon]).map((a) => a.id);
 
 print(JSON.stringify({spriteErrors, sizes, fontErrors, missing, missingInTexts, texts, maps, calls, badCall,
-                      codexErrors, codexIds, hints, achievementIcons, drawn: [...drawn]}));
+                      codexErrors, codexIds, hints, achievementIcons, bossBars, drawn: [...drawn]}));

@@ -1009,17 +1009,42 @@
       return Math.max(14, Math.ceil((r.bottom - c.top) * VH / c.height) + 10);
     }
 
+    // One bar a live boss, the final one first, stacked under the HUD; twins share a bar.
+    const BOSS_BARS = 3, BOSS_ROW = 14;
+    let barsEnd = 0;   // where the last bar ends, in the canvas's pixels; 0 with no boss
     function drawBossBar(s) {
-      const boss = s.enemies.find((e) => e.final && !e.dead)
-        || s.enemies.find((e) => e.boss && !e.dead);
-      if (!boss) return;
+      barsEnd = 0;
+      const bosses = [];
+      for (const e of s.enemies) {
+        if (e.dead || !(e.final || e.boss) || (e.partner && bosses.includes(e.partner))) continue;
+        bosses.push(e);
+      }
+      if (!bosses.length) return;
+      bosses.sort((a, b) => (b.final ? 1 : 0) - (a.final ? 1 : 0));
+      const top = bossBarTop();
+      const rows = Math.min(bosses.length, BOSS_BARS);
+      bosses.slice(0, rows).forEach((boss, i) => drawOneBossBar(boss, top + i * BOSS_ROW));
+      barsEnd = top + (rows - 1) * BOSS_ROW + 5;
+      if (bosses.length > rows) {
+        label(VW / 2, top + rows * BOSS_ROW - 6, "+" + (bosses.length - rows), "#e8c14a");
+        barsEnd += BOSS_ROW - 6;
+      }
+    }
+
+    // The bottom of the boss bars in the page's pixels, for the HUD to keep clear of; 0 with none.
+    function bossBarsBottom() {
+      if (!barsEnd) return 0;
+      const c = canvas.getBoundingClientRect();
+      return c.top + barsEnd * c.height / VH;
+    }
+
+    function drawOneBossBar(boss, y) {
       const cfg = balance.enemies[boss.type];
       const name = boss.final ? FINAL_NAME : boss.type === "boss" ? BOSS_NAME : [cfg.name, cfg.name_en];
-      // Twins share one bar.
       const pair = boss.partner ? [boss, boss.partner] : [boss];
       const hp = pair.reduce((sum, e) => sum + (e.dead ? 0 : Math.max(0, e.hp)), 0);
       const max = pair.reduce((sum, e) => sum + e.maxHp, 0);
-      const w = 160, x = Math.round((VW - w) / 2), y = bossBarTop();
+      const w = 160, x = Math.round((VW - w) / 2);
       label(VW / 2, y - 6, tr(...name), "#e8c14a");
       ctx.fillStyle = DARK;
       ctx.fillRect(x - 1, y - 1, w + 2, 6);
@@ -1208,7 +1233,7 @@
 
     const view = () => ({width: VW, height: VH});
 
-    return {draw, preview, icon, view};
+    return {draw, preview, icon, view, bossBarsBottom};
   }
 
   root.LCSRender = {createRenderer, THEMES};

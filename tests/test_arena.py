@@ -576,6 +576,14 @@ class ArenaArtTest(unittest.TestCase):
     def test_sprites_are_well_formed(self):
         self.assertEqual(self.result["spriteErrors"], [])
 
+    def test_every_live_boss_has_a_bar(self):
+        # The bars stack under the HUD: each boss lowers their end, the fourth on is a «+N».
+        b = self.result["bossBars"]
+        self.assertEqual(b["none"], 0)
+        self.assertGreater(b["one"], 0)
+        self.assertGreater(b["two"], b["one"])
+        self.assertGreater(b["all"], b["two"])
+
     def test_every_achievement_has_an_icon(self):
         self.assertEqual(self.result["achievementIcons"], [])
 

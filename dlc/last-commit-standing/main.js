@@ -833,7 +833,12 @@
     }
     renderer.draw(game.state, sprite);
     updateOverlays();
-    if (now - hudAt > 100) { hudAt = now; updateHud(); updateTips(); }
+    if (now - hudAt > 100) {
+      hudAt = now;
+      updateHud();
+      updateTips();
+      $("tip").style.setProperty("--bars-end", Math.ceil(renderer.bossBarsBottom()) + "px");
+    }
     if (game.state.over) endMatch();
   }
 

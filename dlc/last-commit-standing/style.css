@@ -69,9 +69,9 @@ button.primary { background: #3d3270; border-color: var(--accent); }
   display: flex; gap: 10px; align-items: center; padding: 8px 10px; background: var(--panel);
   border: 2px solid var(--accent); box-shadow: 3px 3px 0 var(--edge); }
 /* On a short field the hero in the middle would sit under the tip: it goes up, under the
-   boss bar. */
+   boss bars (main.js says where they end). */
 @media (max-height: 560px) {
-  #tip { top: 64px; bottom: auto; }
+  #tip { top: max(64px, calc(var(--bars-end, 0px) + 8px)); bottom: auto; }
 }
 /* The pause, the handbook and the results cover the match: the tip waits under them unseen. */
 body:has(.screen:not([hidden])) #tip { display: none; }
