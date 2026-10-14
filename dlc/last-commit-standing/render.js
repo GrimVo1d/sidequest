@@ -1010,7 +1010,7 @@
     }
 
     // One bar a live boss, the final one first, stacked under the HUD; twins share a bar.
-    const BOSS_BARS = 3, BOSS_ROW = 14;
+    const BOSS_BARS = 3, BOSS_ROW = 16;
     let barsEnd = 0;   // where the last bar ends, in the canvas's pixels; 0 with no boss
     function drawBossBar(s) {
       barsEnd = 0;
