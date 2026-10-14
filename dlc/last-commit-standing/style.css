@@ -63,8 +63,9 @@ button.primary { background: #3d3270; border-color: var(--accent); }
 #allies .swatch { width: 8px; height: 8px; border: 1px solid var(--edge); }
 #allies .project { max-width: 24ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #allies .state { color: var(--dim); }
-#notice { position: fixed; left: 0; right: 0; bottom: 128px; text-align: center; color: var(--accent);
-  text-shadow: 1px 1px 0 var(--edge); }
+#notice { position: fixed; left: 0; right: 0; bottom: 128px; width: fit-content; max-width: 90%;
+  margin: 0 auto; padding: 2px 10px; text-align: center; color: var(--accent); background: var(--shade);
+  text-shadow: 1px 0 0 var(--edge), -1px 0 0 var(--edge), 0 1px 0 var(--edge), 0 -1px 0 var(--edge), 1px 1px 0 var(--edge); }
 /* The first time something shows up: what it is and what it does. */
 #tip { position: fixed; left: 50%; bottom: 154px; transform: translateX(-50%); width: 420px;
   display: flex; gap: 10px; align-items: center; padding: 8px 10px; background: var(--panel);
@@ -74,8 +75,9 @@ button.primary { background: #3d3270; border-color: var(--accent); }
 @media (max-height: 560px) {
   #tip { top: max(64px, calc(var(--clear-top, 0px) + 8px)); bottom: auto; }
 }
-/* The pause, the handbook and the results cover the match: the tip waits under them unseen. */
-body:has(.screen:not([hidden])) #tip { display: none; }
+/* The pause, the handbook and the results cover the match: the tip and the notice wait
+   under them unseen. */
+body:has(.screen:not([hidden])) :is(#tip, #notice) { display: none; }
 #tip-icon { flex: none; }
 #tip-title { color: var(--accent); }
 #tip-text { font-size: 12px; }
