@@ -615,7 +615,7 @@
         ctx.drawImage(crown, px(e.x) - (crown.width >> 1), px(y - crown.height - (e.hp < e.maxHp ? 4 : 1)));
       }
       if ((BAR_TYPES.has(e.type) || e.elite) && e.hp < e.maxHp) {
-        const w = Math.max(14, Math.min(30, Math.round(cw * 0.8))), x0 = px(e.x - w / 2), y0 = px(y - 3);
+        const w = Math.max(14, Math.min(30, Math.round(cw * 0.8))), x0 = px(e.x) - (w >> 1), y0 = px(y - 3);
         ctx.fillStyle = DARK;
         ctx.fillRect(x0 - 1, y0 - 1, w + 2, 4);
         ctx.fillStyle = "#d9534f";
@@ -639,7 +639,7 @@
       const face = a.stun > 0 ? "error" : a.meditate > 0 ? "sleep" : blink ? "blink" : "normal";
       const c = sprite("ally", {frame, face, tint: a.stun > 0 ? "#6a6a80" : a.color});
       const alpha = a.state === "leaving" ? Math.max(0, a.leave / 1.5) : 1;
-      const x = px(a.x - c.width / 2), y = px(a.y - c.height / 2 - 2 + bob);
+      const x = px(a.x) - (c.width >> 1), y = px(a.y - 2 + bob) - (c.height >> 1);
       ctx.globalAlpha = alpha;
       ctx.drawImage(c, x, y);
       ctx.globalAlpha = 1;
@@ -668,13 +668,13 @@
         // Waiting for an answer: a question over the head.
         const q = sprite("ask", {});
         const qy = y - q.height - 2 + (Math.floor(s.time * 2) & 1);
-        ctx.drawImage(q, px(a.x - q.width / 2), qy);
+        ctx.drawImage(q, px(a.x) - (q.width >> 1), qy);
       }
       for (const sp of a.spirits.values()) {
         const name = SPIRIT_SPRITES[sp.type] || "spirit";
         const g = sprite(name, {frame: Math.floor(s.time * 6) & 1, tint: a.color});
         ctx.globalAlpha = 0.85 * alpha;
-        ctx.drawImage(g, px(sp.x - g.width / 2), px(sp.y - g.height / 2 + Math.sin(s.time * 5 + sp.angle) * 1.5));
+        ctx.drawImage(g, px(sp.x) - (g.width >> 1), px(sp.y + Math.sin(s.time * 5 + sp.angle) * 1.5) - (g.height >> 1));
         ctx.globalAlpha = 1;
       }
     }
@@ -778,10 +778,10 @@
         return;
       }
       ctx.fillStyle = DARK;
-      ctx.fillRect(px(p.x - w / 2) - 1, y - 2, w + 2, 4);
+      ctx.fillRect(px(p.x) - (w >> 1) - 1, y - 2, w + 2, 4);
       for (let i = 0; i < n; i++) {
         ctx.fillStyle = i < p.ammo ? "#e8d36a" : "#4a4a66";
-        ctx.fillRect(px(p.x - w / 2) + i * 3, y - 1, 2, 2);
+        ctx.fillRect(px(p.x) - (w >> 1) + i * 3, y - 1, 2, 2);
       }
     }
 
@@ -815,7 +815,7 @@
 
     function drawEnemyShot(sh) {
       const c = sprite("log_line", {});
-      ctx.drawImage(c, px(sh.x - c.width / 2), px(sh.y - c.height / 2));
+      ctx.drawImage(c, px(sh.x) - (c.width >> 1), px(sh.y) - (c.height >> 1));
     }
 
     // The incident: a zone to stand in; the green ring fills up while the player holds it.
@@ -824,7 +824,7 @@
       pixelRing(z.x, z.y, z.r, "#d9534f", 0.6 + Math.sin(s.time * 6) * 0.3, 2);
       pixelRing(z.x, z.y, z.r * Math.min(1, z.held / hold), "#4fbf6f", 0.9, 1);
       const c = sprite("incident", {});
-      ctx.drawImage(c, px(z.x - c.width / 2), px(z.y - c.height / 2));
+      ctx.drawImage(c, px(z.x) - (c.width >> 1), px(z.y) - (c.height >> 1));
       label(z.x, z.y - z.r - 6, String(Math.ceil(z.left)), "#d9534f");
     }
 
@@ -837,7 +837,7 @@
       const pulse = 0.25 + Math.sin(s.time * 4 + it.y) * 0.1;
       pixelRing(it.x, it.y - 1, 8, ITEM_COLORS[it.type] || "#fffbe0", pulse);
       const c = sprite(it.type, {frame: Math.floor(s.time * 4) & 1});
-      ctx.drawImage(c, px(it.x - c.width / 2), px(it.y - c.height / 2 - 2 - hop + bob));
+      ctx.drawImage(c, px(it.x) - (c.width >> 1), px(it.y - 2 - hop + bob) - (c.height >> 1));
       if ((Math.floor(s.time * 3 + it.x) % 4) === 0) {
         const sx = px(it.x + c.width / 2 - 1), sy = px(it.y - c.height / 2 - 2 + bob);
         ctx.fillStyle = "#fffbe0";
@@ -850,7 +850,7 @@
       const armed = s.time >= m.armAt;
       const c = sprite("mine", {frame: armed && Math.floor(s.time * 4) & 1 ? 0 : 1,
                                 outline: m.evolved ? "#b8902a" : undefined});
-      ctx.drawImage(c, px(m.x - c.width / 2), px(m.y - c.height / 2));
+      ctx.drawImage(c, px(m.x) - (c.width >> 1), px(m.y) - (c.height >> 1));
     }
 
     // A turret from a build: its barrel follows the target, it blinks before it goes.
@@ -858,7 +858,7 @@
       const left = t.until - s.time;
       if (left < 3 && Math.floor(s.time * 6) & 1) return;
       const c = sprite("turret", {tint: t.color});
-      const x = px(t.x - c.width / 2), y = px(t.y - c.height / 2);
+      const x = px(t.x) - (c.width >> 1), y = px(t.y) - (c.height >> 1);
       ctx.drawImage(c, x, y);
       const cx = t.x, cy = t.y - 2, len = s.time - t.firedAt < 0.08 ? 4 : 5;
       line(cx, cy, cx + Math.cos(t.aim) * len, cy + Math.sin(t.aim) * len, "#3a3a4a");
@@ -878,20 +878,20 @@
           ctx.fillRect(px(p.x + Math.cos(t) * d), px(p.y + Math.sin(t) * d), 1, 1);
         }
         ctx.globalAlpha = 1;
-        ctx.drawImage(c, px(b.x - c.width / 2), px(b.y - c.height / 2));
+        ctx.drawImage(c, px(b.x) - (c.width >> 1), px(b.y) - (c.height >> 1));
       }
     }
 
     function drawGem(g, s) {
       const c = sprite(g.xp >= 10 ? "gem_big" : "gem", {});
       const bob = g.pull ? 0 : Math.round(Math.sin(s.time * 4 + g.x * 0.3) * 1);
-      ctx.drawImage(c, px(g.x - c.width / 2), px(g.y - c.height / 2 + bob));
+      ctx.drawImage(c, px(g.x) - (c.width >> 1), px(g.y + bob) - (c.height >> 1));
     }
 
     function drawShot(sh) {
       if (sh.target !== undefined) {
         const c = sprite("missile", {tint: sh.color});
-        ctx.drawImage(c, px(sh.x - c.width / 2), px(sh.y - c.height / 2));
+        ctx.drawImage(c, px(sh.x) - (c.width >> 1), px(sh.y) - (c.height >> 1));
       } else if (sh.aim !== undefined) {
         const v = Math.hypot(sh.vx, sh.vy) || 1;
         ctx.fillStyle = "#b8902a";
@@ -899,10 +899,10 @@
         ctx.fillStyle = "#e8c14a";
         ctx.fillRect(px(sh.x - sh.vx / v * 2), px(sh.y - sh.vy / v * 2), 1, 1);
         const c = sprite("bullet", {});
-        ctx.drawImage(c, px(sh.x - c.width / 2), px(sh.y - c.height / 2));
+        ctx.drawImage(c, px(sh.x) - (c.width >> 1), px(sh.y) - (c.height >> 1));
       } else {
         const c = sprite("spark", {tint: sh.color});
-        ctx.drawImage(c, px(sh.x - c.width / 2), px(sh.y - c.height / 2));
+        ctx.drawImage(c, px(sh.x) - (c.width >> 1), px(sh.y) - (c.height >> 1));
       }
     }
 

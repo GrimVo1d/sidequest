@@ -1,6 +1,7 @@
 """Last Commit Standing: whole matches of the simulation, played by a bot in jsc."""
 import json
 import os
+import re
 import subprocess
 import unittest
 
@@ -575,6 +576,15 @@ class ArenaArtTest(unittest.TestCase):
 
     def test_sprites_are_well_formed(self):
         self.assertEqual(self.result["spriteErrors"], [])
+
+    def test_centered_sprites_do_not_jitter(self):
+        # px(x - w / 2) rounds the edge, so a sprite and what hangs over it step apart by a
+        # pixel as they walk; every DLC rounds the centre first: px(x) - (w >> 1).
+        for dlc in ("last-commit-standing",):
+            with open(os.path.join(paths.PROJECT_DIR, "dlc", dlc, "render.js"), encoding="utf-8") as f:
+                code = f.read()
+            with self.subTest(dlc):
+                self.assertEqual(re.findall(r"px\([\w.]+\.[xy] - [\w.]+ / 2\)", code), [])
 
     def test_every_live_boss_has_a_bar(self):
         # The bars stack under the HUD: each boss lowers their end, the fourth on is a «+N».
