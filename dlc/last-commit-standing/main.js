@@ -582,7 +582,7 @@
       const sw = el("span", null, "swatch");
       sw.style.backgroundColor = a.color;
       li.appendChild(sw);
-      li.appendChild(el("span", a.project));
+      li.appendChild(el("span", a.project, "project"));
       li.appendChild(el("span", ALLY_STATE(a), "state"));
       list.appendChild(li);
     }
@@ -806,6 +806,16 @@
     $("tip").hidden = !tip;
   }
 
+  // How far down a tip raised on a short field must stay: under the boss bars, and under the
+  // allies when it is wide enough to reach them. The width comes from CSS even while hidden.
+  function tipClearance() {
+    let y = renderer.bossBarsBottom();
+    const list = $("allies").getBoundingClientRect();
+    const tipLeft = (innerWidth - parseFloat(getComputedStyle($("tip")).width)) / 2;
+    if (list.height && list.right > tipLeft) y = Math.max(y, list.bottom);
+    return Math.ceil(y);
+  }
+
   // --- the loop ---------------------------------------------------------------------
 
   function frame(now) {
@@ -837,7 +847,7 @@
       hudAt = now;
       updateHud();
       updateTips();
-      $("tip").style.setProperty("--bars-end", Math.ceil(renderer.bossBarsBottom()) + "px");
+      $("tip").style.setProperty("--clear-top", tipClearance() + "px");
     }
     if (game.state.over) endMatch();
   }

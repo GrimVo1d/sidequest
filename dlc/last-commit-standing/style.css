@@ -61,6 +61,7 @@ button.primary { background: #3d3270; border-color: var(--accent); }
 #allies li { display: flex; gap: 6px; align-items: center; }
 #allies li { width: fit-content; padding: 0 4px; background: var(--shade); text-shadow: 1px 0 0 var(--edge), -1px 0 0 var(--edge), 0 1px 0 var(--edge), 0 -1px 0 var(--edge), 1px 1px 0 var(--edge); }
 #allies .swatch { width: 8px; height: 8px; border: 1px solid var(--edge); }
+#allies .project { max-width: 24ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #allies .state { color: var(--dim); }
 #notice { position: fixed; left: 0; right: 0; bottom: 128px; text-align: center; color: var(--accent);
   text-shadow: 1px 1px 0 var(--edge); }
@@ -69,9 +70,9 @@ button.primary { background: #3d3270; border-color: var(--accent); }
   display: flex; gap: 10px; align-items: center; padding: 8px 10px; background: var(--panel);
   border: 2px solid var(--accent); box-shadow: 3px 3px 0 var(--edge); }
 /* On a short field the hero in the middle would sit under the tip: it goes up, under the
-   boss bars (main.js says where they end). */
+   boss bars and the allies (main.js says how far down). */
 @media (max-height: 560px) {
-  #tip { top: max(64px, calc(var(--bars-end, 0px) + 8px)); bottom: auto; }
+  #tip { top: max(64px, calc(var(--clear-top, 0px) + 8px)); bottom: auto; }
 }
 /* The pause, the handbook and the results cover the match: the tip waits under them unseen. */
 body:has(.screen:not([hidden])) #tip { display: none; }
