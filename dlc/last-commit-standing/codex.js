@@ -143,7 +143,7 @@
               `WebSearch / WebFetch: a beam across the arena, ${A.scout_far.damage} damage.`]},
     ].concat(spirits(B), [
       {id: "states", icon: "ally", name: ["Состояния агента", "Agent states"],
-       text: [`Ошибка — оглушён на ${B.ally.stun_seconds} сек, враги в ярости. Запрет — бьётся о BLOCKED. Compaction — медитирует: неуязвим, не атакует. Ждёт ответа — «?» над головой, игра на паузе. Задача готова — ульта, экран зачищен.`,
+       text: [`Ошибка — оглушён на ${B.ally.stun_seconds} сек, враги в ярости. Запрет — бьётся о щит «ЗАПРЕТ». Compaction — медитирует: неуязвим, не атакует. Ждёт ответа — «?» над головой, игра на паузе. Задача готова — ульта, экран зачищен.`,
               `Error — stunned for ${B.ally.stun_seconds} sec, enemies enraged. Blocked — hits a BLOCKED shield. Compaction — meditates: invulnerable, no attacks. Waiting for an answer — a “?” over the head, the game pauses. Task done — the ultimate clears the screen.`]},
     ]);
   }

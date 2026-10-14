@@ -559,7 +559,7 @@
       pushOut(twin, twin.r);
       e.partner = twin;
       effect({type: "ring", x: at.x, y: at.y, r: 16, color: "#7fe0e0", life: 0.4});
-      text(at.x, at.y - 10, "RACE!", "#7fe0e0");
+      text(at.x, at.y - 10, tr("ГОНКА!", "RACE!"), "#7fe0e0");
     }
 
     // Null pointer jumps towards the player now and then, never into a wall.
@@ -1502,7 +1502,7 @@
           break;
         case "blocked":
           a.blocked = B.ally.blocked_seconds;
-          text(a.x, a.y - 12, "BLOCKED", "#d9534f", 1.5);
+          text(a.x, a.y - 12, tr("ЗАПРЕТ", "BLOCKED"), "#d9534f", 1.5);
           break;
         case "compact":
           a.meditate = e.phase === "end" ? 0 : B.ally.compact_max_seconds;
