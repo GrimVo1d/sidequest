@@ -1,0 +1,43 @@
+# Settings of the development tools (docs/style.md, section 2). Sidequest itself is run
+# from the folder, not installed as a package.
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = [".tmp", "data"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "N", "C4", "PIE", "RUF"]
+ignore = [
+    "RUF001", "RUF002", "RUF003",  # Cyrillic in strings and comments is intended
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Handlers are named after Claude Code hook events: _on_PreToolUse.
+"sidequest/normalizer.py" = ["N802"]
+# Short upper-case aliases of balance sections, as in the JS code: B, T, AG.
+"tests/*" = ["N806"]
+# Window checks carry JavaScript snippets as long strings.
+"dev/webkit/*" = ["E501"]
+"landing/*.py" = ["E501"]
+
+[tool.mypy]
+python_version = "3.12"
+files = ["sidequest", "tests", "dev/webkit", "landing"]
+exclude = ["^\\.tmp/", "^data/"]
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_unreachable = true
+strict_equality = true
+
+[[tool.mypy.overrides]]
+module = "sidequest.*"
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+warn_return_any = true
+
+[[tool.mypy.overrides]]
+# pywebview and the macOS bridges ship without type information.
+module = ["webview", "webview.*", "Foundation", "AppKit", "WebKit", "objc", "PyObjCTools.*"]
+ignore_missing_imports = true
