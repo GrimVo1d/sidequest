@@ -697,12 +697,13 @@
       const recoil = s.time - p.firedAt < 0.06 ? 1 : 0;
       // Held in a hand at the side: the avatar is an opaque square, so a gun in front of
       // it (aiming up or down) would cover the face and one behind it would vanish.
-      const side = Math.max(5, Math.abs(Math.cos(p.aim)) * 7) * (flip ? -1 : 1);
-      const gx = x + side - (flip ? -recoil : recoil), gy = y + 3 + Math.sin(p.aim) * 3;
+      // Whole-pixel offsets from the rounded hero, so the gun keeps its place on a walk.
+      const side = Math.round(Math.max(5, Math.abs(Math.cos(p.aim)) * 7)) * (flip ? -1 : 1);
+      const gx = px(x) + side - (flip ? -recoil : recoil), gy = px(y) + 3 + Math.round(Math.sin(p.aim) * 3);
       const c = sprite("gun", {flip});
-      ctx.drawImage(c, px(flip ? gx - c.width + 3 : gx - 3), px(gy - 2));
+      ctx.drawImage(c, flip ? gx - c.width + 3 : gx - 3, gy - 2);
       if (recoil) {
-        const mx = px(gx + (flip ? -9 : 9)), my = px(gy - 1);
+        const mx = gx + (flip ? -9 : 9), my = gy - 1;
         ctx.fillStyle = "#fffbe0";
         ctx.fillRect(mx - 1, my - 1, 3, 3);
         ctx.fillStyle = "#e8c14a";
@@ -837,9 +838,11 @@
       const pulse = 0.25 + Math.sin(s.time * 4 + it.y) * 0.1;
       pixelRing(it.x, it.y - 1, 8, ITEM_COLORS[it.type] || "#fffbe0", pulse);
       const c = sprite(it.type, {frame: Math.floor(s.time * 4) & 1});
-      ctx.drawImage(c, px(it.x) - (c.width >> 1), px(it.y - 2 - hop + bob) - (c.height >> 1));
+      const ix = px(it.x) - (c.width >> 1), iy = px(it.y - 2 - hop + bob) - (c.height >> 1);
+      ctx.drawImage(c, ix, iy);
       if ((Math.floor(s.time * 3 + it.x) % 4) === 0) {
-        const sx = px(it.x + c.width / 2 - 1), sy = px(it.y - c.height / 2 - 2 + bob);
+        // The sparkle sits on the top right corner and hops with the item.
+        const sx = ix + c.width - 1, sy = iy;
         ctx.fillStyle = "#fffbe0";
         ctx.fillRect(sx, sy - 1, 1, 3);
         ctx.fillRect(sx - 1, sy, 3, 1);
