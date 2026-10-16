@@ -1,4 +1,5 @@
 """Last Commit Standing: whole matches of the simulation, played by a bot in jsc."""
+
 import json
 import os
 import re
@@ -18,8 +19,9 @@ DLC = os.path.join(paths.PROJECT_DIR, "dlc", "last-commit-standing")
 class ArenaTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        run = subprocess.run([JSC, HARNESS, "--", paths.PROJECT_DIR],
-                             capture_output=True, text=True, timeout=120)
+        run = subprocess.run(
+            [JSC, HARNESS, "--", paths.PROJECT_DIR], capture_output=True, text=True, timeout=120
+        )
         if run.returncode:
             raise AssertionError(run.stdout + run.stderr)
         cls.result = json.loads(run.stdout)
@@ -37,8 +39,11 @@ class ArenaTest(unittest.TestCase):
         self.assertIn("gem", met)
 
     def test_every_text_has_english(self):
-        entries = [e for section in ("upgrades", "gear", "achievements", "weapons", "modifiers")
-                   for e in self.balance[section]]
+        entries = [
+            e
+            for section in ("upgrades", "gear", "achievements", "weapons", "modifiers")
+            for e in self.balance[section]
+        ]
         entries += [w["evolution"] for w in self.balance["weapons"]]
         for entry in entries:
             self.assertTrue(entry.get("name_en") and entry.get("text_en"), entry["id"])
@@ -58,8 +63,10 @@ class ArenaTest(unittest.TestCase):
         self.assertGreaterEqual(d["sets"], 8)
         self.assertEqual(d["allies"], 0)  # live agents stay out
         self.assertTrue(d["solo"])
-        self.assertEqual((d["results"]["mode"], d["results"]["day"], d["results"]["with_agent"]),
-                         ("daily", "2026-10-09", False))
+        self.assertEqual(
+            (d["results"]["mode"], d["results"]["day"], d["results"]["with_agent"]),
+            ("daily", "2026-10-09", False),
+        )
 
     def test_session_ghost(self):
         g = self.result["solo"]["ghost"]
@@ -76,7 +83,9 @@ class ArenaTest(unittest.TestCase):
     def test_modifiers(self):
         m = self.result["solo"]["modifiers"]
         self.assertEqual(m["glass"]["modifiers"], ["glass_cannon", "no_medkits"])  # unknown dropped
-        self.assertEqual((m["glass"]["max_hp"], m["glass"]["hp"], m["glass"]["damage"]), (50, 50, 2))
+        self.assertEqual(
+            (m["glass"]["max_hp"], m["glass"]["hp"], m["glass"]["damage"]), (50, 50, 2)
+        )
         self.assertGreater(m["glass"]["items"], 0)
         self.assertEqual(m["glass"]["medkits"], 0)
         self.assertTrue(m["rage"])
@@ -134,15 +143,23 @@ class ArenaTest(unittest.TestCase):
     def test_fast_reviewer(self):
         r, AG = self.result["agent"]["reviewer"], self.balance["agent"]
         self.assertTrue(r["waiting"])
-        self.assertEqual(r["fast"], {"reviews": 1, "coffee": AG["reviewer"]["coffee_seconds"],
-                                     "score": AG["reviewer"]["score"]})
+        self.assertEqual(
+            r["fast"],
+            {
+                "reviews": 1,
+                "coffee": AG["reviewer"]["coffee_seconds"],
+                "score": AG["reviewer"]["score"],
+            },
+        )
         self.assertEqual(r["reviews"], 1)  # slow, the button, the agent itself: no bonus
         self.assertFalse(r["after"])
 
     def test_spirits_and_orchestra(self):
         sp, o = self.result["agent"]["spirits"], self.result["agent"]["orchestra"]
-        self.assertEqual(sp["types"], {"Explore": "scout", "Plan": "plan",
-                                       "general-purpose": "shooter", "none": "shooter"})
+        self.assertEqual(
+            sp["types"],
+            {"Explore": "scout", "Plan": "plan", "general-purpose": "shooter", "none": "shooter"},
+        )
         self.assertGreater(sp["healed"], 0)
         self.assertGreater(sp["slowed"], 0)
         self.assertTrue(o["on"])
@@ -182,8 +199,9 @@ class ArenaTest(unittest.TestCase):
     def test_slots_are_limited(self):
         slots = self.result["arsenal"]["slots"]
         build = self.balance["build"]
-        self.assertEqual(slots["most"], {"weapons": build["weapon_slots"],
-                                         "passives": build["passive_slots"]})
+        self.assertEqual(
+            slots["most"], {"weapons": build["weapon_slots"], "passives": build["passive_slots"]}
+        )
         self.assertEqual(slots["last"], ["filler"])
         for name, match in self.matches().items():
             with self.subTest(name):
@@ -221,8 +239,10 @@ class ArenaTest(unittest.TestCase):
         self.assertEqual(f["score"], self.balance["build"]["filler"]["score"])
 
     def test_level_text(self):
-        self.assertEqual(self.result["arsenal"]["level_text"],
-                         ["дробинки +2, задержка −15%", "pellets +2, cooldown −15%"])
+        self.assertEqual(
+            self.result["arsenal"]["level_text"],
+            ["дробинки +2, задержка −15%", "pellets +2, cooldown −15%"],
+        )
 
     def test_no_broken_numbers(self):
         for name, match in self.matches().items():
@@ -230,8 +250,15 @@ class ArenaTest(unittest.TestCase):
                 self.assertIsNone(match["bad"])
 
     def test_match_ends_when_every_agent_is_done(self):
-        for name in ("short-task", "long-task", "error-streak", "blocked",
-                     "joined-mid-session", "unknown-tool", "busy_two"):
+        for name in (
+            "short-task",
+            "long-task",
+            "error-streak",
+            "blocked",
+            "joined-mid-session",
+            "unknown-tool",
+            "busy_two",
+        ):
             with self.subTest(name):
                 match = self.result[name]
                 self.assertTrue(match["over"])
@@ -410,14 +437,18 @@ class ArenaTest(unittest.TestCase):
         self.assertTrue(e["dead"])
         self.assertTrue(e["chest"])
         self.assertEqual(e["elites"], 1)
-        self.assertAlmostEqual(e["healed"], self.balance["elites"]["kinds"]["vampire"]["heal"], places=2)
+        self.assertAlmostEqual(
+            e["healed"], self.balance["elites"]["kinds"]["vampire"]["heal"], places=2
+        )
         self.assertAlmostEqual(e["fast"], self.balance["elites"]["kinds"]["fast"]["speed"])
         self.assertIn("elite", self.result["busy_two"]["met"])
 
     def test_new_bosses(self):
         b, E = self.result["bestiary"], self.balance["enemies"]
         oom = E["boss_oom"]
-        self.assertEqual(b["oom"], {"splits": 2, "smalls": 2 * oom["split"]["count"], "size": 2, "r": 2})
+        self.assertEqual(
+            b["oom"], {"splits": 2, "smalls": 2 * oom["split"]["count"], "size": 2, "r": 2}
+        )
         loop = b["loop"]
         self.assertEqual(loop["segments"], E["boss_loop"]["segments"])
         self.assertLessEqual(loop["gap"], E["boss_loop"]["spacing"] + 0.01)
@@ -504,7 +535,7 @@ class ArenaTest(unittest.TestCase):
     def test_card_rows_fit_the_hub(self):
         card = self.result["progress"]["card"]
         self.assertLessEqual(len(card), 4)
-        for label, value, *screen in card:
+        for label, value, *_screen in card:
             self.assertEqual(set(label), {"ru", "en"})
             for text in label.values():
                 self.assertLessEqual(len(text), 24)
@@ -520,7 +551,9 @@ class ArenaTest(unittest.TestCase):
         self.assertGreaterEqual(p["bests"]["kills"], 40)
         self.assertEqual(p["bests"]["time"], 900)
         of = p["of"]
-        self.assertEqual(of["marathon"], {"field": "time", "have": 900, "need": 1800, "of": "match"})
+        self.assertEqual(
+            of["marathon"], {"field": "time", "have": 900, "need": 1800, "of": "match"}
+        )
         self.assertEqual(of["kills_total"]["of"], "total")
         self.assertEqual(of["kills_total"]["have"], p["records"]["totals"]["kills"])
         self.assertEqual(of["veteran"]["have"], p["records"]["totals"]["matches"])
@@ -548,8 +581,9 @@ class ArenaArtTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        run = subprocess.run([JSC, ART_HARNESS, "--", paths.PROJECT_DIR],
-                             capture_output=True, text=True, timeout=120)
+        run = subprocess.run(
+            [JSC, ART_HARNESS, "--", paths.PROJECT_DIR], capture_output=True, text=True, timeout=120
+        )
         if run.returncode:
             raise AssertionError(run.stdout + run.stderr)
         cls.result = json.loads(run.stdout)
@@ -561,14 +595,26 @@ class ArenaArtTest(unittest.TestCase):
         ids = self.result["codexIds"]
         self.assertEqual(ids["gear"], [g["id"] for g in balance["gear"]])
         self.assertEqual(ids["passives"], [u["id"] for u in balance["upgrades"]])
-        self.assertEqual(ids["weapons"], [w["id"] for w in balance["weapons"]]
-                         + [w["evolution"]["id"] for w in balance["weapons"]])
-        self.assertEqual(ids["work"], ["commit", "push", "turret", "tests", "red_ci", "reviewer",
-                                       "orchestra"])
+        self.assertEqual(
+            ids["weapons"],
+            [w["id"] for w in balance["weapons"]]
+            + [w["evolution"]["id"] for w in balance["weapons"]],
+        )
+        self.assertEqual(
+            ids["work"], ["commit", "push", "turret", "tests", "red_ci", "reviewer", "orchestra"]
+        )
         self.assertIn("spirit_plan", ids["allies"])
         # Every enemy has a first-time hint, except the small leak (part of the big one).
         self.assertEqual(ids["events"], ["deploy", "incident"])
-        for enemy in ("flaky", "monolith", "elite", "boss_oom", "boss_loop", "boss_race", "boss_fire"):
+        for enemy in (
+            "flaky",
+            "monolith",
+            "elite",
+            "boss_oom",
+            "boss_loop",
+            "boss_race",
+            "boss_fire",
+        ):
             self.assertIn(enemy, ids["enemies"])
         # Every enemy has a first-time hint, except the parts of others: the small leak, the
         # microservice and the loop's body.
@@ -581,7 +627,9 @@ class ArenaArtTest(unittest.TestCase):
         # px(x - w / 2) rounds the edge, so a sprite and what hangs over it step apart by a
         # pixel as they walk; every DLC rounds the centre first: px(x) - (w >> 1).
         for dlc in ("last-commit-standing",):
-            with open(os.path.join(paths.PROJECT_DIR, "dlc", dlc, "render.js"), encoding="utf-8") as f:
+            with open(
+                os.path.join(paths.PROJECT_DIR, "dlc", dlc, "render.js"), encoding="utf-8"
+            ) as f:
                 code = f.read()
             with self.subTest(dlc):
                 self.assertEqual(re.findall(r"px\([\w.]+\.[xy] - [\w.]+ / 2\)", code), [])
@@ -603,9 +651,27 @@ class ArenaArtTest(unittest.TestCase):
             self.assertIn(name, self.result["drawn"])
 
     def test_bestiary_is_drawn(self):
-        for name in ("flaky", "spaghetti", "offbyone", "debt", "logspam", "regression", "scope",
-                     "monolith", "micro", "boss_oom", "boss_loop", "loop_segment", "boss_race",
-                     "boss_fire", "goo", "fire", "log_line", "incident", "elite"):
+        for name in (
+            "flaky",
+            "spaghetti",
+            "offbyone",
+            "debt",
+            "logspam",
+            "regression",
+            "scope",
+            "monolith",
+            "micro",
+            "boss_oom",
+            "boss_loop",
+            "loop_segment",
+            "boss_race",
+            "boss_fire",
+            "goo",
+            "fire",
+            "log_line",
+            "incident",
+            "elite",
+        ):
             self.assertIn(name, self.result["drawn"])
 
     def test_sprite_sizes(self):

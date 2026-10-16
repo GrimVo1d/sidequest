@@ -28,7 +28,7 @@
 "use strict";
 
 (function () {
-  const handlers = {};
+  const handlers = Object.create(null);  // event kinds come from outside: no "constructor"
   const pauseHandlers = [];
   const devCommands = {};
   const pending = {};
@@ -78,6 +78,10 @@
       helloResolve(info);
     } else if (m.kind === "dev_command" && devCommands[m.id]) {
       devCommands[m.id].fn();
+    } else if (m.kind === "key" && (m.type === "keydown" || m.type === "keyup")) {
+      // A key pressed while the hub had the focus: the frame is sandboxed, so the hub
+      // cannot dispatch it here itself.
+      window.dispatchEvent(new KeyboardEvent(m.type, {code: String(m.code), key: String(m.key), bubbles: true}));
     }
   });
 

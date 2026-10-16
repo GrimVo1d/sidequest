@@ -1,4 +1,5 @@
 """Two languages: the setting, the system language and the texts in place."""
+
 import os
 import unittest
 from unittest import mock

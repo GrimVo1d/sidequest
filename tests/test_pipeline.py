@@ -1,4 +1,5 @@
 """The real sidequest-emit.sh talking to the real receiver over a unix socket."""
+
 import json
 import os
 import shutil
@@ -10,7 +11,12 @@ import time
 import unittest
 
 from sidequest import paths, selfcheck
-from sidequest.receiver import AlreadyRunning, Receiver
+from sidequest.receiver import (
+    READ_DEADLINE,
+    AlreadyRunningError,
+    Receiver,
+    SocketPathTooLongError,
+)
 
 from .helpers import temp_dir
 
@@ -38,14 +44,16 @@ class PipelineTest(unittest.TestCase):
 
     def run_hook(self, data):
         start = time.monotonic()
-        proc = subprocess.run(["/bin/sh", self.emit], input=data, capture_output=True,
-                              timeout=10)
+        proc = subprocess.run(["/bin/sh", self.emit], input=data, capture_output=True, timeout=10)
         return proc, time.monotonic() - start
 
     def test_payload_arrives_intact(self):
         self.start_receiver()
-        payload = {"hook_event_name": "PostToolUse", "session_id": "s",
-                   "tool_input": {"content": "ünïcode \"quotes\" $(rm -rf /) `x`\n" * 3}}
+        payload = {
+            "hook_event_name": "PostToolUse",
+            "session_id": "s",
+            "tool_input": {"content": 'ünïcode "quotes" $(rm -rf /) `x`\n' * 3},
+        }
         proc, _ = self.run_hook(json.dumps(payload).encode())
         self.assertEqual((proc.returncode, proc.stdout, proc.stderr), (0, b"", b""))
         self.assertTrue(self.arrived.wait(2))
@@ -97,9 +105,82 @@ class PipelineTest(unittest.TestCase):
         self.assertEqual(proc.returncode, 0)
         self.assertLess(elapsed, 3)
 
+    def test_deep_project_folder(self):
+        # The hook reaches the socket by a relative name, so a folder deeper than the
+        # ~100 bytes a socket path may have still works.
+        deep = os.path.join(temp_dir(self), "d" * 120)
+        os.makedirs(os.path.join(deep, "hooks"))
+        os.makedirs(os.path.join(deep, "data"), mode=0o700)
+        shutil.copy(paths.EMIT_SCRIPT, os.path.join(deep, "hooks"))
+        self.emit = os.path.join(deep, "hooks", "sidequest-emit.sh")
+        self.addCleanup(os.chdir, os.getcwd())
+        os.chdir(os.path.join(deep, "data"))  # the test receiver binds relatively too
+        self.sock = "sidequest.sock"
+        self.start_receiver()
+        proc, _ = self.run_hook(b'{"hook_event_name": "Stop"}')
+        self.assertEqual((proc.returncode, proc.stdout, proc.stderr), (0, b"", b""))
+        self.assertTrue(self.arrived.wait(2))
+
+    def test_too_long_socket_path_is_refused(self):
+        with self.assertRaises(SocketPathTooLongError):
+            Receiver("/" + "d" * 200 + "/sidequest.sock", self.on_payload).start()
+
+    def test_path_does_not_choose_the_tools(self):
+        self.start_receiver()
+        fake = os.path.join(os.path.dirname(self.emit), "fake-bin")
+        os.makedirs(fake)
+        marker = os.path.join(fake, "ran")
+        for tool in ("nc", "cat", "sleep"):
+            with open(os.path.join(fake, tool), "w") as f:
+                f.write(f"#!/bin/sh\ntouch '{marker}'\n")
+            os.chmod(os.path.join(fake, tool), 0o700)
+        env = dict(os.environ, PATH=fake)
+        proc = subprocess.run(
+            ["/bin/sh", self.emit], input=b'{"hook_event_name": "Stop"}', env=env, timeout=10
+        )
+        self.assertEqual(proc.returncode, 0)
+        self.assertTrue(self.arrived.wait(2))
+        self.assertFalse(os.path.exists(marker))
+
+    def test_unread_input_is_drained(self):
+        server = socket.socket(socket.AF_UNIX)
+        server.bind(self.sock)
+        server.listen(1)  # never reads: nc is stopped with most of the input unsent
+        self.addCleanup(server.close)
+        hook = subprocess.Popen(["/bin/sh", self.emit], stdin=subprocess.PIPE)
+        try:
+            hook.stdin.write(b"x" * 4_000_000)  # BrokenPipeError if the hook stops reading
+            hook.stdin.close()
+        finally:
+            self.assertEqual(hook.wait(10), 0)
+
+    def test_nan_is_not_json(self):
+        self.start_receiver()
+        self.run_hook(b'{"hook_event_name": "Stop", "duration_ms": NaN}')
+        self.assertTrue(self.arrived.wait(2))
+        self.assertEqual(self.got, [None])
+
+    def test_slow_client_does_not_hold_the_receiver(self):
+        self.start_receiver()
+        stop = threading.Event()
+        self.addCleanup(stop.set)
+
+        def trickle():
+            with socket.socket(socket.AF_UNIX) as slow:
+                slow.connect(self.sock)
+                while not stop.wait(0.5):
+                    slow.send(b" ")
+
+        threading.Thread(target=trickle, daemon=True).start()
+        time.sleep(0.2)
+        start = time.monotonic()
+        self.run_hook(json.dumps({"hook_event_name": "Stop"}).encode())
+        self.assertTrue(self.arrived.wait(READ_DEADLINE + 2))
+        self.assertLess(time.monotonic() - start, READ_DEADLINE + 2)
+
     def test_second_instance_refuses(self):
         self.start_receiver()
-        with self.assertRaises(AlreadyRunning):
+        with self.assertRaises(AlreadyRunningError):
             Receiver(self.sock, self.on_payload).start()
 
     def test_selfcheck_pipeline(self):

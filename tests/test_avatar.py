@@ -13,8 +13,12 @@ HARNESS = os.path.join(os.path.dirname(__file__), "avatar_harness.js")
 
 
 def good(**changes):
-    value = {"source": "upload", "size": 16, "palette": ["#112233", "#AABBCC"],
-             "frames": [{"pixels": "01." * 85 + "0", "delay": 50}]}
+    value = {
+        "source": "upload",
+        "size": 16,
+        "palette": ["#112233", "#AABBCC"],
+        "frames": [{"pixels": "01." * 85 + "0", "delay": 50}],
+    }
     value.update(changes)
     return value
 
@@ -31,29 +35,36 @@ class CleanTest(unittest.TestCase):
         self.assertEqual(result["parts"], {"hair": "short", "bg": "night"})
 
     def test_delays_are_clamped(self):
-        frames = [{"pixels": "0" * 256, "delay": 1}, {"pixels": "1" * 256, "delay": 10 ** 9}]
+        frames = [{"pixels": "0" * 256, "delay": 1}, {"pixels": "1" * 256, "delay": 10**9}]
         result = avatar.clean(good(frames=frames))
         self.assertEqual([f["delay"] for f in result["frames"]], [20, 10000])
 
     def test_rejects_bad_input(self):
         bad = [
-            None, "x", good(source="url"), good(size=64), good(size=True),
-            good(palette=[]), good(palette=["red"]), good(palette=["#000000"] * 33),
+            None,
+            "x",
+            good(source="url"),
+            good(size=64),
+            good(size=True),
+            good(palette=[]),
+            good(palette=["red"]),
+            good(palette=["#000000"] * 33),
             good(palette=["#000000;background:url(x)"]),
-            good(frames=[]), good(frames=[{"pixels": "0" * 255}]),
-            good(frames=[{"pixels": "2" * 256}]),            # index outside the palette
+            good(frames=[]),
+            good(frames=[{"pixels": "0" * 255}]),
+            good(frames=[{"pixels": "2" * 256}]),  # index outside the palette
             good(frames=[{"pixels": "<" * 256}]),
             good(frames=[{"pixels": "0" * 256, "delay": "1"}]),
             good(frames=[{"pixels": "0" * 256}] * 65),
-            good(source="preset"), good(source="preset", preset="../x"),
+            good(source="preset"),
+            good(source="preset", preset="../x"),
             good(source="builder", parts={"hair": "<b>"}),
             good(source="builder", parts={str(i): "a" for i in range(17)}),
             good(source="builder", parts=["hair"]),
         ]
         for value in bad:
-            with self.subTest(value=str(value)[:80]):
-                with self.assertRaises(ValueError):
-                    avatar.clean(value)
+            with self.subTest(value=str(value)[:80]), self.assertRaises(ValueError):
+                avatar.clean(value)
 
 
 def picture(size=128, frames=1, data=None):
@@ -70,21 +81,21 @@ class PictureCleanTest(unittest.TestCase):
     def test_rejects_bad_pictures(self):
         ok = base64.b64encode(bytes(128 * 128 * 4)).decode()
         bad = [
-            dict(picture(), source="preset", preset="x"),            # only uploads
+            dict(picture(), source="preset", preset="x"),  # only uploads
             picture(size=64),
-            picture(data=ok[:-4]),                                    # short
-            picture(data="!" * len(ok)),                              # not base64
-            picture(256, frames=17),                                  # over 4 MB together
+            picture(data=ok[:-4]),  # short
+            picture(data="!" * len(ok)),  # not base64
+            picture(256, frames=17),  # over 4 MB together
             picture(frames=65),
             {"source": "upload", "size": 128, "frames": [{"pixels": "0" * 128 * 128}]},
         ]
         for value in bad:
-            with self.subTest(value=str(value)[:80]):
-                with self.assertRaises(ValueError):
-                    avatar.clean(value)
+            with self.subTest(value=str(value)[:80]), self.assertRaises(ValueError):
+                avatar.clean(value)
 
 
 # --- a tiny GIF writer, independent from the decoder under test ----------------------
+
 
 def lzw_encode(indices, min_code):
     clear, end = 1 << min_code, (1 << min_code) + 1
@@ -93,12 +104,12 @@ def lzw_encode(indices, min_code):
     codes = [(clear, size)]
     w = ()
     for k in indices:
-        if w + (k,) in table:
+        if (*w, k) in table:
             w += (k,)
             continue
         codes.append((table[w], size))
         if next_code < 4096:
-            table[w + (k,)] = next_code
+            table[(*w, k)] = next_code
             next_code += 1
             if next_code > (1 << size) and size < 12:
                 size += 1
@@ -117,7 +128,7 @@ def lzw_encode(indices, min_code):
         data.append(acc)
     out = bytearray([min_code])
     for i in range(0, len(data), 255):
-        chunk = data[i:i + 255]
+        chunk = data[i : i + 255]
         out += bytes([len(chunk)]) + chunk
     return bytes(out + b"\0")
 
@@ -125,6 +136,7 @@ def lzw_encode(indices, min_code):
 def gif(width, height, palette, frames):
     """frames: dicts with rect, rows (palette indexes), delay, disposal, transparent,
     optional local palette and interlace."""
+
     def table(colors):
         size = 1
         while (2 << (size - 1)) < len(colors):
@@ -133,12 +145,25 @@ def gif(width, height, palette, frames):
         return size - 1, b"".join(bytes(c) for c in colors)
 
     bits, gct = table(palette)
-    out = bytearray(b"GIF89a") + bytes([width & 255, width >> 8, height & 255, height >> 8,
-                                        0x80 | bits, 0, 0]) + gct
+    out = (
+        bytearray(b"GIF89a")
+        + bytes([width & 255, width >> 8, height & 255, height >> 8, 0x80 | bits, 0, 0])
+        + gct
+    )
     for f in frames:
         t = f.get("transparent", -1)
-        out += bytes([0x21, 0xF9, 4, (f.get("disposal", 0) << 2) | (t >= 0),
-                      f["delay"] & 255, f["delay"] >> 8, max(t, 0), 0])
+        out += bytes(
+            [
+                0x21,
+                0xF9,
+                4,
+                (f.get("disposal", 0) << 2) | (t >= 0),
+                f["delay"] & 255,
+                f["delay"] >> 8,
+                max(t, 0),
+                0,
+            ]
+        )
         x, y, w, h = f["rect"]
         flags, local = 0, b""
         if "palette" in f:
@@ -147,12 +172,13 @@ def gif(width, height, palette, frames):
         rows = f["rows"]
         if f.get("interlace"):
             flags |= 0x40
-            order = [r for start, step in ((0, 8), (4, 8), (2, 4), (1, 2))
-                     for r in range(start, h, step)]
+            order = [
+                r for start, step in ((0, 8), (4, 8), (2, 4), (1, 2)) for r in range(start, h, step)
+            ]
             rows = [rows[r] for r in order]
         out += bytes([0x2C, x, 0, y, 0, w, 0, h, 0, flags]) + local
         out += lzw_encode([i for row in rows for i in row], 2)
-    return bytes(out + b"\x3B")
+    return bytes(out + b"\x3b")
 
 
 RED, GREEN, BLUE, WHITE = (200, 0, 0), (0, 200, 0), (0, 0, 200), (255, 255, 255)
@@ -166,28 +192,43 @@ class AvatarJsTest(unittest.TestCase):
         folder = temp_dir(cls)
         frames = [
             # Red with a transparent corner; kept as is.
-            {"rect": (0, 0, 4, 4), "rows": [[3, 0, 0, 0]] + [[0] * 4] * 3, "delay": 5,
-             "disposal": 1, "transparent": 3},
+            {
+                "rect": (0, 0, 4, 4),
+                "rows": [[3, 0, 0, 0]] + [[0] * 4] * 3,
+                "delay": 5,
+                "disposal": 1,
+                "transparent": 3,
+            },
             # Blue square, cleared after showing (disposal 2); 10 ms becomes 100 ms.
             {"rect": (1, 1, 2, 2), "rows": [[2, 2], [2, 2]], "delay": 1, "disposal": 2},
             # One green pixel where the blue was; restored away afterwards (disposal 3).
             {"rect": (2, 2, 1, 1), "rows": [[1]], "delay": 30, "disposal": 3},
             # Interlaced rows of local colors; pixel (3,3) transparent shows what is below.
-            {"rect": (0, 0, 4, 4), "rows": [[0] * 4, [1] * 4, [2] * 4, [2, 2, 2, 3]],
-             "delay": 40, "palette": LOCAL, "interlace": True, "transparent": 3},
+            {
+                "rect": (0, 0, 4, 4),
+                "rows": [[0] * 4, [1] * 4, [2] * 4, [2, 2, 2, 3]],
+                "delay": 40,
+                "palette": LOCAL,
+                "interlace": True,
+                "transparent": 3,
+            },
         ]
         path = os.path.join(folder, "t.gif")
         with open(path, "wb") as f:
             f.write(gif(4, 4, [RED, GREEN, BLUE, WHITE], frames))
-        run = subprocess.run([JSC, HARNESS, "--", paths.PROJECT_DIR, path],
-                             capture_output=True, text=True, timeout=60)
+        run = subprocess.run(
+            [JSC, HARNESS, "--", paths.PROJECT_DIR, path],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
         if run.returncode:
             raise AssertionError(run.stdout + run.stderr)
         cls.result = json.loads(run.stdout)
 
     def pixels(self, frame):
         raw = bytes.fromhex(frame["rgba"])
-        return [tuple(raw[i:i + 3]) if raw[i + 3] else None for i in range(0, len(raw), 4)]
+        return [tuple(raw[i : i + 3]) if raw[i + 3] else None for i in range(0, len(raw), 4)]
 
     def test_builder_and_presets_pass_the_python_check(self):
         for value in self.result["builder"]:
@@ -201,8 +242,9 @@ class AvatarJsTest(unittest.TestCase):
         self.assertEqual([f["delay"] for f in frames], [50, 100, 300, 400])
         f1, f2, f3, f4 = (self.pixels(f) for f in frames)
         self.assertEqual(f1, [None] + [RED] * 15)
-        self.assertEqual([f2[5], f2[6], f2[9], f2[10], f2[0], f2[15]],
-                         [BLUE, BLUE, BLUE, BLUE, None, RED])
+        self.assertEqual(
+            [f2[5], f2[6], f2[9], f2[10], f2[0], f2[15]], [BLUE, BLUE, BLUE, BLUE, None, RED]
+        )
         # Blue area was cleared (disposal 2), then one green pixel drawn at (2,2).
         self.assertEqual([f3[5], f3[6], f3[9], f3[10], f3[4]], [None, None, None, GREEN, RED])
         # Frame 3 used disposal 3, so frame 4 is drawn over frame 2's cleared state.
@@ -217,7 +259,7 @@ class AvatarJsTest(unittest.TestCase):
     def test_quantized_upload_is_valid(self):
         value = avatar.clean(self.result["quantized"])
         self.assertLessEqual(len(value["palette"]), 32)
-        self.assertEqual(len(value["frames"]), 1)       # identical frames are merged
+        self.assertEqual(len(value["frames"]), 1)  # identical frames are merged
         self.assertEqual(value["frames"][0]["delay"], 200)
         self.assertEqual(value["frames"][0]["pixels"][:32], "." * 32)
 
@@ -228,16 +270,29 @@ class AvatarJsTest(unittest.TestCase):
 
     def test_pictures_keep_full_color(self):
         gif = avatar.clean(self.result["picture_gif"])
-        self.assertEqual((gif["size"], len(gif["frames"])), (128, 4))   # a GIF: 128 px
+        self.assertEqual((gif["size"], len(gif["frames"])), (128, 4))  # a GIF: 128 px
         still = avatar.clean(self.result["picture_still"])
         self.assertEqual((still["size"], len(still["frames"])), (256, 1))
         raw = base64.b64decode(still["frames"][0]["rgba"])
-        self.assertEqual(raw[3], 0)                       # "fit": transparent band on top
-        self.assertEqual(raw[128 * 256 * 4:128 * 256 * 4 + 4], bytes([200] * 4))
+        self.assertEqual(raw[3], 0)  # "fit": transparent band on top
+        self.assertEqual(raw[128 * 256 * 4 : 128 * 256 * 4 + 4], bytes([200] * 4))
         self.assertTrue(self.result["picture_decoded"])
 
     def test_huge_gif_is_refused_before_decoding(self):
         self.assertIn("слишком большой", self.result["huge_error"])
+
+    def test_gif_bombs_are_refused(self):
+        self.assertIn("повреждён", self.result["gif_big_frame"])
+        self.assertIn("слишком длинный", self.result["gif_bomb"])
+        self.assertIsNone(self.result["gif_small"])
+
+    def test_still_pictures_are_checked_by_their_header(self):
+        still = self.result["still"]
+        for name in ("png_ok", "jpeg_ok", "webp_ok"):
+            self.assertIsNone(still[name], name)
+        for name in ("png_bomb", "png_wide", "jpeg_bomb", "webp_bomb"):
+            self.assertIn("слишком большая", still[name], name)
+        self.assertIn("не поддерживается", still["unknown"])
 
 
 if __name__ == "__main__":

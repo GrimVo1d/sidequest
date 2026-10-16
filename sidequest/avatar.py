@@ -25,9 +25,37 @@ Picture avatar (an upload kept as is, only shrunk to a square):
 `rgba` is size * size * 4 bytes, row by row. All frames together are at most
 MAX_PICTURE_BYTES, so a long GIF comes as 128 x 128.
 """
+
 import base64
 import binascii
 import re
+from typing import Any, NotRequired, TypedDict
+
+
+class PixelFrame(TypedDict):
+    pixels: str
+    delay: int
+
+
+class PictureFrame(TypedDict):
+    rgba: str
+    delay: int
+
+
+class PixelAvatar(TypedDict):
+    source: str
+    size: int
+    palette: list[str]
+    frames: list[PixelFrame]
+    preset: NotRequired[str]
+    parts: NotRequired[dict[str, str]]
+
+
+class PictureAvatar(TypedDict):
+    source: str
+    size: int
+    frames: list[PictureFrame]
+
 
 SOURCES = ("preset", "builder", "upload")
 SIZES = (16, 32)
@@ -39,11 +67,11 @@ MAX_PARTS = 16
 MIN_DELAY, MAX_DELAY = 20, 10000
 PIXEL_CHARS = "0123456789abcdefghijklmnopqrstuv"
 
-_COLOR_RE = re.compile(r"^#[0-9a-f]{6}$")
-_ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,31}$")
+_COLOR_RE = re.compile(r"^#[0-9a-f]{6}\Z")
+_ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,31}\Z")
 
 
-def clean(avatar):
+def clean(avatar: object) -> PixelAvatar | PictureAvatar:
     """Return a checked copy of `avatar` with only known fields; raise ValueError."""
     if not isinstance(avatar, dict):
         raise ValueError("avatar must be an object")
@@ -68,8 +96,8 @@ def clean(avatar):
     frames = avatar.get("frames")
     if not isinstance(frames, list) or not 1 <= len(frames) <= MAX_FRAMES:
         raise ValueError(f"avatar must have 1..{MAX_FRAMES} frames")
-    allowed = set("." + PIXEL_CHARS[:len(palette)])
-    clean_frames = []
+    allowed = set("." + PIXEL_CHARS[: len(palette)])
+    clean_frames: list[PixelFrame] = []
     for frame in frames:
         if not isinstance(frame, dict):
             raise ValueError("frame must be an object")
@@ -80,7 +108,12 @@ def clean(avatar):
             raise ValueError("pixel outside the palette")
         clean_frames.append({"pixels": pixels, "delay": _delay(frame)})
 
-    result = {"source": source, "size": size, "palette": palette, "frames": clean_frames}
+    result: PixelAvatar = {
+        "source": source,
+        "size": size,
+        "palette": palette,
+        "frames": clean_frames,
+    }
     if source == "preset":
         preset = avatar.get("preset")
         if not isinstance(preset, str) or not _ID_RE.match(preset):
@@ -91,27 +124,31 @@ def clean(avatar):
         if not isinstance(parts, dict) or len(parts) > MAX_PARTS:
             raise ValueError("bad parts")
         for key, value in parts.items():
-            if not (isinstance(key, str) and _ID_RE.match(key)
-                    and isinstance(value, str) and _ID_RE.match(value)):
+            if not (
+                isinstance(key, str)
+                and _ID_RE.match(key)
+                and isinstance(value, str)
+                and _ID_RE.match(value)
+            ):
                 raise ValueError("bad part")
         result["parts"] = dict(parts)
     return result
 
 
-def _delay(frame):
+def _delay(frame: dict[str, Any]) -> int:
     delay = frame.get("delay", 100)
     if not isinstance(delay, (int, float)) or isinstance(delay, bool):
         raise ValueError("delay must be a number")
     return max(MIN_DELAY, min(MAX_DELAY, int(delay)))
 
 
-def _picture_frames(avatar, size):
+def _picture_frames(avatar: dict[str, Any], size: int) -> list[PictureFrame]:
     frames = avatar.get("frames")
     if not isinstance(frames, list) or not 1 <= len(frames) <= MAX_FRAMES:
         raise ValueError(f"avatar must have 1..{MAX_FRAMES} frames")
     if len(frames) * size * size * 4 > MAX_PICTURE_BYTES:
         raise ValueError("picture avatar is too big")
-    result = []
+    result: list[PictureFrame] = []
     for frame in frames:
         if not isinstance(frame, dict) or not isinstance(frame.get("rgba"), str):
             raise ValueError("frame must have rgba")

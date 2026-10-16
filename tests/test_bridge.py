@@ -1,4 +1,5 @@
 """The JS bridge without a window: what the hub and DLC can and cannot reach."""
+
 import json
 import os
 import unittest
@@ -13,8 +14,9 @@ from .helpers import SID, raw, temp_dir
 class BridgeTest(unittest.TestCase):
     def make(self, dev=False):
         self.dir = temp_dir(self)
-        core = Core(db_path=os.path.join(self.dir, "t.db"),
-                    socket_path=os.path.join(self.dir, "s.sock"))
+        core = Core(
+            db_path=os.path.join(self.dir, "t.db"), socket_path=os.path.join(self.dir, "s.sock")
+        )
         self.addCleanup(core.store.close)
         settings = os.path.join(self.dir, "settings.json")
         for name, folder in (("DLC_DATA_DIR", "dlc"), ("BACKUPS_DIR", "backups")):
@@ -38,6 +40,21 @@ class BridgeTest(unittest.TestCase):
         for name in public:
             self.assertTrue(callable(getattr(bridge, name)), name)
 
+    def test_page_gets_functions_not_the_bridge(self):
+        _, bridge = self.make()
+        exposed = {f.__name__: f for f in app.exposed(bridge)}
+        self.assertIn("drain", exposed)
+        self.assertFalse([n for n in exposed if n.startswith("_") or "." in n])
+        self.assertEqual(exposed["drain"](), [])
+        # pywebview finds an exposed function by its exact name; with no js_api object
+        # there is nothing to walk a dotted name like "_core.store._db.execute" through.
+        self.assertNotIn("_core", dir(exposed["drain"]))
+
+    def test_dlc_pages_are_served_by_the_scheme(self):
+        _, bridge = self.make()
+        for dlc in bridge.list_dlc():
+            self.assertTrue(dlc["url"].startswith("sidequest://app/dlc/"), dlc["url"])
+
     def test_quit_closes_the_window(self):
         _, bridge = self.make()
         bridge.quit()  # no window yet: nothing to close
@@ -47,8 +64,12 @@ class BridgeTest(unittest.TestCase):
 
     def test_dev_methods_need_dev_flag(self):
         _, bridge = self.make(dev=False)
-        for call in (lambda: bridge.dev_send("tool"), bridge.dev_sources,
-                     bridge.dev_taint, bridge.dev_sessions):
+        for call in (
+            lambda: bridge.dev_send("tool"),
+            bridge.dev_sources,
+            bridge.dev_taint,
+            bridge.dev_sessions,
+        ):
             with self.assertRaises(PermissionError):
                 call()
 
@@ -72,10 +93,25 @@ class BridgeTest(unittest.TestCase):
         core, bridge = self.make()
         core.on_payload(raw("SessionStart", source="startup"), 100.0)
         for i in range(app.GHOST_MIN_ACTIONS):
-            core.on_payload(raw("PreToolUse", tool_name="Read", tool_use_id=f"t{i}",
-                                tool_input={"file_path": "/x/a.py"}), 101.0 + i)
-            core.on_payload(raw("PostToolUse", tool_name="Read", tool_use_id=f"t{i}",
-                                tool_input={"file_path": "/x/a.py"}, tool_response={}), 101.5 + i)
+            core.on_payload(
+                raw(
+                    "PreToolUse",
+                    tool_name="Read",
+                    tool_use_id=f"t{i}",
+                    tool_input={"file_path": "/x/a.py"},
+                ),
+                101.0 + i,
+            )
+            core.on_payload(
+                raw(
+                    "PostToolUse",
+                    tool_name="Read",
+                    tool_use_id=f"t{i}",
+                    tool_input={"file_path": "/x/a.py"},
+                    tool_response={},
+                ),
+                101.5 + i,
+            )
         other = "99999999-2222-3333-4444-555555555555"
         core.on_payload(raw("SessionStart", sid=other, source="startup"), 200.0)
         sessions = bridge.dlc_sessions("arena")
@@ -91,9 +127,11 @@ class BridgeTest(unittest.TestCase):
 
     def test_dlc_card_rows_are_plain_and_short(self):
         _, bridge = self.make()
-        bridge.dlc_save("last-commit-standing", "card",
-                        [["Лучший счёт", 1200], ["x" * 50, "y" * 50], ["bad"], {"a": 1},
-                         ["4", 4], ["5", 5]])
+        bridge.dlc_save(
+            "last-commit-standing",
+            "card",
+            [["Лучший счёт", 1200], ["x" * 50, "y" * 50], ["bad"], {"a": 1}, ["4", 4], ["5", 5]],
+        )
         found = {d["id"]: d for d in bridge.list_dlc()}
         card = found["last-commit-standing"]["card"]
         self.assertEqual(card[0], ["Лучший счёт", "1200"])
@@ -105,8 +143,11 @@ class BridgeTest(unittest.TestCase):
 
     def test_dlc_card_row_may_open_a_screen(self):
         _, bridge = self.make()
-        bridge.dlc_save("last-commit-standing", "card",
-                        [["Ачивки", "3/9", "achievements"], ["a", 1, "Bad Screen!"], ["b", 2, 7]])
+        bridge.dlc_save(
+            "last-commit-standing",
+            "card",
+            [["Ачивки", "3/9", "achievements"], ["a", 1, "Bad Screen!"], ["b", 2, 7]],
+        )
         card = {d["id"]: d for d in bridge.list_dlc()}["last-commit-standing"]["card"]
         self.assertEqual(card, [["Ачивки", "3/9", "achievements"], ["a", "1"], ["b", "2"]])
 
@@ -131,8 +172,13 @@ class BridgeTest(unittest.TestCase):
         bridge.dlc_save("arena", "save", {"level": 3})
         self.assertEqual(bridge.dlc_load("arena", "save"), {"level": 3})
         self.assertIsNone(bridge.dlc_load("arena", "missing"))
-        for dlc_id, key in (("../x", "save"), ("arena", "../../db"), ("Arena", "s"),
-                            ("arena", "a/b"), ("", "s")):
+        for dlc_id, key in (
+            ("../x", "save"),
+            ("arena", "../../db"),
+            ("Arena", "s"),
+            ("arena", "a/b"),
+            ("", "s"),
+        ):
             with self.assertRaises(ValueError):
                 bridge.dlc_save(dlc_id, key, 1)
 
@@ -153,8 +199,13 @@ class BridgeTest(unittest.TestCase):
     def test_avatar_is_checked_and_stored(self):
         _, bridge = self.make()
         self.assertIsNone(bridge.profile()["avatar"])
-        value = {"source": "upload", "size": 16, "palette": ["#000000"],
-                 "frames": [{"pixels": "0" * 256, "delay": 100}], "file": "/etc/passwd"}
+        value = {
+            "source": "upload",
+            "size": 16,
+            "palette": ["#000000"],
+            "frames": [{"pixels": "0" * 256, "delay": 100}],
+            "file": "/etc/passwd",
+        }
         stored = bridge.set_avatar(value)
         self.assertNotIn("file", stored)
         self.assertEqual(bridge.profile()["avatar"], stored)
@@ -174,8 +225,11 @@ class BridgeTest(unittest.TestCase):
         _, bridge = self.make()
         preview = bridge.install_preview()
         self.assertTrue(preview["ok"] and preview["changes"])
-        with mock.patch.object(app.selfcheck, "check_version",
-                               return_value=(app.selfcheck.Result("v", True, "x"), "2.1.286")):
+        with mock.patch.object(
+            app.selfcheck,
+            "check_version",
+            return_value=(app.selfcheck.Result("v", True, "x"), "2.1.286"),
+        ):
             self.assertTrue(bridge.install_apply()["ok"])
             self.assertTrue(bridge.status()["connected"])
             result = bridge.uninstall_apply()
@@ -189,8 +243,9 @@ class BridgeTest(unittest.TestCase):
         core.on_payload(raw("UserPromptSubmit", prompt="x", prompt_id="p"), 2.0)
         core.on_payload(raw("PermissionRequest", tool_name="Write"), 3.0)
         status = bridge.status()
-        self.assertEqual(status["sessions"], [{"session": SID, "project": "my-app",
-                                               "status": "waiting"}])
+        self.assertEqual(
+            status["sessions"], [{"session": SID, "project": "my-app", "status": "waiting"}]
+        )
         self.assertEqual(status["paused"][0]["reason"], "waiting")
         self.assertEqual(bridge.dlc_live_sessions("arena"), status["sessions"])
 

@@ -11,7 +11,7 @@ on screen. Text drawn on the canvas is not seen by any of these: look at the sna
 An odd size (the default is 1201x801) catches what rounds differently on half pixels.
 Without the developer panel (--no-dev) the DLC buttons are skipped.
 """
-import json
+
 import sys
 
 from smoke import AGENT, DLCS, FILES
@@ -61,11 +61,16 @@ def drive(c, dlc, lang, with_dev):
             c.wait(0.2)
         c.snapshot(name)
         errors = c.errors() or []
-        new = errors[len(seen_errors):]
+        new = errors[len(seen_errors) :]
         seen_errors[:] = errors
         look = c.frame(LOOK) or {}
-        record = {"step": name, "errors": new, "overlaps": c.overlaps(dlc["hud"]),
-                  "clipped": look.get("clipped", []), "unfit": look.get("unfit", [])}
+        record = {
+            "step": name,
+            "errors": new,
+            "overlaps": c.overlaps(dlc["hud"]),
+            "clipped": look.get("clipped", []),
+            "unfit": look.get("unfit", []),
+        }
         if lang == "en":
             record["russian"] = look.get("russian", [])
         out["steps"].append({k: v for k, v in record.items() if v or k == "step"})
@@ -79,8 +84,10 @@ def drive(c, dlc, lang, with_dev):
         step(f"02-codex-{i + 1}", 0.3)
     c.frame("d.getElementById('btn-codex-back').click()")
 
-    c.frame("(() => { const b = [...d.querySelectorAll('.mode')].find((x) => /агент|agent/i.test(x.textContent)); "
-            "if (b) b.click(); return 1; })()")
+    c.frame(
+        "(() => { const b = [...d.querySelectorAll('.mode')].find((x) => /агент|agent/i.test(x.textContent)); "
+        "if (b) b.click(); return 1; })()"
+    )
     c.wait(0.5)
     c.frame("d.getElementById('btn-play').click()")
     c.wait(2)
@@ -88,7 +95,16 @@ def drive(c, dlc, lang, with_dev):
     c.send(AGENT, "prompt")
     for f in FILES:
         c.send(AGENT, "tool", tool="Read", action="scout", ok=True, file=f)
-        c.send(AGENT, "tool", tool="Edit", action="attack", ok=True, file=f, lines_added=20, lines_removed=12)
+        c.send(
+            AGENT,
+            "tool",
+            tool="Edit",
+            action="attack",
+            ok=True,
+            file=f,
+            lines_added=20,
+            lines_removed=12,
+        )
         c.wait(0.2)
     for category in ("other", "build", "test"):
         c.send(AGENT, "tool", tool="Bash", action="cast", category=category, ok=True)
@@ -111,7 +127,9 @@ def drive(c, dlc, lang, with_dev):
     c.send(SECOND, "session_start", joined=False)
     c.send(SECOND, "prompt")
     for f in FILES[:3]:
-        c.send(SECOND, "tool", tool="Edit", action="attack", ok=True, file="lib/" + f, lines_added=5)
+        c.send(
+            SECOND, "tool", tool="Edit", action="attack", ok=True, file="lib/" + f, lines_added=5
+        )
     step("05-subagents-two-agents", 3)
     c.send(AGENT, "subagent_stop", agent="qa-explore")
     c.send(AGENT, "subagent_stop", agent="qa-plan")
@@ -122,7 +140,10 @@ def drive(c, dlc, lang, with_dev):
     step("06-walked")
 
     if with_dev:
-        commands = c.hub("typeof dlcDevCommands === 'undefined' ? [] : dlcDevCommands.map((x) => x.id)") or []
+        commands = (
+            c.hub("typeof dlcDevCommands === 'undefined' ? [] : dlcDevCommands.map((x) => x.id)")
+            or []
+        )
         out["dev_commands"] = commands
         for i, cmd in enumerate(commands):
             c.dev(cmd)
@@ -154,7 +175,12 @@ if __name__ == "__main__":
     if "--size" in args:
         i = args.index("--size")
         size = [int(v) for v in args[i + 1].split("x")]
-        del args[i:i + 2]
+        del args[i : i + 2]
     lang = args[2] if len(args) > 2 and args[2] in ("ru", "en") else "ru"
     which = DLCS[args[0]]
-    run(lambda c: drive(c, which, lang, "--no-dev" not in args), args[1:], width=size[0], height=size[1])
+    run(
+        lambda c: drive(c, which, lang, "--no-dev" not in args),
+        args[1:],
+        width=size[0],
+        height=size[1],
+    )

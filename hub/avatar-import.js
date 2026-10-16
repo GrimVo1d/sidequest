@@ -8,6 +8,12 @@
   const MAX_FILE = 8 * 1024 * 1024;
   const MAX_SIDE = 2048;         // GIF canvas: bigger files are refused, not decoded
   const MAX_GIF_FRAMES = 1000;
+  // Every GIF frame is drawn on the whole canvas, so the work is frames × width × height;
+  // a small file may claim far more than that (a "GIF bomb").
+  const MAX_GIF_PIXELS = 100 * 1000 * 1000;
+  // A still picture is checked by its header before it is decoded: 8 MB of PNG can
+  // claim 20000×20000 pixels, which is 1.6 GB once decoded.
+  const MAX_STILL_SIDE = 16384, MAX_STILL_PIXELS = 64 * 1024 * 1024;
   const WORK_SIDE = 128;         // GIF frames are kept at most this big between steps
   const STILL_SIDE = 512;        // the same for a still picture
   const PICTURE_SIZE = 256, GIF_PICTURE_SIZE = 128;   // see PICTURE_SIZES in avatar.py
@@ -60,6 +66,9 @@
         }
       } else if (block === 0x2c) {
         const left = u16(), top = u16(), w = u16(), h = u16(), p = u8();
+        // A frame bigger than the canvas cannot be shown, and its w × h is what lzw()
+        // allocates; one shifted out of it is clipped, as browsers do.
+        if (w > width || h > height) throw new Error(tr("GIF повреждён", "the GIF is damaged"));
         let table = globalTable;
         if (p & 0x80) {
           const n = 2 << (p & 7);
@@ -71,6 +80,10 @@
         skipBlocks();
         if (++frames > MAX_GIF_FRAMES) throw new Error(tr(`в GIF больше ${MAX_GIF_FRAMES} кадров`,
                                                                   `the GIF has more than ${MAX_GIF_FRAMES} frames`));
+        if (frames * width * height > MAX_GIF_PIXELS) {
+          throw new Error(tr(`GIF слишком длинный для ${width}×${height}: ${frames} кадров и больше`,
+                             `the GIF is too long for ${width}×${height}: ${frames} frames and more`));
+        }
         onImage({left, top, w, h, interlaced: !!(p & 0x40), table, minCode, dataStart}, control);
         control = {delay: 0, disposal: 0, transparent: -1};
       } else if (pos >= bytes.length) {
@@ -298,6 +311,59 @@
     return {source: "upload", size: n, palette: palette.map(hex), frames: out};
   }
 
+  // --- still pictures ----------------------------------------------------------------
+
+  // {width, height} from the header of a PNG, JPEG or WebP, or null for anything else.
+  function stillSize(bytes) {
+    const be16 = (o) => (bytes[o] << 8) | bytes[o + 1];
+    const le16 = (o) => bytes[o] | (bytes[o + 1] << 8);
+    const le24 = (o) => le16(o) | (bytes[o + 2] << 16);
+    const ascii = (o, n) => String.fromCharCode(...bytes.subarray(o, o + n));
+    if (bytes.length >= 24 && ascii(1, 3) === "PNG" && ascii(12, 4) === "IHDR") {
+      return {width: be16(16) * 65536 + be16(18), height: be16(20) * 65536 + be16(22)};
+    }
+    if (bytes.length >= 30 && ascii(0, 4) === "RIFF" && ascii(8, 4) === "WEBP") {
+      const chunk = ascii(12, 4);
+      if (chunk === "VP8 ") return {width: le16(26) & 0x3fff, height: le16(28) & 0x3fff};
+      if (chunk === "VP8L") {
+        const b = bytes.subarray(21, 25);
+        return {width: 1 + (((b[1] & 0x3f) << 8) | b[0]),
+                height: 1 + (((b[3] & 0xf) << 10) | (b[2] << 2) | (b[1] >> 6))};
+      }
+      if (chunk === "VP8X") return {width: 1 + le24(24), height: 1 + le24(27)};
+      return null;
+    }
+    if (bytes[0] === 0xff && bytes[1] === 0xd8) {
+      // JPEG: the size is in the first SOF segment, found by skipping the others.
+      for (let pos = 2; pos + 9 <= bytes.length;) {
+        if (bytes[pos] !== 0xff) return null;
+        const marker = bytes[pos + 1];
+        if (marker === 0xff) { pos++; continue; }  // fill byte
+        if (marker === 0xd8 || marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) { pos += 2; continue; }
+        if (marker === 0xda || marker === 0xd9) return null;  // image data before any SOF
+        if (marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc) {
+          return {width: be16(pos + 7), height: be16(pos + 5)};
+        }
+        pos += 2 + be16(pos + 2);
+      }
+    }
+    return null;
+  }
+
+  function checkStill(bytes) {
+    const size = stillSize(bytes);
+    if (!size) {
+      throw new Error(tr("это не картинка или формат не поддерживается (нужен PNG, JPEG, WebP или GIF)",
+                         "not a picture, or the format is not supported (PNG, JPEG, WebP or GIF)"));
+    }
+    const {width, height} = size;
+    if (!width || !height || width > MAX_STILL_SIDE || height > MAX_STILL_SIDE ||
+        width * height > MAX_STILL_PIXELS) {
+      throw new Error(tr(`картинка слишком большая: ${width}×${height}`,
+                         `the picture is too big: ${width}×${height}`));
+    }
+  }
+
   // --- entry points ------------------------------------------------------------------
 
   // Reads the file once. Returns working frames for convert().
@@ -305,6 +371,7 @@
     if (file.size > MAX_FILE) throw new Error(tr("файл больше 8 МБ", "the file is over 8 MB"));
     const bytes = new Uint8Array(await file.arrayBuffer());
     if (isGif(bytes)) return {animated: true, frames: decodeGif(bytes, 64)};
+    checkStill(bytes);
     let bitmap;
     try {
       bitmap = await createImageBitmap(file);
@@ -359,5 +426,5 @@
     return toAvatar(frames, n, options.colors || 16);
   }
 
-  root.AvatarImport = {load, convert, decodeGif, toAvatar, toPicture, square, MAX_FILE};
+  root.AvatarImport = {load, convert, decodeGif, toAvatar, toPicture, square, checkStill, MAX_FILE};
 })(typeof window !== "undefined" ? window : globalThis);

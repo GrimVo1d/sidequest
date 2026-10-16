@@ -1,9 +1,9 @@
 import json
 import unittest
 
-from sidequest.normalizer import Normalizer, bash_category, git_ops
+from sidequest.normalizer import MAX_FILE, Normalizer, bash_category, git_ops
 
-from .helpers import SID, batch, post, pre, raw
+from .helpers import CWD, SID, batch, post, pre, raw
 
 SECRET = "TOP-SECRET-CONTENT"
 
@@ -79,8 +79,7 @@ class NormalizerTest(unittest.TestCase):
     def start(self):
         events = self.feed(raw("SessionStart", source="startup", model="m"))
         self.feed(raw("InstructionsLoaded", file_path="/x/CLAUDE.md", memory_type="User"))
-        self.feed(raw("UserPromptSubmit", prompt=SECRET, prompt_id="p1",
-                      permission_mode="default"))
+        self.feed(raw("UserPromptSubmit", prompt=SECRET, prompt_id="p1", permission_mode="default"))
         return events
 
     def test_session_start_and_project(self):
@@ -96,19 +95,35 @@ class NormalizerTest(unittest.TestCase):
 
     def test_edit_counts_lines_and_drops_content(self):
         self.start()
-        tool_input = {"file_path": "/Users/someone/code/my-app/src/auth.py",
-                      "old_string": SECRET, "new_string": SECRET, "replace_all": False}
-        response = {"filePath": tool_input["file_path"], "oldString": SECRET,
-                    "newString": SECRET, "originalFile": SECRET,
-                    "structuredPatch": [{"oldStart": 1, "oldLines": 2, "newStart": 1,
-                                         "newLines": 4,
-                                         "lines": [" a", "-" + SECRET, "+b", "+c", "+d"]}]}
+        tool_input = {
+            "file_path": "/Users/someone/code/my-app/src/auth.py",
+            "old_string": SECRET,
+            "new_string": SECRET,
+            "replace_all": False,
+        }
+        response = {
+            "filePath": tool_input["file_path"],
+            "oldString": SECRET,
+            "newString": SECRET,
+            "originalFile": SECRET,
+            "structuredPatch": [
+                {
+                    "oldStart": 1,
+                    "oldLines": 2,
+                    "newStart": 1,
+                    "newLines": 4,
+                    "lines": [" a", "-" + SECRET, "+b", "+c", "+d"],
+                }
+            ],
+        }
         self.assertEqual(self.feed(pre("Edit", "t1", tool_input)), [])
         events = self.feed(post("Edit", "t1", tool_input, response))
         self.assertEqual(len(events), 1)
         e = events[0]
-        self.assertEqual((e["kind"], e["tool"], e["action"], e["file"]),
-                         ("tool", "Edit", "attack", "src/auth.py"))
+        self.assertEqual(
+            (e["kind"], e["tool"], e["action"], e["file"]),
+            ("tool", "Edit", "attack", "src/auth.py"),
+        )
         self.assertEqual((e["lines_added"], e["lines_removed"], e["ok"]), (3, 1, True))
         self.assertNotIn(SECRET, json.dumps(events))
         self.assertEqual(self.feed(batch(("Edit", "t1"))), [])
@@ -116,8 +131,13 @@ class NormalizerTest(unittest.TestCase):
     def test_write_new_file_counts_content_lines(self):
         self.start()
         tool_input = {"file_path": "/elsewhere/notes.txt", "content": "a\nb\nc\n"}
-        response = {"type": "create", "filePath": "/elsewhere/notes.txt",
-                    "content": "a\nb\nc\n", "structuredPatch": [], "originalFile": None}
+        response = {
+            "type": "create",
+            "filePath": "/elsewhere/notes.txt",
+            "content": "a\nb\nc\n",
+            "structuredPatch": [],
+            "originalFile": None,
+        }
         e = self.feed(post("Write", "t1", tool_input, response))[0]
         self.assertEqual((e["lines_added"], e["lines_removed"]), (3, 0))
         self.assertEqual(e["file"], "notes.txt")  # outside the project: name only
@@ -126,12 +146,22 @@ class NormalizerTest(unittest.TestCase):
         self.start()
         tool_input = {"command": "git push --force origin main", "description": SECRET}
         self.feed(pre("Bash", "t1", tool_input))
-        events = self.feed(raw("PostToolUseFailure", tool_name="Bash", tool_use_id="t1",
-                               tool_input=tool_input, is_interrupt=False, duration_ms=5,
-                               error="Exit code 128\nfatal: " + SECRET))
+        events = self.feed(
+            raw(
+                "PostToolUseFailure",
+                tool_name="Bash",
+                tool_use_id="t1",
+                tool_input=tool_input,
+                is_interrupt=False,
+                duration_ms=5,
+                error="Exit code 128\nfatal: " + SECRET,
+            )
+        )
         e = events[0]
-        self.assertEqual((e["kind"], e["category"], e["git"], e["exit_code"], e["ok"]),
-                         ("tool_error", "git", ["push"], 128, False))
+        self.assertEqual(
+            (e["kind"], e["category"], e["git"], e["exit_code"], e["ok"]),
+            ("tool_error", "git", ["push"], 128, False),
+        )
         self.assertNotIn(SECRET, json.dumps(events))
         self.assertNotIn("git push", json.dumps(events))
 
@@ -173,26 +203,44 @@ class NormalizerTest(unittest.TestCase):
     def test_permission_wait_and_resume(self):
         self.start()
         self.feed(pre("Write", "t1", {"file_path": "/x", "content": "y"}))
-        events = self.feed(raw("PermissionRequest", tool_name="Write",
-                               tool_input={}, permission_suggestions=[]))
+        events = self.feed(
+            raw("PermissionRequest", tool_name="Write", tool_input={}, permission_suggestions=[])
+        )
         self.assertEqual(kinds(events), ["waiting"])
         self.assertEqual(events[0]["tool"], "Write")
-        self.assertEqual(self.feed(raw("Notification", notification_type="permission_prompt",
-                                       message="x")), [])
-        events = self.feed(post("Write", "t1", {"file_path": "/x", "content": "y"},
-                                {"structuredPatch": []}))
+        self.assertEqual(
+            self.feed(raw("Notification", notification_type="permission_prompt", message="x")), []
+        )
+        events = self.feed(
+            post("Write", "t1", {"file_path": "/x", "content": "y"}, {"structuredPatch": []})
+        )
         self.assertEqual(kinds(events), ["resumed", "tool"])
 
     def test_subagent_events_do_not_end_main_pause(self):
         self.start()
         self.feed(raw("SubagentStart", agent_id="ag1", agent_type="general-purpose"))
         self.feed(raw("PermissionRequest", tool_name="AskUserQuestion", tool_input={}))
-        events = self.feed(post("Bash", "s1", {"command": "wc -l x"}, {}, agent_id="ag1",
-                                agent_type="general-purpose"))
+        events = self.feed(
+            post(
+                "Bash",
+                "s1",
+                {"command": "wc -l x"},
+                {},
+                agent_id="ag1",
+                agent_type="general-purpose",
+            )
+        )
         self.assertEqual(kinds(events), ["tool"])
         self.assertEqual(events[0]["agent"], "ag1")
-        events = self.feed(raw("SubagentStop", agent_id="ag1", agent_type="general-purpose",
-                               last_assistant_message=SECRET, background_tasks=[]))
+        events = self.feed(
+            raw(
+                "SubagentStop",
+                agent_id="ag1",
+                agent_type="general-purpose",
+                last_assistant_message=SECRET,
+                background_tasks=[],
+            )
+        )
         self.assertEqual(kinds(events), ["subagent_stop"])
         events = self.feed(post("AskUserQuestion", "q1", {}, {}))
         self.assertEqual(kinds(events), ["resumed", "tool"])
@@ -209,26 +257,36 @@ class NormalizerTest(unittest.TestCase):
     def test_task_notification_is_not_a_prompt_and_keeps_pause(self):
         self.start()
         self.feed(raw("PermissionRequest", tool_name="Write", tool_input={}))
-        events = self.feed(raw("UserPromptSubmit", prompt="<task-notification>",
-                               prompt_id="p1"))
+        events = self.feed(raw("UserPromptSubmit", prompt="<task-notification>", prompt_id="p1"))
         self.assertEqual(events, [])
         self.assertIsNotNone(self.n.sessions[SID].waiting)
 
     def test_stop_with_background_tasks_is_not_final(self):
         self.start()
-        e = self.feed(raw("Stop", background_tasks=[{"id": "a", "status": "running"}],
-                          last_assistant_message=SECRET))[0]
+        e = self.feed(
+            raw(
+                "Stop",
+                background_tasks=[{"id": "a", "status": "running"}],
+                last_assistant_message=SECRET,
+            )
+        )[0]
         self.assertEqual((e["kind"], e["background"], e["final"]), ("stop", 1, False))
         e = self.feed(raw("Stop", background_tasks=[]))[0]
         self.assertTrue(e["final"])
 
     def test_compaction(self):
         self.start()
-        self.assertEqual(kinds(self.feed(raw("PreCompact", trigger="manual",
-                                             custom_instructions=None))), ["compact"])
+        self.assertEqual(
+            kinds(self.feed(raw("PreCompact", trigger="manual", custom_instructions=None))),
+            ["compact"],
+        )
         # Hidden compaction agent: SubagentStop without SubagentStart, empty type.
-        self.assertEqual(self.feed(raw("SubagentStop", agent_id="hidden", agent_type="",
-                                       last_assistant_message=SECRET)), [])
+        self.assertEqual(
+            self.feed(
+                raw("SubagentStop", agent_id="hidden", agent_type="", last_assistant_message=SECRET)
+            ),
+            [],
+        )
         self.assertEqual(self.feed(raw("SessionStart", source="compact")), [])
         events = self.feed(raw("PostCompact", trigger="manual", compact_summary=SECRET))
         self.assertEqual(events[0]["phase"], "end")
@@ -260,6 +318,73 @@ class NormalizerTest(unittest.TestCase):
         dumped = json.dumps([list(k) for k in self.n.shapes])
         self.assertNotIn(SECRET, dumped)
         self.assertIn("prompt", dumped)
+
+
+class HostileShapeTest(unittest.TestCase):
+    """Any local process can write to the socket, so every field may have any type."""
+
+    def setUp(self):
+        self.n = Normalizer()
+        self.n.process(raw("SessionStart", source="startup"), 1)
+        self.n.process(raw("UserPromptSubmit", prompt_id="p1"), 2)
+
+    def test_odd_types_never_raise(self):
+        file = {"file_path": CWD + "/a"}
+        shapes = [
+            post("Bash", "t1", {"command": 123}, {}),
+            post("Bash", "t2", {"command": ["git", "push"]}, {}),
+            post("Read", ["x"], file, {}),
+            pre("Read", {"a": 1}, file),
+            post("Edit", "t3", file, {"structuredPatch": "abc"}),
+            post("Edit", "t4", file, {"structuredPatch": [{"lines": [1, 2]}, "hunk"]}),
+            post("Write", "t5", {"file_path": CWD + "/a", "content": ["a"]}, {}),
+            post(["Edit"], "t6", file, {"structuredPatch": []}),
+            raw("PostToolUseFailure", tool_name="Bash", tool_use_id="t7", error=1),
+            raw("SubagentStart", agent_id=["a"], agent_type="x"),
+            raw("SubagentStop", agent_id={"a": 1}, agent_type="x"),
+            raw("PostToolBatch", tool_calls=[{"tool_use_id": ["q"], "tool_name": "Bash"}]),
+            raw("PostToolBatch", tool_calls="calls"),
+            raw("Stop", background_tasks=7),
+            raw(["SessionStart"]),
+        ]
+        for t, payload in enumerate(shapes, start=3):
+            with self.subTest(payload=payload):
+                for event in self.n.process(payload, t):
+                    self.assertIsInstance(event["kind"], str)
+
+    def test_values_of_another_type_are_dropped(self):
+        secret = {"code": SECRET}
+        events = []
+        events += self.n.process(raw("PermissionRequest", tool_name=secret), 3)
+        events += self.n.process(
+            post("Read", "z1", {"file_path": CWD + "/b"}, {}, agent_id=secret), 4
+        )
+        events += self.n.process(raw("PreCompact", trigger=secret), 5)
+        events += self.n.process(raw("SessionEnd", reason=["x"]), 6)
+        self.assertNotIn(SECRET, json.dumps(events))
+
+    def test_odd_numbers_are_dropped(self):
+        for value in (True, {"stdout": SECRET}, float("inf"), float("nan")):
+            with self.subTest(value=value):
+                payload = post("Read", "z2", {"file_path": CWD + "/b"}, {})
+                payload["duration_ms"] = value
+                self.assertIsNone(self.n.process(payload, 3)[0]["duration_ms"])
+
+    def test_long_strings_are_cut(self):
+        long = "x" * 100_000
+        events = self.n.process(raw("SessionEnd", reason=long, sid="s" * 100_000), 3)
+        self.assertLessEqual(len(json.dumps(events)), 2000)
+        events = self.n.process(post("Read", "z3", {"file_path": CWD + "/" + long}, {}), 4)
+        self.assertEqual(len(events[0]["file"]), MAX_FILE)
+
+    def test_first_event_of_odd_shape_still_starts_the_session(self):
+        n = Normalizer()
+        payload = raw("PostToolUseFailure", sid="joined", tool_name="Bash", tool_use_id="a")
+        payload["tool_input"] = {"command": "ls"}
+        payload["error"] = {"msg": "x"}
+        events = n.process(payload, 1)
+        self.assertEqual(kinds(events)[0], "session_start")
+        self.assertIn("joined", n.sessions)
 
 
 if __name__ == "__main__":

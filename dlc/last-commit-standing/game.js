@@ -100,6 +100,7 @@
     const PASSIVES = new Map(B.upgrades.map((u) => [u.id, u]));
     const PISTOL = WEAPONS.get("pistol").base;
     const CELL = 32;
+    const TEXT_PILE = 5;   // floating texts over one spot at once
     const modeName = ["classic", "daily", "ghost"].includes(options && options.mode) ? options.mode : "agent";
     // Classic and the daily task are played alone: crystals, a final boss, death ends it.
     const classic = modeName === "classic" || modeName === "daily";
@@ -175,7 +176,11 @@
 
     // A floating text. One that would land on another still in the air (it rises 14 px a
     // second) goes above it, so a burst of events stays readable.
+    // A floating text over (x, y), above the ones already there; a pile over one spot keeps
+    // at most TEXT_PILE of them, so the oldest goes first.
     function text(x, y, value, color, life) {
+      const pile = s.texts.filter((o) => Math.abs(o.x - x) < 48 && Math.abs(o.y - o.t * 14 - y) < 9 * TEXT_PILE);
+      if (pile.length >= TEXT_PILE) s.texts.splice(s.texts.indexOf(pile.reduce((a, b) => (b.t > a.t ? b : a))), 1);
       for (let moved = true, i = 0; moved && i < 8; i++) {
         moved = false;
         for (const o of s.texts) {
@@ -245,20 +250,34 @@
       }
     }
 
-    // No wall between a point and (x, y) for a circle of radius r: checked every few pixels.
-    function clearPath(o, x, y, r) {
-      const n = Math.ceil(Math.hypot(x - o.x, y - o.y) / 6);
-      for (let i = 1; i <= n; i++) {
-        if (inWall(o.x + (x - o.x) * i / n, o.y + (y - o.y) * i / n, r)) return false;
+    // Where the segment from (x0, y0) by (dx, dy) first enters a wall grown by r (the same
+    // box as inWall), as a share of its length from 0 to 1, or Infinity when it enters none.
+    // Exact: the segment is clipped against each box on both axes (the slab method), so a
+    // line never cuts the corner of a wall the way a check every few pixels did.
+    function wallEntry(x0, y0, dx, dy, r) {
+      let first = Infinity;
+      for (const w of WALLS) {
+        let t0 = 0, t1 = 1;
+        for (const [p, d, lo, hi] of [[x0, dx, w.x - r, w.x + w.w + r], [y0, dy, w.y - r, w.y + w.h + r]]) {
+          if (d === 0) {
+            if (p <= lo || p >= hi) t1 = -1;
+            continue;
+          }
+          const a = (lo - p) / d, b = (hi - p) / d;
+          t0 = Math.max(t0, Math.min(a, b));
+          t1 = Math.min(t1, Math.max(a, b));
+        }
+        if (t0 < t1) first = Math.min(first, t0);
       }
-      return true;
+      return first;
     }
+
+    // No wall between a point and (x, y) for a circle of radius r.
+    const clearPath = (o, x, y, r) => wallEntry(o.x, o.y, x - o.x, y - o.y, r) === Infinity;
 
     // How far a line from (x, y) along (dx, dy) goes before a wall, up to `length`.
     function toWall(x, y, dx, dy, length) {
-      if (!WALLS.length) return length;
-      for (let d = 6; d < length; d += 6) if (inWall(x + dx * d, y + dy * d, 0)) return d - 6;
-      return length;
+      return Math.min(length, wallEntry(x, y, dx * length, dy * length, 0) * length);
     }
 
     const inSight = (from, e) => !WALLS.length || clearPath(from, e.x, e.y, 0);
@@ -957,7 +976,7 @@
       const first = nearestEnemies(p, o.count, o.range, true);
       for (const start of first) {
         if (hit.has(start)) continue;
-        const points = [{x: p.x, y: p.y - 4}];
+        const points = [{x: p.x, y: p.y}];   // from where the sight was checked
         let target = start;
         for (let j = 0; j < o.chain && target; j++) {
           hit.add(target);
@@ -1408,7 +1427,7 @@
 
     function spiritType(agentType) {
       const key = typeof agentType === "string" ? agentType.toLowerCase() : "";
-      return AG.spirits.types[key] || "shooter";
+      return Object.hasOwn(AG.spirits.types, key) ? AG.spirits.types[key] : "shooter";
     }
 
     // Three or more agents at once, the sessions and their subagents: the orchestra.
@@ -1472,7 +1491,7 @@
       switch (e.kind) {
         case "tool":
           a.actions++;
-          agentXp(B.xp.per_action[e.action] || B.xp.per_action.generic);
+          agentXp(B.xp.per_action[Object.hasOwn(B.xp.per_action, e.action) ? e.action : "generic"]);
           if (canAct(a)) ability(a, src, e);
           if (e.tool === "Bash") bashDone(a, src, e);
           if (a.actions % I.ally_every_actions === 0 && s.finaleAt === null && s.endAt === null) {

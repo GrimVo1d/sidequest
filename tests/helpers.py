@@ -1,4 +1,5 @@
 """Test helpers: temp folders inside the project and stage-0 shaped payloads."""
+
 import os
 import shutil
 import tempfile
@@ -35,17 +36,38 @@ def raw(name, sid=SID, **fields):
 
 
 def pre(tool, tool_use_id, tool_input, **extra):
-    return raw("PreToolUse", tool_name=tool, tool_use_id=tool_use_id,
-               tool_input=tool_input, permission_mode="default", prompt_id="p1", **extra)
+    return raw(
+        "PreToolUse",
+        tool_name=tool,
+        tool_use_id=tool_use_id,
+        tool_input=tool_input,
+        permission_mode="default",
+        prompt_id="p1",
+        **extra,
+    )
 
 
 def post(tool, tool_use_id, tool_input, tool_response, **extra):
-    return raw("PostToolUse", tool_name=tool, tool_use_id=tool_use_id,
-               tool_input=tool_input, tool_response=tool_response, duration_ms=12,
-               permission_mode="default", prompt_id="p1", **extra)
+    return raw(
+        "PostToolUse",
+        tool_name=tool,
+        tool_use_id=tool_use_id,
+        tool_input=tool_input,
+        tool_response=tool_response,
+        duration_ms=12,
+        permission_mode="default",
+        prompt_id="p1",
+        **extra,
+    )
 
 
 def batch(*calls, **extra):
-    return raw("PostToolBatch", prompt_id="p1", tool_calls=[
-        {"tool_name": tool, "tool_input": {}, "tool_use_id": tid, "tool_response": "x"}
-        for tool, tid in calls], **extra)
+    return raw(
+        "PostToolBatch",
+        prompt_id="p1",
+        tool_calls=[
+            {"tool_name": tool, "tool_input": {}, "tool_use_id": tid, "tool_response": "x"}
+            for tool, tid in calls
+        ],
+        **extra,
+    )

@@ -4,12 +4,16 @@ HUD elements overlap or leave the window, and the page's JS errors.
 
     .venv/bin/python dev/webkit/smoke.py arena <out> [ru|en] [--no-dev]
 """
+
 import sys
 
 from webkit import run
 
 DLCS = {
-    "arena": {"name": "Last Commit Standing", "hud": ["top", "xp", "allies", "panel", "notice", "tip"]},
+    "arena": {
+        "name": "Last Commit Standing",
+        "hud": ["top", "xp", "allies", "panel", "notice", "tip"],
+    },
 }
 AGENT = "aaaa1111-0000-0000-0000-000000000001"
 FILES = ["src/auth.py", "src/db.py", "tests/test_auth.py", "README.md", "docs/api.md"]
@@ -24,8 +28,10 @@ def drive(c, dlc):
     c.snapshot("2-codex")
     c.frame("d.getElementById('btn-codex-back').click()")
     # The mode with a live agent, where a DLC has a choice of modes.
-    c.frame("(() => { const b = [...d.querySelectorAll('.mode')].find((x) => /агент|agent/i.test(x.textContent)); "
-            "if (b) b.click(); return 1; })()")
+    c.frame(
+        "(() => { const b = [...d.querySelectorAll('.mode')].find((x) => /агент|agent/i.test(x.textContent)); "
+        "if (b) b.click(); return 1; })()"
+    )
     c.frame("d.getElementById('btn-play').click()")
     c.wait(2)
     c.send(AGENT, "session_start", joined=False)

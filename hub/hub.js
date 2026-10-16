@@ -408,7 +408,8 @@ window.addEventListener("message", async (msg) => {
     lastPauseKey = "";
     if (status) renderPause(status.paused);
   } else if (m.kind === "call") {
-    const fn = DLC_METHODS[m.method];
+    // Own keys only: "constructor" or "toString" from a DLC is not a method.
+    const fn = Object.hasOwn(DLC_METHODS, m.method) ? DLC_METHODS[m.method] : null;
     let reply;
     try {
       if (!fn) throw new Error("unknown method " + m.method);
@@ -541,7 +542,7 @@ function passToGame(e) {
   const frame = $("game-frame");
   if (!frame.contentWindow || (document.activeElement && TYPING.has(document.activeElement.tagName))) return;
   frame.focus();
-  frame.contentWindow.dispatchEvent(new frame.contentWindow.KeyboardEvent(e.type, {code: e.code, key: e.key, bubbles: true}));
+  toGame({kind: "key", type: e.type, code: e.code, key: e.key});
   e.preventDefault();
 }
 window.addEventListener("keydown", (e) => {
