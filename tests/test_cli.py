@@ -16,9 +16,7 @@ class SessionsCommandTest(unittest.TestCase):
     def setUp(self):
         db = os.path.join(temp_dir(self), "sidequest.db")
         store = Store(db)
-        store.add_event(
-            {"kind": "session_start", "session": SID, "project": "my-app", "ts": 100.0}
-        )
+        store.add_event({"kind": "session_start", "session": SID, "project": "my-app", "ts": 100.0})
         store.add_event(
             {
                 "kind": "session_start",
