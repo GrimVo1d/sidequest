@@ -406,6 +406,18 @@
      "score": 1.5, "enemy_hp": 1.5}
   ],
 
+  "character": {
+    "unlocks": [
+      {"slot": "top", "id": "armor", "achievement": "boss", "rarity": "rare"},
+      {"slot": "top", "id": "cape", "achievement": "zoo", "rarity": "epic"},
+      {"slot": "hat", "id": "crown", "achievement": "classic_win", "rarity": "epic"},
+      {"slot": "hat", "id": "halo", "achievement": "clean_run", "rarity": "epic"},
+      {"slot": "hat", "id": "wizard", "achievement": "level", "rarity": "rare"},
+      {"slot": "cloth", "id": "gold", "achievement": "kills_total", "rarity": "legendary"},
+      {"slot": "cloth", "id": "neon", "achievement": "hardcore", "rarity": "legendary"}
+    ]
+  },
+
   "upgrades": [
     {"id": "damage",     "name": "Острее",        "text": "+20% урона всего оружия",
      "name_en": "Sharper", "text_en": "+20% damage for every weapon",

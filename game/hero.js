@@ -7,6 +7,7 @@
 //   LCSHero.fromAvatar(profile.avatar)               // the look nearest to the avatar
 //   const f = LCSHero.frame(look, "walk", 2, {recoil}) // {rows, palette, muzzle}
 //   LCSHero.ANIMS.walk                               // {frames, fps}
+//   LCSHero.isOpen(balance.character.unlocks, got, "hat", "crown")   // for the editor
 "use strict";
 
 (function (root) {
@@ -200,6 +201,19 @@
       ".........UU.....",
       "..........U.....",
     ]]]},
+    // A cape behind the back from the shoulders to the knees, fastened with a gold clasp.
+    // In the shade of the top's color with folds, so it does not merge with the body.
+    cape: {sleeve: "top", layers: [["hair_back", 11, [
+      "...ttt..........",
+      "..tttt..........",
+      "..tTtt..........",
+      ".ttTtt..........",
+      ".tTttt..........",
+      ".tTtTt..........",
+      "tTttt...........",
+      "tTtTt...........",
+      "tttt............",
+    ]], ["over", 11, [".......Y........"]]]},
     // Metal with a trim in the top color.
     armor: {sleeve: "metal", layers: [["over", 11, [
       ".....ggggg......",
@@ -254,6 +268,14 @@
       "....YYYYYYY.....",
       "....yRyyyRy.....",
     ]]],
+    halo: [["hat", 0, ["....yYYYYy......"]]],
+    // A short cone with a star and a wide brim.
+    wizard: [["hat", 0, [
+      "........Cc......",
+      "......CCCC......",
+      ".....CCYCCC.....",
+      "..cccccccccccc..",
+    ]]],
   };
 
   // --- the look --------------------------------------------------------------------
@@ -280,7 +302,18 @@
                         bottom: "pants", bottom_color: "gray", shoes: "sneakers",
                         shoes_color: "white", hat: "none"};
 
-  const colorTables = () => root.SidequestAvatar.COLORS;
+  // Clothes take the avatar builder's colors plus rare ones of their own:
+  // [label, base, shade, English label].
+  const EXTRA_CLOTH = {gold: ["золотая", "#d9a93a", "#a87c22", "gold"],
+                       neon: ["неоновая", "#ff4fb0", "#c83088", "neon"]};
+  let tables = null;
+  function colorTables() {
+    if (!tables) {
+      const C = root.SidequestAvatar.COLORS;
+      tables = {skin: C.skin, hair_color: C.hair_color, cloth: Object.assign({}, C.cloth, EXTRA_CLOTH)};
+    }
+    return tables;
+  }
   const choices = (slot) => (slot.parts || colorTables()[slot.colors]);
 
   // Keeps known choices only; everything else falls back to the default look.
@@ -308,6 +341,119 @@
       face: Object.hasOwn(ACC_FACE, parts.acc) ? ACC_FACE[parts.acc] : "none",
       hat: Object.hasOwn(ACC_HAT, parts.acc) ? ACC_HAT[parts.acc] : "none",
     });
+  }
+
+  // --- names, presets and unlocks ----------------------------------------------------
+
+  const SLOT_NAMES = {
+    skin: ["Кожа", "Skin"], hair: ["Причёска", "Hair"], hair_color: ["Цвет волос", "Hair color"],
+    eyes: ["Глаза", "Eyes"], mouth: ["Рот", "Mouth"], face: ["Очки", "Glasses"],
+    top: ["Верх", "Top"], top_color: ["Цвет верха", "Top color"], bottom: ["Низ", "Bottom"],
+    bottom_color: ["Цвет низа", "Bottom color"], shoes: ["Обувь", "Shoes"],
+    shoes_color: ["Цвет обуви", "Shoes color"], hat: ["Шапка", "Hat"],
+  };
+  // Names of the drawn parts; colors take theirs from the avatar builder.
+  const PART_NAMES = {
+    hair: {none: ["нет", "none"], short: ["короткая", "short"], spiky: ["ёжик", "spiky"],
+           long: ["длинная", "long"], bun: ["пучок", "bun"], mohawk: ["ирокез", "mohawk"]},
+    eyes: {dots: ["точки", "dots"], big: ["большие", "big"], sleepy: ["сонные", "sleepy"],
+           happy: ["довольные", "happy"], angry: ["злые", "angry"], wink: ["закрытые", "closed"]},
+    mouth: {smile: ["улыбка", "smile"], flat: ["ровный", "flat"], open: ["открытый", "open"],
+            grin: ["оскал", "grin"], frown: ["грустный", "frown"]},
+    face: {none: ["нет", "none"], glasses: ["очки", "glasses"], shades: ["тёмные", "shades"]},
+    top: {tee: ["футболка", "t-shirt"], shirt: ["рубашка", "shirt"], tank: ["майка", "tank top"],
+          hoodie: ["худи", "hoodie"], jacket: ["пиджак", "jacket"], cape: ["плащ", "cape"],
+          armor: ["доспех", "armor"]},
+    bottom: {pants: ["брюки", "trousers"], shorts: ["шорты", "shorts"], skirt: ["юбка", "skirt"]},
+    shoes: {sneakers: ["кеды", "sneakers"], boots: ["ботинки", "boots"]},
+    hat: {none: ["нет", "none"], cap: ["кепка", "cap"], beanie: ["шапка", "beanie"],
+          headphones: ["наушники", "headphones"], crown: ["корона", "crown"], halo: ["нимб", "halo"],
+          wizard: ["колпак", "wizard hat"]},
+  };
+
+  const slotOf = (key) => SLOTS.find((s) => s.key === key);
+  const choiceIds = (key) => Object.keys(choices(slotOf(key)));
+  const slotName = (key) => SLOT_NAMES[key];
+
+  // [ru, en] of a choice of a slot.
+  function choiceName(key, id) {
+    const slot = slotOf(key);
+    if (slot.parts) return PART_NAMES[key][id];
+    const option = root.SidequestAvatar.OPTIONS.find((o) => o.key === slot.colors);
+    const c = option && option.choices.find((x) => x.id === id);
+    const extra = EXTRA_CLOTH[id];
+    return c ? [c.label, c.label_en] : [extra[0], extra[3]];
+  }
+
+  const isColor = (key) => !slotOf(key).parts;
+
+  // A color choice as CSS, for the editor's swatches.
+  const swatch = (key, id) => colorTables()[slotOf(key).colors][id][1];
+
+  // Ready looks for the editor; they use only parts that are open from the start.
+  const PRESETS = [
+    {id: "developer", name: "Разработчик", name_en: "Developer", look: DEFAULT_LOOK},
+    {id: "reviewer", name: "Ревьюер", name_en: "Reviewer",
+     look: {skin: "fair", hair: "short", hair_color: "gray", eyes: "dots", mouth: "flat",
+            face: "glasses", top: "shirt", top_color: "blue", bottom: "pants",
+            bottom_color: "black", shoes: "sneakers", shoes_color: "white", hat: "none"}},
+    {id: "devops", name: "Девопс", name_en: "DevOps",
+     look: {skin: "tan", hair: "bun", hair_color: "black", eyes: "sleepy", mouth: "flat",
+            face: "none", top: "jacket", top_color: "black", bottom: "pants",
+            bottom_color: "blue", shoes: "boots", shoes_color: "black", hat: "beanie"}},
+    {id: "intern", name: "Стажёр", name_en: "Intern",
+     look: {skin: "light", hair: "spiky", hair_color: "blonde", eyes: "big", mouth: "open",
+            face: "none", top: "tee", top_color: "yellow", bottom: "shorts",
+            bottom_color: "blue", shoes: "sneakers", shoes_color: "red", hat: "cap"}},
+    {id: "lead", name: "Тимлид", name_en: "Team lead",
+     look: {skin: "dark", hair: "short", hair_color: "black", eyes: "dots", mouth: "grin",
+            face: "none", top: "hoodie", top_color: "black", bottom: "pants",
+            bottom_color: "gray", shoes: "sneakers", shoes_color: "white", hat: "headphones"}},
+    {id: "designer", name: "Дизайнер", name_en: "Designer",
+     look: {skin: "brown", hair: "long", hair_color: "pink", eyes: "happy", mouth: "smile",
+            face: "shades", top: "tank", top_color: "white", bottom: "skirt",
+            bottom_color: "purple", shoes: "boots", shoes_color: "black", hat: "none"}},
+    {id: "orc", name: "Орк с бэкенда", name_en: "Backend orc",
+     look: {skin: "orc", hair: "mohawk", hair_color: "black", eyes: "angry", mouth: "frown",
+            face: "none", top: "tank", top_color: "gray", bottom: "pants",
+            bottom_color: "green", shoes: "boots", shoes_color: "black", hat: "none"}},
+  ];
+
+  // Rare choices open with achievements: `unlocks` is balance.character.unlocks, entries
+  // {slot, id, achievement, rarity}, where `slot` is a slot or a color table ("cloth" covers
+  // every clothes color). A choice that is open from the start is not in the list.
+  function unlockOf(unlocks, key, id) {
+    const slot = slotOf(key);
+    return (unlocks || []).find((x) => x.id === id && (x.slot === slot.key || x.slot === slot.colors)) || null;
+  }
+
+  // The achievement that opens a choice, or null when it is open anyway.
+  function lockedBy(unlocks, key, id) {
+    const u = unlockOf(unlocks, key, id);
+    return u ? u.achievement : null;
+  }
+
+  // "common" for a choice open from the start, otherwise "rare", "epic" or "legendary".
+  function rarity(unlocks, key, id) {
+    const u = unlockOf(unlocks, key, id);
+    return u ? u.rarity : "common";
+  }
+
+  // `got`: the earned achievements, {id: when}. `owned`: the look carried over from the
+  // avatar builder; what it wears stays open, so an old crown is not taken away.
+  function isOpen(unlocks, got, key, id, owned) {
+    const a = lockedBy(unlocks, key, id);
+    return !a || Object.hasOwn(got || {}, a) || (!!owned && owned[key] === id);
+  }
+
+  // A look of open choices picked at random; `rnd` returns [0, 1).
+  function random(unlocks, got, rnd, owned) {
+    const out = {};
+    for (const slot of SLOTS) {
+      const ids = choiceIds(slot.key).filter((id) => isOpen(unlocks, got, slot.key, id, owned));
+      out[slot.key] = ids[Math.floor((rnd || Math.random)() * ids.length)];
+    }
+    return out;
   }
 
   // --- frames ----------------------------------------------------------------------
@@ -402,5 +548,6 @@
     return {rows: grid.map((r) => r.join("")), palette, muzzle};
   }
 
-  root.LCSHero = {W, H, BODY_X, SLOTS, DEFAULT_LOOK, ANIMS, clean, fromAvatar, frame};
+  root.LCSHero = {W, H, BODY_X, SLOTS, DEFAULT_LOOK, ANIMS, PRESETS, clean, fromAvatar, frame,
+                  choiceIds, slotName, choiceName, isColor, swatch, lockedBy, rarity, isOpen, random};
 })(typeof window !== "undefined" ? window : globalThis);

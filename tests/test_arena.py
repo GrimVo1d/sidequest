@@ -633,6 +633,23 @@ class ArenaArtTest(unittest.TestCase):
         )
         self.assertIn("headphones", [look["hat"] for look in presets])
 
+    def test_hero_editor_data(self):
+        editor = self.result["heroEditor"]
+        self.assertEqual(editor["badNames"], [])
+        self.assertEqual(editor["badUnlocks"], [])
+        self.assertEqual(editor["lockedPresets"], [])
+        self.assertEqual(editor["badRandom"], [])
+        # Every rare choice turns up in random looks once its achievement is earned.
+        with open(os.path.join(GAME, "balance.json"), encoding="utf-8") as f:
+            unlocks = json.load(f)["character"]["unlocks"]
+        rare = sorted({u["id"] for u in unlocks})
+        self.assertEqual(editor["randomRare"], rare)
+        self.assertEqual(editor["crown"], ["classic_win", "epic", False, True])
+        # A rare clothes color is locked for the top, the bottom and the shoes alike.
+        self.assertEqual(editor["gold"], ["kills_total"] * 3)
+        # What an old avatar already wears stays open: the "Merge king" keeps its crown.
+        self.assertEqual(editor["owned"], [True, True, False])
+
     def test_hero_animates(self):
         facts = self.result["heroFacts"]
         self.assertEqual(facts["walkFrames"], 3)  # two strides and the pass between them

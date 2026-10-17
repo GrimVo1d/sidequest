@@ -42,8 +42,10 @@
 
   function clear(node) { while (node.firstChild) node.removeChild(node.firstChild); }
 
+  const SCREENS = ["menu", "levelup", "esc", "codex", "awards", "results", "character"];
+
   function show(id) {
-    for (const s of ["menu", "levelup", "esc", "results", "codex", "awards"]) $(s).hidden = s !== id;
+    for (const s of SCREENS) $(s).hidden = s !== id;
   }
 
   function clock(seconds) {
@@ -525,8 +527,9 @@
   // e.code, not e.key: WASD works on any keyboard layout.
   addEventListener("keydown", (e) => {
     // A screen is open: the arrows and Enter work its buttons.
-    const screen = ["menu", "levelup", "esc", "codex", "awards", "results"].find((id) => !$(id).hidden);
+    const screen = SCREENS.find((id) => !$(id).hidden);
     if (screen && SidequestKeys.handle(e, $(screen))) return;
+    if (screen === "character" && e.code === "Escape") { LCSCharacter.cancel(); e.preventDefault(); return; }
     if (codexFrom && e.code === "Escape") { closeCodex(); e.preventDefault(); return; }
     if (codexFrom) return;
     if (!game || game.state.over) return;
@@ -707,6 +710,26 @@
     }
   }
 
+  // --- the hero's look -------------------------------------------------------------
+
+  // Over the menu; "Save" keeps the look in the game's saves, the arena takes it at once.
+  async function openCharacter() {
+    const {got} = await progress();
+    const owned = LCSHero.fromAvatar((await Sidequest.profile()).avatar);
+    show("character");
+    LCSCharacter.open({
+      look, owned, balance, got,
+      save: async (next) => {
+        await Sidequest.storage.set("character", next);
+        look = next;
+      },
+      close: () => {
+        show("menu");
+        $("btn-character").focus({preventScroll: true});
+      },
+    });
+  }
+
   // --- handbook and first-time hints ----------------------------------------------
 
   // The handbook and the achievements screen open over the menu or the pause and go back there.
@@ -884,6 +907,7 @@
   $("btn-resume").addEventListener("click", () => { escOpen = false; window.focus(); });
   $("btn-quit").addEventListener("click", () => { escOpen = false; quit(); });
   $("btn-again").addEventListener("click", openMenu);
+  $("btn-character").addEventListener("click", openCharacter);
   $("btn-codex").addEventListener("click", () => openCodex("menu"));
   $("btn-esc-codex").addEventListener("click", () => openCodex("esc"));
   $("btn-codex-back").addEventListener("click", closeCodex);

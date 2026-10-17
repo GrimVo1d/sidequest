@@ -95,6 +95,53 @@ const heroFacts = {
   downMuzzle: heroFrame("down", 0).muzzle,
 };
 
+// The hero editor's data: names in both languages, unlocks that point at real choices and
+// achievements, presets and random looks that use only what is open.
+const unlocks = balance.character.unlocks;
+const achievementIds = new Set(balance.achievements.map((a) => a.id));
+const heroEditor = {badNames: [], badUnlocks: [], lockedPresets: [], badRandom: []};
+for (const slot of LCSHero.SLOTS) {
+  const [ru, en] = LCSHero.slotName(slot.key);
+  if (!ru || !en || /[а-яё]/i.test(en)) heroEditor.badNames.push(slot.key);
+  for (const id of LCSHero.choiceIds(slot.key)) {
+    const [r, e] = LCSHero.choiceName(slot.key, id) || [];
+    if (!r || !e || /[а-яё]/i.test(e)) heroEditor.badNames.push(`${slot.key}=${id}`);
+  }
+}
+for (const u of unlocks) {
+  const slots = LCSHero.SLOTS.filter((s) => s.key === u.slot || s.colors === u.slot);
+  if (!slots.length || !slots.every((s) => LCSHero.choiceIds(s.key).includes(u.id))
+      || !achievementIds.has(u.achievement) || !["rare", "epic", "legendary"].includes(u.rarity)) {
+    heroEditor.badUnlocks.push(u);
+  }
+}
+for (const p of LCSHero.PRESETS) {
+  const look = LCSHero.clean(p.look);
+  if (JSON.stringify(look) !== JSON.stringify(Object.assign({}, LCSHero.DEFAULT_LOOK, p.look))
+      || LCSHero.SLOTS.some((s) => !LCSHero.isOpen(unlocks, {}, s.key, look[s.key]))) {
+    heroEditor.lockedPresets.push(p.id);
+  }
+}
+let seed = 7;
+const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+const allGot = Object.fromEntries([...achievementIds].map((id) => [id, 1]));
+const usedRare = new Set();
+for (let i = 0; i < 300; i++) {
+  const fresh = LCSHero.random(unlocks, {}, rnd), rich = LCSHero.random(unlocks, allGot, rnd);
+  if (JSON.stringify(LCSHero.clean(fresh)) !== JSON.stringify(fresh)) heroEditor.badRandom.push(fresh);
+  for (const s of LCSHero.SLOTS) {
+    if (!LCSHero.isOpen(unlocks, {}, s.key, fresh[s.key])) heroEditor.badRandom.push(fresh);
+    if (LCSHero.rarity(unlocks, s.key, rich[s.key]) !== "common") usedRare.add(rich[s.key]);
+  }
+}
+heroEditor.randomRare = [...usedRare].sort();
+heroEditor.crown = [LCSHero.lockedBy(unlocks, "hat", "crown"), LCSHero.rarity(unlocks, "hat", "crown"),
+                    LCSHero.isOpen(unlocks, {}, "hat", "crown"), LCSHero.isOpen(unlocks, {classic_win: 1}, "hat", "crown")];
+const owned = LCSHero.fromAvatar({parts: {acc: "crown", body: "armor"}});
+heroEditor.owned = [LCSHero.isOpen(unlocks, {}, "hat", "crown", owned), LCSHero.isOpen(unlocks, {}, "top", "armor", owned),
+                    LCSHero.isOpen(unlocks, {}, "hat", "halo", owned)];
+heroEditor.gold = ["top_color", "bottom_color", "shoes_color"].map((k) => LCSHero.lockedBy(unlocks, k, "gold"));
+
 const fontErrors = [];
 for (const [ch, g] of Object.entries(LCSFont.GLYPHS)) {
   const rows = g.split("|");
@@ -242,5 +289,5 @@ const bossBars = {none: bossBarsEnd([]), one: bossBarsEnd([balance.bosses.order[
 // The achievements screen draws each achievement's icon.
 const achievementIcons = balance.achievements.filter((a) => !LCSSprites.SPRITES[a.icon]).map((a) => a.id);
 
-print(JSON.stringify({spriteErrors, heroErrors, heroLooks, heroFacts, sizes, fontErrors, missing, missingInTexts, texts, maps, calls, badCall,
+print(JSON.stringify({spriteErrors, heroErrors, heroLooks, heroFacts, heroEditor, sizes, fontErrors, missing, missingInTexts, texts, maps, calls, badCall,
                       codexErrors, codexIds, hints, achievementIcons, bossBars, drawn: [...drawn]}));
