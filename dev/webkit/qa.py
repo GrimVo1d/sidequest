@@ -7,7 +7,7 @@ a snapshot, new JS errors, HUD elements that overlap or leave the window, clippe
 screens that do not fit the window and do not scroll and, in English, Russian letters left
 on screen. Text drawn on the canvas is not seen by any of these: look at the snapshots.
 
-    .venv/bin/python dev/webkit/qa.py <out> [ru|en] [--size WxH] [--no-dev] [--show]
+    .venv/bin/python dev/webkit/qa.py <out> [ru|en] [--size WxH] [--no-dev] [--hidden]
 
 An odd size (the default is 1201x801) catches what rounds differently on half pixels.
 Without the developer panel (--no-dev) its game buttons are skipped.
