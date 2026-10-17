@@ -67,6 +67,16 @@ class PipelineTest(unittest.TestCase):
         self.assertTrue(self.arrived.wait(5))
         self.assertEqual(len(self.got[0]["blob"]), 5_000_000)
 
+    def test_receiver_survives_json_nested_too_deep(self):
+        self.start_receiver()
+        self.run_hook(b"[" * 200_000 + b"]" * 200_000)
+        self.assertTrue(self.arrived.wait(5))
+        self.assertEqual(self.got, [None])
+        self.arrived.clear()
+        self.run_hook(json.dumps({"hook_event_name": "Stop"}).encode())
+        self.assertTrue(self.arrived.wait(2))
+        self.assertEqual(self.got[-1], {"hook_event_name": "Stop"})
+
     def test_events_keep_order(self):
         self.start_receiver()
         for i in range(20):

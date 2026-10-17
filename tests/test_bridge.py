@@ -150,6 +150,22 @@ class BridgeTest(unittest.TestCase):
             bridge.save("save", 1)
         self.assertEqual(os.listdir(outside), [])
 
+    def test_saves_do_not_follow_links_inside_the_folder(self):
+        _, bridge = self.make()
+        bridge.save("save", 1)
+        outside = os.path.join(temp_dir(self), "secret.json")
+        with open(outside, "w") as f:
+            f.write('"keep"')
+        game = os.path.join(self.dir, "game")
+        os.symlink(outside, os.path.join(game, "linked.json"))
+        with self.assertRaises(OSError):
+            bridge.load("linked")
+        bridge.save("linked", 2)  # replaces the link, never writes through it
+        with open(outside) as f:
+            self.assertEqual(f.read(), '"keep"')
+        self.assertFalse(os.path.islink(os.path.join(game, "linked.json")))
+        self.assertEqual(sorted(os.listdir(game)), ["linked.json", "save.json"])
+
     def test_saves_refuse_nan(self):
         _, bridge = self.make()
         with self.assertRaises(ValueError):

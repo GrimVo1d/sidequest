@@ -1,4 +1,5 @@
 import json
+import time
 import unittest
 
 from sidequest.normalizer import MAX_FILE, Normalizer, bash_category, git_ops
@@ -47,6 +48,13 @@ class BashCategoryTest(unittest.TestCase):
         for command, expected in cases.items():
             with self.subTest(command=command):
                 self.assertEqual(bash_category(command), expected)
+
+    def test_huge_command_is_classified_by_its_start(self):
+        command = "git commit -m x && cat <<'EOF' > big.txt\n" + "a b 'c\n" * 2_000_000
+        start = time.monotonic()
+        self.assertEqual(bash_category(command), "git")
+        self.assertEqual(git_ops(command), ["commit"])
+        self.assertLess(time.monotonic() - start, 1)
 
     def test_git_ops(self):
         cases = {

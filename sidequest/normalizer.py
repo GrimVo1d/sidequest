@@ -144,6 +144,9 @@ _EXIT_CODE = re.compile(r"^Exit code (-?\d+)")
 
 MAX_TEXT = 128  # the longest name, id or reason a game event keeps, in characters
 MAX_FILE = 256  # the longest file path a game event keeps
+# Only the start of a shell command is classified: a heredoc of megabytes would hold the
+# receiver in shlex long enough for other hooks to time out.
+MAX_COMMAND = 64 * 1024
 
 
 def _text(value: object, limit: int = MAX_TEXT) -> str | None:
@@ -198,6 +201,10 @@ def _segment_category(words: list[str]) -> str | None:
     return None
 
 
+def _command_head(command: object) -> str:
+    return command[:MAX_COMMAND] if isinstance(command, str) else ""
+
+
 def bash_category(command: object) -> str:
     """Classify a shell command as test, build, git, search or other.
 
@@ -205,7 +212,7 @@ def bash_category(command: object) -> str:
     a search or neutral glue: `cat data.txt | python3 run.py` runs a script, so "other".
     """
     found: set[str | None] = set()
-    for segment in _SEGMENT_SPLIT.split(command if isinstance(command, str) else ""):
+    for segment in _SEGMENT_SPLIT.split(_command_head(command)):
         words = _words(segment)
         if words:
             found.add(_segment_category(words))
@@ -243,7 +250,7 @@ def git_ops(command: object) -> list[str]:
     Only these words leave the normalizer, never the command.
     """
     found: set[str | None] = set()
-    for segment in _SEGMENT_SPLIT.split(command if isinstance(command, str) else ""):
+    for segment in _SEGMENT_SPLIT.split(_command_head(command)):
         words = _words(segment)
         if words:
             found.add(_git_op(words))

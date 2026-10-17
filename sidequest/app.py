@@ -9,6 +9,7 @@ import contextlib
 import json
 import os
 import sys
+import tempfile
 import threading
 import time
 from collections.abc import Callable
@@ -279,18 +280,25 @@ class Bridge:
 
     def load(self, key: Any) -> Any:
         try:
-            with open(self._save_file(key), encoding="utf-8") as f:
-                return json.load(f)
+            fd = os.open(self._save_file(key), os.O_RDONLY | os.O_NOFOLLOW)
         except FileNotFoundError:
             return None
+        with open(fd, encoding="utf-8") as f:
+            return json.load(f)
 
     def save(self, key: Any, value: Any) -> bool:
         path = self._save_file(key)
         os.makedirs(paths.GAME_DATA_DIR, mode=0o700, exist_ok=True)
-        tmp = path + ".tmp"
-        with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(value, f, ensure_ascii=False, allow_nan=False)
-        os.replace(tmp, path)
+        # A fresh temporary file, never through a link planted in the folder; the rename
+        # replaces a link in place of the save itself rather than following it.
+        fd, tmp = tempfile.mkstemp(dir=paths.GAME_DATA_DIR, prefix=key + ".", suffix=".tmp")
+        try:
+            with open(fd, "w", encoding="utf-8") as f:
+                json.dump(value, f, ensure_ascii=False, allow_nan=False)
+            os.replace(tmp, path)
+        except BaseException:
+            os.unlink(tmp)
+            raise
         return True
 
     def _save_file(self, key: Any) -> str:
@@ -515,6 +523,9 @@ def create_window(bridge: Bridge, title: str, **options: Any) -> "webview.Window
     import webview
 
     _main_frame_only()
+    # No page in the window may read local files with fetch or XHR: a page dropped onto the
+    # window would get no CSP of ours. Our own scripts load by <script>, which this keeps.
+    webview.settings["ALLOW_FILE_URLS"] = False
     window = webview.create_window(title, _file_url(paths.GAME_PAGE), **options)
     # None only when a window is created while the GUI runs and its "initialized"
     # handler cancels it; this one is made before webview.start().

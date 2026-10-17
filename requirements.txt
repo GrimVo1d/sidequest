@@ -1,1 +1,12 @@
+# The game's dependencies with the whole tree pinned: sidequest/app.py patches pywebview's
+# internals, so an untested version of it or of PyObjC must not slip in.
 pywebview==6.2.1
+bottle==0.13.4
+proxy_tools==0.1.0
+pyobjc-core==12.2.2
+pyobjc-framework-Cocoa==12.2.2
+pyobjc-framework-Quartz==12.2.2
+pyobjc-framework-Security==12.2.2
+pyobjc-framework-UniformTypeIdentifiers==12.2.2
+pyobjc-framework-WebKit==12.2.2
+typing_extensions==4.16.0

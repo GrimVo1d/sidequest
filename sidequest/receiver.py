@@ -73,22 +73,25 @@ class Receiver:
                 continue
             except OSError:
                 break
-            ts = time.time()
-            with conn:
-                raw = _read_all(conn)
-            if not raw:  # oversized, timed out, or an empty probe connection
-                continue
-            payload: object
             try:
-                payload = json.loads(raw, parse_constant=reject_constant)
-            except ValueError:
-                payload = None
-            try:
-                self.on_payload(payload, ts)
+                self._handle(conn)
             except Exception:  # a bad event must never stop the receiver
                 import traceback
 
                 traceback.print_exc()
+
+    def _handle(self, conn: socket.socket) -> None:
+        ts = time.time()
+        with conn:
+            raw = _read_all(conn)
+        if not raw:  # oversized, timed out, or an empty probe connection
+            return
+        payload: object
+        try:
+            payload = json.loads(raw, parse_constant=reject_constant)
+        except (ValueError, RecursionError):  # not JSON, or nested too deep to parse
+            payload = None
+        self.on_payload(payload, ts)
 
 
 def reject_constant(name: str) -> None:

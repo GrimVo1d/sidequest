@@ -448,6 +448,9 @@ function bindDev() {
 
 // Arrows and Enter on the shell's overlays and its screen. Caught before the arena's own
 // keys: while one of them is up, the game under it does not move.
+// A file dropped onto the window would open in place of the game: the drop does nothing.
+for (const type of ["dragover", "drop"]) window.addEventListener(type, (e) => e.preventDefault());
+
 window.addEventListener("keydown", (e) => {
   const overlay = [$("modal"), $("agent-pause"), $("agent")].find((x) => !x.hidden);
   if (!overlay) return;
