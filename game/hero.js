@@ -157,13 +157,13 @@
     ]]],
   };
 
-  // One eye: the face is in profile.
+  // One eye: the face is in profile. The white behind the pupil keeps it visible on dark skin.
   const EYES = {
-    dots: [["face", 5, ["..........E.....", "..........E....."]]],
-    big: [["face", 5, [".........WE.....", ".........WE....."]]],
-    sleepy: [["face", 5, [".........ss.....", "..........E....."]]],
+    dots: [["face", 5, [".........WE.....", "..........E....."]]],
+    big: [["face", 4, ["..........E.....", ".........WE.....", ".........WE....."]]],
+    sleepy: [["face", 5, [".........ss.....", ".........WE....."]]],
     happy: [["face", 5, ["..........E.....", ".........E.E...."]]],
-    angry: [["face", 4, [".........E......", "..........E.....", "..........E....."]]],
+    angry: [["face", 4, [".........E......", "..........E.....", ".........WE....."]]],
     wink: [["face", 6, [".........EE....."]]],
   };
   // Eyes of the hurt and the downed hero, whatever the look.
@@ -231,12 +231,13 @@
       "....CCCCCCC.....",
       "...CCCCCCCCcccc.",
     ]]],
+    // A knitted dome with a pompom and a folded ribbed band.
     beanie: [["hat", 0, [
-      ".......W........",
-      ".....CCCCC......",
-      "....CCCCCCC.....",
-      "...CCCCCCCCC....",
-      "...cCcCcCcCc....",
+      "......WWW.......",
+      ".....CCWCCc.....",
+      "....CCCCCCCc....",
+      "...cCCCCCCCCc...",
+      "...cCcCcCcCcC...",
     ]]],
     // The band over the top down to the cup on the ear.
     headphones: [["hat", 1, [
