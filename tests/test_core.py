@@ -3,7 +3,7 @@ import threading
 import time
 import unittest
 
-from sidequest import replay, selfcheck
+from sidequest import i18n, replay, selfcheck
 from sidequest.core import Core
 from sidequest.db import Store
 
@@ -174,6 +174,9 @@ class CoreTest(unittest.TestCase):
         self.assertEqual(self.core.store.verified_version(), "9.9.9")
 
     def test_control_session_reports_missing_fields(self):
+        # The report is in the user's language; this checks the Russian texts.
+        self.addCleanup(i18n.set_language, i18n.language())
+        i18n.set_language("ru")
         self.core.start_control_session("9.9.9")
         self.working_session()
         p = pre("Bash", "t1", {"command": "ls"})
