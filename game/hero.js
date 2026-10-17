@@ -5,7 +5,7 @@
 // No DOM: frames are checked in jsc. Colors come from the avatar builder (avatar.js).
 //   const look = LCSHero.clean(saved)               // a valid look from anything
 //   LCSHero.fromAvatar(profile.avatar)               // the look nearest to the avatar
-//   const f = LCSHero.frame(look, "walk", 2, false)  // {rows, palette, muzzle}
+//   const f = LCSHero.frame(look, "walk", 2, {recoil}) // {rows, palette, muzzle}
 //   LCSHero.ANIMS.walk                               // {frames, fps}
 "use strict";
 
@@ -18,40 +18,39 @@
   // jacket, A/a upper sleeve, B/b forearm, P/p hips and thighs, L/l shins, F/f shoes,
   // H/h hair, C/c hat cloth. The lower case is the far side or the shade.
 
+  // A profile: the back of the head on the left, the ear, the nose, the chin, the neck.
   const HEAD = [
-    ".....SSSSSS.....",
-    "....SSSSSSSS....",
-    "....SSSSSSSS....",
-    "....SSSSSSSS....",
+    ".....SSSSS......",
+    "....SSSSSSS.....",
+    "...SSSSSSSSS....",
+    "...SSSSSSSSS....",
+    "...sSSsSSSSSS...",
+    "...sSSsSSSSS....",
     "....sSSSSSSS....",
-    "....sSSSSSSS....",
-    ".....sSSSSSS....",
-    "......ssSSs.....",
-    ".......sSs......",
+    ".....ssSSSS.....",
+    "......sSS.......",
   ];
   const HEAD_TOP = 2;
 
   const TORSO = [
-    "......TTTT......",
-    ".....TTTTTT.....",
-    ".....TTTTTT.....",
-    ".....TTTTTT.....",
-    ".....tTTTTt.....",
-    ".....tttttt.....",
+    ".....TTTTT......",
+    "....TTTTTTT.....",
+    "....TTTTTTT.....",
+    "....TTTTTTT.....",
+    "....tTTTTTt.....",
+    "....ttttttt.....",
   ];
   const TORSO_TOP = 11;
 
-  const BACK_ARM = ["....a...........", "....a...........", "....b...........", "....s..........."];
   const ARM_TOP = 12;
-  // The front hand holds the gun forward; the gun is the last layer.
-  const FRONT_ARM = [".........AA.....", "..........ABBS.."];
-  const HANGING_ARM = [".........A......", ".........B......", ".........S......"];
-  const GUN = [
-    "..............GGGGGg",
-    ".............SKK....",
-    "..............K.....",
-  ];
-  const MUZZLE = {x: W, y: ARM_TOP};   // the pixel right after the barrel
+  // Aiming, the front hand holds the gun forward; at rest the gun hangs at the hip. The gun
+  // is the last layer.
+  const AIM_ARM = ["........AA......", ".........ABBS..."];
+  const AIM_GUN = [".............GGGGg..", "............SKK.....", ".............K......"];
+  const REST_ARM = ["........A.......", "........A.......", "........B.......", "........S......."];
+  const REST_GUN = ["", "", "", ".........KGGGg..", ".........K......"];
+  const HANGING_ARM = ["........A.......", "........B.......", "........S......."];
+  const MUZZLE = {x: 18, y: ARM_TOP};   // the pixel right after the raised barrel
 
   // Legs end on the last row; the upper body sits on them `bob` rows lower.
   const HIPS_TOP = 17;   // where the hips are on standing legs
@@ -106,95 +105,109 @@
   const HAIR = {
     none: [],
     short: [["hair", 1, [
-      ".....HHHHHH.....",
+      ".....HHHHH......",
       "....HHHHHHHH....",
-      "....HHHHHHHH....",
-      "....HhH.........",
+      "...HHHHHHHHHH...",
+      "...HHHHHh..H....",
+      "...HHh..........",
+      "...Hh...........",
+      "...h............",
     ]]],
     spiky: [["hair", 0, [
-      ".....H.H.H......",
-      "....HHHHHHH.....",
+      "....H..H..H.....",
+      "....HH.HH.HH....",
       "...HHHHHHHHH....",
-      "....HHHHHHHH....",
-      "....Hh.H........",
+      "...HHHHHHHHHHH..",
+      "...HHHHHh..H....",
+      "...HHh..........",
+      "...Hh...........",
     ]]],
-    long: [["hair_back", 2, [
-      "...HH...........",
-      "...HH...........",
-      "...HH...........",
-      "...hH...........",
-      "...hH...........",
-      "...hh...........",
-      "....h...........",
+    // Hair to the shoulders, falling behind the neck.
+    long: [["hair_back", 9, [
+      "..HHH...........",
+      "..hHH...........",
+      "..hHh...........",
+      "...h............",
     ]], ["hair", 1, [
-      ".....HHHHHH.....",
-      "....HHHHHHHH....",
-      "...HHHHHHHHH....",
-      "...HHhH.........",
-    ]]],
-    bun: [["hair", 0, [
-      "...hh...........",
-      "..hHHHHHHH......",
-      "...HHHHHHHH.....",
-      "....HHHHHHHH....",
-      "....HhH.........",
-    ]]],
-    mohawk: [["hair", 0, [
-      "......HHHH......",
       ".....HHHHH......",
-      "......hHh.......",
+      "....HHHHHHHH....",
+      "...HHHHHHHHHH...",
+      "..HHHHHHh..H....",
+      "..HHHh..........",
+      "..HHHh..........",
+      "..HHh...........",
+      "..HHh...........",
+    ]]],
+    // Pulled back into a knot on the back of the head: the forehead stays open.
+    bun: [["hair", 0, [
+      ".hHh............",
+      ".HHHhHHHH.......",
+      ".hHhHHHHHHH.....",
+      "...HHHHHHHHH....",
+      "...HHHHHHh......",
+      "...HHh..........",
+    ]]],
+    // A crest along the top; the sides are shaved.
+    mohawk: [["hair", 0, [
+      "....HHHH........",
+      ".....HHHHHH.....",
+      "....hhHHHHHh....",
+      "...h.h..........",
+      "...h............",
     ]]],
   };
 
+  // One eye: the face is in profile.
   const EYES = {
-    dots: [["face", 6, ["........E.E....."]]],
-    big: [["face", 5, ["........WEWE....", "........EEEE...."]]],
-    sleepy: [["face", 6, ["........EE.E...."]]],
-    happy: [["face", 5, ["........E.E.....", ".......E.E.E...."]]],
-    angry: [["face", 5, [".......EE.EE....", "........E.E....."]]],
-    wink: [["face", 5, ["..........E.....", "........EE.E...."]]],
+    dots: [["face", 5, ["..........E.....", "..........E....."]]],
+    big: [["face", 5, [".........WE.....", ".........WE....."]]],
+    sleepy: [["face", 5, [".........ss.....", "..........E....."]]],
+    happy: [["face", 5, ["..........E.....", ".........E.E...."]]],
+    angry: [["face", 4, [".........E......", "..........E.....", "..........E....."]]],
+    wink: [["face", 6, [".........EE....."]]],
   };
   // Eyes of the hurt and the downed hero, whatever the look.
-  const EYES_HURT = [["face", 5, ["........E..E....", ".........EE....."]]];
-  const EYES_DOWN = [["face", 5, [".......E.E......", "........E.......", ".......E.E......"]]];
+  const EYES_HURT = [["face", 4, [".........E......", "..........E.....", ".........E......"]]];
+  const EYES_DOWN = [["face", 5, [".........E.E....", "..........E.....", ".........E.E...."]]];
 
   const MOUTH = {
     smile: [["face", 8, [".........MM....."]]],
-    flat: [["face", 8, [".........EE....."]]],
-    open: [["face", 8, ["..........M.....", "..........M....."]]],
+    flat: [["face", 8, ["..........E....."]]],
+    open: [["face", 8, [".........EE.....", "..........M....."]]],
     grin: [["face", 8, [".........WW....."]]],
-    frown: [["face", 8, ["..........M....."]]],
+    frown: [["face", 8, ["..........M.....", ".........M......"]]],
   };
 
+  // One lens in front of the eye and the temple back to the ear.
   const FACE = {
     none: [],
-    glasses: [["face", 5, [".......KKKKK....", ".......KW.KW...."]]],
-    shades: [["face", 5, [".......KKKKKK...", "........KK.K...."]]],
+    glasses: [["face", 4, [".........KKK....", "......KKK.K.....", ".........K.K...."]]],
+    shades: [["face", 5, ["......KKKKWK....", ".........KKK...."]]],
   };
 
   // `sleeve`: what the forearms are (top color, or bare skin); `bare`: bare arms.
   const TOPS = {
     tee: {sleeve: "skin"},
-    shirt: {sleeve: "top"},
-    tank: {sleeve: "skin", bare: true},
-    hoodie: {sleeve: "top", layers: [["hair_back", 9, [
-      "....tt..........",
-      "...ttt..........",
-    ]]]},
+    shirt: {sleeve: "top", layers: [["over", 11, ["......WWW......."]]]},
+    tank: {sleeve: "skin", bare: true, layers: [["over", 11, ["......SSS......."]]]},
+    // The hood lies on the shoulders behind the neck; a pocket on the belly.
+    hoodie: {sleeve: "top", layers: [["over", 10, ["....ttt.........", "....tTt........."]],
+                                     ["over", 14, [".......ttt......"]]]},
+    // Open at the front over a white shirt.
     jacket: {sleeve: "top", layers: [["over", 11, [
-      ".......UU.......",
       "........UU......",
-      "........UU......",
-      "........U.......",
+      ".........UU.....",
+      ".........UU.....",
+      "..........U.....",
     ]]]},
     // Metal with a trim in the top color.
     armor: {sleeve: "metal", layers: [["over", 11, [
-      "......gggg......",
-      ".....gGGGGg.....",
-      ".....GGgGGG.....",
-      ".....GGGGGG.....",
-      ".....tTTTTt.....",
-      ".....GGGGGG.....",
+      ".....ggggg......",
+      "....gGGGGGg.....",
+      "....GGGgGGG.....",
+      "....GGGGGGG.....",
+      "....tTTTTTt.....",
+      "....GGGGGGG.....",
     ]]]},
   };
 
@@ -213,28 +226,32 @@
 
   const HATS = {
     none: [],
-    cap: [["hat", 0, [
-      ".....CCCCCC.....",
-      "....CCCCCCCC....",
-      "....ccccccccCCC.",
+    cap: [["hat", 1, [
+      ".....CCCCC......",
+      "....CCCCCCC.....",
+      "...CCCCCCCCcccc.",
     ]]],
     beanie: [["hat", 0, [
-      "......CWC.......",
-      ".....CCCCCC.....",
-      "....CCCCCCCC....",
-      "....cCcCcCcC....",
+      ".......W........",
+      ".....CCCCC......",
+      "....CCCCCCC.....",
+      "...CCCCCCCCC....",
+      "...cCcCcCcCc....",
     ]]],
+    // The band over the top down to the cup on the ear.
     headphones: [["hat", 1, [
-      ".....KKKKKK.....",
-      "....K......K....",
-      "....K...........",
-      "...KRK..........",
-      "...KRK..........",
+      ".....KKK........",
+      "......K.........",
+      "......K.........",
+      ".....KKK........",
+      ".....KRK........",
+      ".....KRK........",
+      "......K.........",
     ]]],
     crown: [["hat", 0, [
-      ".....Y.YY.Y.....",
-      ".....YYYYYY.....",
-      ".....YyRyRY.....",
+      "....Y..Y..Y.....",
+      "....YYYYYYY.....",
+      "....yRyyyRy.....",
     ]]],
   };
 
@@ -298,7 +315,7 @@
                  G: "#8a8aa0", g: "#c8c8d4", Y: "#e8c14a", y: "#b8902a", U: "#f4f2fa"};
 
   // Draw order, back to front.
-  const STACK = ["hair_back", "back_arm", "legs", "torso", "over", "hips", "head", "face", "hair",
+  const STACK = ["hair_back", "legs", "torso", "over", "hips", "head", "face", "hair",
                  "hat", "front_arm", "weapon"];
   const HEAD_SLOTS = new Set(["head", "face", "hair", "hat", "hair_back"]);
 
@@ -326,8 +343,10 @@
   }
 
   // {rows, palette, muzzle}: rows of W letters, "." transparent; `muzzle` is where shots
-  // leave the barrel, or null without a gun. `recoil` pulls the arm and the gun back.
-  function frame(look, anim, n, recoil) {
+  // leave the barrel, or null when the gun is not raised. options: recoil (pulls the arm and
+  // the gun back), rest (the gun lowered: nothing to shoot at for a while).
+  function frame(look, anim, n, options) {
+    const o = options || {};
     const a = ANIMS[anim] || ANIMS.idle;
     const pose = a.poses[Math.abs(n | 0) % a.poses.length];
     const L = clean(look);
@@ -346,21 +365,21 @@
     if (shoes.tall) {
       layers.legs.push([H - 2, [legs[legs.length - 2].replace(/[Ll]/g, (c) => (c === "L" ? "F" : "f"))]]);
     }
-    layers.back_arm.push([ARM_TOP, BACK_ARM]);
     layers.torso.push([TORSO_TOP, TORSO]);
     layers.head.push([HEAD_TOP, HEAD]);
+    const raised = !pose.unarmed && (o.recoil || !o.rest);
     if (pose.unarmed) {
       layers.front_arm.push([ARM_TOP, HANGING_ARM]);
     } else {
-      layers.front_arm.push([ARM_TOP, FRONT_ARM]);
-      layers.weapon.push([ARM_TOP, GUN]);
+      layers.front_arm.push([ARM_TOP, raised ? AIM_ARM : REST_ARM]);
+      layers.weapon.push([ARM_TOP, raised ? AIM_GUN : REST_GUN]);
     }
     const parts = [].concat(HAIR[L.hair], pose.eyes || EYES[L.eyes], MOUTH[L.mouth], FACE[L.face],
                             top.layers || [], bottom.layers || [], HATS[L.hat]);
     for (const [slot, y, rows] of parts) layers[slot].push([y, rows]);
 
     const grid = Array.from({length: H}, () => Array(W).fill("."));
-    const back = recoil ? -1 : 0;
+    const back = o.recoil ? -1 : 0;
     for (const slot of STACK) {
       for (const [y, rows] of layers[slot]) {
         // The legs stay put; the hips follow the legs, the rest sinks by `bob`.
@@ -378,7 +397,7 @@
     const [F, f] = pair("cloth", L.shoes_color);
     const palette = Object.assign({}, FIXED, {S, s, H: Hc, h, T, t, A: T, a: t, B: T, b: t,
                                               C: T, c: t, P, p, L: P, l: p, F, f});
-    const muzzle = pose.unarmed ? null : {x: MUZZLE.x + back, y: MUZZLE.y + pose.bob};
+    const muzzle = raised ? {x: MUZZLE.x + back, y: MUZZLE.y + pose.bob} : null;
     return {rows: grid.map((r) => r.join("")), palette, muzzle};
   }
 

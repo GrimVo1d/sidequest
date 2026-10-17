@@ -639,6 +639,10 @@ class ArenaArtTest(unittest.TestCase):
         self.assertTrue(facts["recoilMoves"])
         self.assertEqual(facts["muzzleRecoil"]["x"], facts["muzzle"]["x"] - 1)
         self.assertIsNone(facts["downMuzzle"])
+        # At rest the gun is lowered and shoots nothing; a shot raises it again.
+        self.assertTrue(facts["restMoves"])
+        self.assertIsNone(facts["restMuzzle"])
+        self.assertEqual(facts["recoilAtRest"], facts["muzzleRecoil"])
 
     def test_centered_sprites_do_not_jitter(self):
         # px(x - w / 2) rounds the edge, so a sprite and what hangs over it step apart by a

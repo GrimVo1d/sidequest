@@ -56,13 +56,13 @@ for (const [name, def] of Object.entries(LCSSprites.SPRITES)) {
   sizes[name] = [def.frames[0][0].length, def.frames[0].length];
 }
 
-// The hero: every choice of every slot in every frame, with and without recoil.
+// The hero: every choice of every slot in every frame, aimed, recoiling and at rest.
 const heroErrors = [];
 function checkHero(look, what) {
   for (const [anim, a] of Object.entries(LCSHero.ANIMS)) {
     for (let n = 0; n < a.frames; n++) {
-      for (const recoil of [false, true]) {
-        const f = LCSHero.frame(look, anim, n, recoil);
+      for (const gun of [{}, {recoil: true}, {rest: true}]) {
+        const f = LCSHero.frame(look, anim, n, gun);
         if (f.rows.length !== LCSHero.H) heroErrors.push(`${what} ${anim} ${n}: ${f.rows.length} rows`);
         f.rows.forEach((row, i) => {
           if (row.length !== LCSHero.W) heroErrors.push(`${what} ${anim} ${n} row ${i}: width ${row.length}`);
@@ -83,12 +83,15 @@ const heroLooks = {
   picture: LCSHero.fromAvatar({frames: [], parts: null}),
 };
 // What changes between frames: the walk moves the legs, recoil moves the gun and the
-// muzzle, the downed hero has no gun.
-const heroFrame = (anim, n, recoil) => LCSHero.frame(LCSHero.clean(null), anim, n, recoil);
+// muzzle, a lowered or a downed hero's gun does not shoot.
+const heroFrame = (anim, n, gun) => LCSHero.frame(LCSHero.clean(null), anim, n, gun);
 const heroFacts = {
   walkFrames: new Set([0, 1, 2, 3].map((n) => heroFrame("walk", n).rows.join("|"))).size,
-  recoilMoves: heroFrame("idle", 0, true).rows.join("|") !== heroFrame("idle", 0).rows.join("|"),
-  muzzle: heroFrame("idle", 0).muzzle, muzzleRecoil: heroFrame("idle", 0, true).muzzle,
+  recoilMoves: heroFrame("idle", 0, {recoil: true}).rows.join("|") !== heroFrame("idle", 0).rows.join("|"),
+  restMoves: heroFrame("idle", 0, {rest: true}).rows.join("|") !== heroFrame("idle", 0).rows.join("|"),
+  muzzle: heroFrame("idle", 0).muzzle, muzzleRecoil: heroFrame("idle", 0, {recoil: true}).muzzle,
+  restMuzzle: heroFrame("idle", 0, {rest: true}).muzzle,
+  recoilAtRest: heroFrame("idle", 0, {recoil: true, rest: true}).muzzle,
   downMuzzle: heroFrame("down", 0).muzzle,
 };
 

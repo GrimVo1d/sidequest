@@ -32,6 +32,7 @@
   const AMMO_MARKS = 10;   // the most rounds shown as marks under the player
   const HERO_FEET = 7;     // px from the player's middle down to the soles
   const HURT_POSE = 0.1;   // the hit flash left (s) while the hero still flinches
+  const GUN_REST = 0.8;    // s without a shot before the hero lowers the gun
   const BOSS_NAME = ["Конфликт слияния", "Merge conflict"];
   const FINAL_NAME = ["Финальный конфликт", "Final conflict"];
 
@@ -141,6 +142,12 @@
     fit();
 
     const px = (v) => Math.round(v);
+    // drawImage at an alpha, then back to opaque.
+    function faded(alpha, ...image) {
+      ctx.globalAlpha = alpha;
+      ctx.drawImage(...image);
+      ctx.globalAlpha = 1;
+    }
     const newCanvas = (w, h) => {
       const c = document.createElement("canvas");
       c.width = w;
@@ -213,9 +220,7 @@
     }
     function label(x, y, value, color, alpha) {
       const c = textCanvas(value, color);
-      ctx.globalAlpha = alpha === undefined ? 1 : Math.max(0, alpha);
-      ctx.drawImage(c, px(x) - (c.width >> 1), px(y) - (c.height >> 1));
-      ctx.globalAlpha = 1;
+      faded(alpha === undefined ? 1 : Math.max(0, alpha), c, px(x) - (c.width >> 1), px(y) - (c.height >> 1));
     }
 
     // A ring of single pixels: crisper than a stroked arc.
@@ -644,9 +649,7 @@
       const c = sprite("ally", {frame, face, tint: a.stun > 0 ? "#6a6a80" : a.color});
       const alpha = a.state === "leaving" ? Math.max(0, a.leave / 1.5) : 1;
       const x = px(a.x) - (c.width >> 1), y = px(a.y - 2 + bob) - (c.height >> 1);
-      ctx.globalAlpha = alpha;
-      ctx.drawImage(c, x, y);
-      ctx.globalAlpha = 1;
+      faded(alpha, c, x, y);
       if (a.stun > 0) {
         // Stars circling the head.
         for (let i = 0; i < 2; i++) {
@@ -677,19 +680,18 @@
       for (const sp of a.spirits.values()) {
         const name = SPIRIT_SPRITES[sp.type] || "spirit";
         const g = sprite(name, {frame: Math.floor(s.time * 6) & 1, tint: a.color});
-        ctx.globalAlpha = 0.85 * alpha;
-        ctx.drawImage(g, px(sp.x) - (g.width >> 1), px(sp.y + Math.sin(s.time * 5 + sp.angle) * 1.5) - (g.height >> 1));
-        ctx.globalAlpha = 1;
+        const sy = px(sp.y + Math.sin(s.time * 5 + sp.angle) * 1.5) - (g.height >> 1);
+        faded(0.85 * alpha, g, px(sp.x) - (g.width >> 1), sy);
       }
     }
 
-    // The hero (hero.js), cached per look, pose, recoil, flip and hit flash.
+    // The hero (hero.js), cached per look, pose, gun, flip and hit flash.
     const heroes = new Map();
-    function heroSprite(look, anim, n, recoil, flip, fill) {
-      const key = `${Object.values(look).join(",")}|${anim}|${n}|${recoil ? 1 : 0}|${flip ? 1 : 0}|${fill || ""}`;
+    function heroSprite(look, anim, n, gun, flip, fill) {
+      const key = [Object.values(look), anim, n, !!gun.recoil, !!gun.rest, flip, fill].join("|");
       let h = heroes.get(key);
       if (h) return h;
-      const f = HERO.frame(look, anim, n, recoil);
+      const f = HERO.frame(look, anim, n, gun);
       const img = SP.decodeRows(f.rows, f.palette, {fill});
       // Where the body's middle and the muzzle are on the canvas (the outline adds 1).
       const bodyX = flip ? img.width - 2 - HERO.BODY_X : HERO.BODY_X + 1;
@@ -707,34 +709,31 @@
       return [anim, Math.floor(s.time * a.fps) % a.frames];
     }
 
-    function drawPlayer(p, s, look) {
+    // Twice a frame: in its place among the actors, then (`over`) a faint copy of the figure
+    // with its rings and bars on top, so the crowd in front never hides the hero.
+    function drawPlayer(p, s, look, over) {
       const [anim, n] = heroPose(p, s);
-      const flip = Math.cos(p.aim) < 0, recoil = !p.dead && s.time - p.firedAt < 0.06;
-      const h = heroSprite(look, anim, n, recoil, flip);
+      const flip = Math.cos(p.aim) < 0, shot = s.time - p.firedAt;
+      const gun = {recoil: !p.dead && shot < 0.06, rest: shot > GUN_REST};
+      const h = heroSprite(look, anim, n, gun, flip);
       const x = px(p.x) - h.bodyX, y = px(p.y) + HERO_FEET - (h.canvas.height - 2);
       if (p.dead > 0) {
-        ctx.globalAlpha = 0.35;
-        ctx.drawImage(h.canvas, x, y - Math.round((3 - p.dead) * 3));
-        ctx.globalAlpha = 1;
+        faded(0.35, h.canvas, x, y - Math.round((3 - p.dead) * 3));
         // Alone (classic) there is no coming back, so no countdown.
         if (!s.solo) label(p.x, y - 6, String(Math.ceil(p.dead)), "#e8e6f0");
         return;
       }
       const blink = p.invulnerable > 0 && Math.floor(s.time * 12) % 2 === 0;
-      ctx.globalAlpha = blink ? 0.4 : 1;
-      ctx.drawImage(h.canvas, x, y);
-      if (hurtFlash > 0) {
-        ctx.globalAlpha = hurtFlash * 3;
-        ctx.drawImage(heroSprite(look, anim, n, recoil, flip, "#ff4040").canvas, x, y);
-      }
-      ctx.globalAlpha = 1;
-      if (recoil && h.muzzle) {
+      faded(over ? 0.3 : blink ? 0.4 : 1, h.canvas, x, y);
+      if (hurtFlash > 0 && !over) faded(hurtFlash * 3, heroSprite(look, anim, n, gun, flip, "#ff4040").canvas, x, y);
+      if (gun.recoil && h.muzzle) {
         const mx = x + h.muzzle.x, my = y + h.muzzle.y;
         ctx.fillStyle = "#fffbe0";
         ctx.fillRect(mx - 1, my - 1, 3, 3);
         ctx.fillStyle = "#e8c14a";
         ctx.fillRect(mx + (flip ? -2 : 2), my, 1, 1);
       }
+      if (!over) return;
       const cy = p.y + HERO_FEET - HERO.H / 2;   // the middle of the figure
       if (p.shield > 0) {
         const r = 15 + Math.sin(s.time * 4);
@@ -792,9 +791,8 @@
       if (h.kind === "goo") {
         const c = sprite("goo", {outline: null});
         const k = Math.max(1, Math.round(h.r * 2 / c.width));
-        ctx.globalAlpha = Math.max(0, Math.min(0.8, left / 1.5));
-        ctx.drawImage(c, px(h.x - c.width * k / 2), px(h.y - c.height * k / 2), c.width * k, c.height * k);
-        ctx.globalAlpha = 1;
+        const w = c.width * k, ht = c.height * k;
+        faded(Math.max(0, Math.min(0.8, left / 1.5)), c, px(h.x) - (w >> 1), px(h.y) - (ht >> 1), w, ht);
         return;
       }
       if (s.time < h.from) {
@@ -984,9 +982,7 @@
         // The item flies into the player.
         const p = s.player, e = k * k;
         const c = sprite(fx.item, {});
-        ctx.globalAlpha = 1 - k;
-        ctx.drawImage(c, px(fx.x + (p.x - fx.x) * e - c.width / 2), px(fx.y + (p.y - 4 - fx.y) * e - c.height / 2));
-        ctx.globalAlpha = 1;
+        faded(1 - k, c, px(fx.x + (p.x - fx.x) * e - c.width / 2), px(fx.y + (p.y - 4 - fx.y) * e - c.height / 2));
         pixelRing(p.x, p.y - 2, 6 + k * 10, ITEM_COLORS[fx.item] || "#fffbe0", 1 - k, 1);
       } else if (fx.type === "blink") {
         // A dotted trail from where the null pointer was to where it is now.
@@ -1170,13 +1166,16 @@
         // A gold mark under the player's feet, to find yourself in a crowd.
         pixelRing(p.x, p.y + 6, 9, "#e8c14a", 0.45 + levelGlow * 0.5);
       }
+      // By the feet: whoever stands lower on screen is nearer and covers the rest.
       actors.push(p);
-      actors.sort((a, b) => a.y - b.y);
+      const feet = (o) => o.y + (o === p ? HERO_FEET : o.session !== undefined ? 6 : o.r);
+      actors.sort((a, b) => feet(a) - feet(b));
       for (const o of actors) {
         if (o === p) drawPlayer(p, s, look);
         else if (o.session !== undefined) drawAlly(o, s);
         else drawEnemy(o, s);
       }
+      if (!p.dead) drawPlayer(p, s, look, true);
 
       if (!p.dead) for (const w of s.weapons) if (w.on && w.blades) drawLinters(w, s);
       for (const sh of s.shots) if (visible(sh, 10)) drawShot(sh);
