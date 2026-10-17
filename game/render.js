@@ -5,7 +5,7 @@
 "use strict";
 
 (function (root) {
-  const SP = root.LCSSprites, FONT = root.LCSFont;
+  const SP = root.LCSSprites, FONT = root.LCSFont, HERO = root.LCSHero;
   const DARK = SP.OUTLINE;
   const TAU = Math.PI * 2;
 
@@ -30,6 +30,8 @@
                        chest: "#e8c14a"};
   const tr = (ru, en) => root.SidequestI18n ? root.SidequestI18n.t(ru, en) : ru;
   const AMMO_MARKS = 10;   // the most rounds shown as marks under the player
+  const HERO_FEET = 7;     // px from the player's middle down to the soles
+  const HURT_POSE = 0.1;   // the hit flash left (s) while the hero still flinches
   const BOSS_NAME = ["Конфликт слияния", "Merge conflict"];
   const FINAL_NAME = ["Финальный конфликт", "Final conflict"];
 
@@ -156,21 +158,23 @@
       let c = sprites.get(key);
       if (c) return c;
       const colors = o.tint ? {A: o.tint, a: SP.shade(o.tint, 0.72)} : null;
-      const img = SP.decode(name, {frame: o.frame, face: o.face, colors, fill: o.fill,
-                                   outline: o.outline});
-      c = newCanvas(img.width, img.height);
-      const cx = c.getContext("2d");
+      c = toCanvas(SP.decode(name, {frame: o.frame, face: o.face, colors, fill: o.fill,
+                                    outline: o.outline}), o.flip);
+      sprites.set(key, c);
+      return c;
+    }
+
+    // Decoded RGBA bytes on a canvas, mirrored if `flip`.
+    function toCanvas(img, flip) {
+      const c = newCanvas(img.width, img.height), cx = c.getContext("2d");
       const data = cx.createImageData(img.width, img.height);
       data.data.set(img.data);
       cx.putImageData(data, 0, 0);
-      if (o.flip) {
-        const f = newCanvas(img.width, img.height), fx = f.getContext("2d");
-        fx.scale(-1, 1);
-        fx.drawImage(c, -img.width, 0);
-        c = f;
-      }
-      sprites.set(key, c);
-      return c;
+      if (!flip) return c;
+      const f = newCanvas(img.width, img.height), fx = f.getContext("2d");
+      fx.scale(-1, 1);
+      fx.drawImage(c, -img.width, 0);
+      return f;
     }
 
     const shadows = new Map();
@@ -679,80 +683,76 @@
       }
     }
 
-    // The player's avatar gets the same outline as the sprites: a dark silhouette under it.
-    const avatarBox = newCanvas(16, 16), avatarCtx = avatarBox.getContext("2d");
-    const silhouette = newCanvas(16, 16), silCtx = silhouette.getContext("2d");
-    function silhouetteOf(color) {
-      silCtx.globalCompositeOperation = "copy";
-      silCtx.drawImage(avatarBox, 0, 0);
-      silCtx.globalCompositeOperation = "source-in";
-      silCtx.fillStyle = color;
-      silCtx.fillRect(0, 0, 16, 16);
-      silCtx.globalCompositeOperation = "source-over";
-      return silhouette;
+    // The hero (hero.js), cached per look, pose, recoil, flip and hit flash.
+    const heroes = new Map();
+    function heroSprite(look, anim, n, recoil, flip, fill) {
+      const key = `${Object.values(look).join(",")}|${anim}|${n}|${recoil ? 1 : 0}|${flip ? 1 : 0}|${fill || ""}`;
+      let h = heroes.get(key);
+      if (h) return h;
+      const f = HERO.frame(look, anim, n, recoil);
+      const img = SP.decodeRows(f.rows, f.palette, {fill});
+      // Where the body's middle and the muzzle are on the canvas (the outline adds 1).
+      const bodyX = flip ? img.width - 2 - HERO.BODY_X : HERO.BODY_X + 1;
+      const muzzle = f.muzzle && {x: flip ? img.width - 2 - f.muzzle.x : f.muzzle.x + 1, y: f.muzzle.y + 1};
+      h = {canvas: toCanvas(img, flip), bodyX, muzzle};
+      heroes.set(key, h);
+      return h;
     }
 
-    function drawGun(p, s, x, y) {
-      const flip = Math.cos(p.aim) < 0;
-      const recoil = s.time - p.firedAt < 0.06 ? 1 : 0;
-      // Held in a hand at the side: the avatar is an opaque square, so a gun in front of
-      // it (aiming up or down) would cover the face and one behind it would vanish.
-      // Whole-pixel offsets from the rounded hero, so the gun keeps its place on a walk.
-      const side = Math.round(Math.max(5, Math.abs(Math.cos(p.aim)) * 7)) * (flip ? -1 : 1);
-      const gx = px(x) + side - (flip ? -recoil : recoil), gy = px(y) + 3 + Math.round(Math.sin(p.aim) * 3);
-      const c = sprite("gun", {flip});
-      ctx.drawImage(c, flip ? gx - c.width + 3 : gx - 3, gy - 2);
-      if (recoil) {
-        const mx = gx + (flip ? -9 : 9), my = gy - 1;
+    // Which animation the hero plays now, and its frame.
+    function heroPose(p, s) {
+      if (p.dead > 0) return ["down", 0];
+      if (hurtFlash > HURT_POSE) return ["hurt", 0];
+      const anim = p.moving ? "walk" : "idle", a = HERO.ANIMS[anim];
+      return [anim, Math.floor(s.time * a.fps) % a.frames];
+    }
+
+    function drawPlayer(p, s, look) {
+      const [anim, n] = heroPose(p, s);
+      const flip = Math.cos(p.aim) < 0, recoil = !p.dead && s.time - p.firedAt < 0.06;
+      const h = heroSprite(look, anim, n, recoil, flip);
+      const x = px(p.x) - h.bodyX, y = px(p.y) + HERO_FEET - (h.canvas.height - 2);
+      if (p.dead > 0) {
+        ctx.globalAlpha = 0.35;
+        ctx.drawImage(h.canvas, x, y - Math.round((3 - p.dead) * 3));
+        ctx.globalAlpha = 1;
+        // Alone (classic) there is no coming back, so no countdown.
+        if (!s.solo) label(p.x, y - 6, String(Math.ceil(p.dead)), "#e8e6f0");
+        return;
+      }
+      const blink = p.invulnerable > 0 && Math.floor(s.time * 12) % 2 === 0;
+      ctx.globalAlpha = blink ? 0.4 : 1;
+      ctx.drawImage(h.canvas, x, y);
+      if (hurtFlash > 0) {
+        ctx.globalAlpha = hurtFlash * 3;
+        ctx.drawImage(heroSprite(look, anim, n, recoil, flip, "#ff4040").canvas, x, y);
+      }
+      ctx.globalAlpha = 1;
+      if (recoil && h.muzzle) {
+        const mx = x + h.muzzle.x, my = y + h.muzzle.y;
         ctx.fillStyle = "#fffbe0";
         ctx.fillRect(mx - 1, my - 1, 3, 3);
         ctx.fillStyle = "#e8c14a";
         ctx.fillRect(mx + (flip ? -2 : 2), my, 1, 1);
       }
-    }
-
-    function drawPlayer(p, s, avatar) {
-      avatarCtx.clearRect(0, 0, 16, 16);
-      avatarCtx.imageSmoothingEnabled = avatar.width > 32;
-      avatarCtx.drawImage(avatar, 0, 0, 16, 16);
-      const bob = p.moving && !p.dead ? (Math.floor(s.time * 10) & 1 ? -1 : 0) : 0;
-      const x = px(p.x - 8), y = px(p.y - 10 + bob);
-      if (p.dead > 0) {
-        ctx.globalAlpha = 0.35;
-        ctx.drawImage(avatarBox, x, y - Math.round((3 - p.dead) * 3));
-        ctx.globalAlpha = 1;
-        // Alone (classic) there is no coming back, so no countdown.
-        if (!s.solo) label(p.x, p.y - 16, String(Math.ceil(p.dead)), "#e8e6f0");
-        return;
-      }
-      const blink = p.invulnerable > 0 && Math.floor(s.time * 12) % 2 === 0;
-      ctx.globalAlpha = blink ? 0.4 : 1;
-      const sil = silhouetteOf(DARK);
-      for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) ctx.drawImage(sil, x + dx, y + dy);
-      ctx.drawImage(avatarBox, x, y);
-      if (hurtFlash > 0) {
-        ctx.globalAlpha = hurtFlash * 3;
-        ctx.drawImage(silhouetteOf("#ff4040"), x, y);
-      }
-      ctx.globalAlpha = 1;
-      drawGun(p, s, p.x, p.y + bob);
+      const cy = p.y + HERO_FEET - HERO.H / 2;   // the middle of the figure
       if (p.shield > 0) {
-        const r = 13 + Math.sin(s.time * 4);
-        pixelRing(p.x, p.y - 2, r, "#5b8bd0", 0.5);
+        const r = 15 + Math.sin(s.time * 4);
+        pixelRing(p.x, cy, r, "#5b8bd0", 0.5);
         for (let i = 0; i < p.shield; i++) {
           const t = s.time * 2 + i / p.shield * TAU;
           ctx.fillStyle = "#8fb3e0";
-          ctx.fillRect(px(p.x + Math.cos(t) * r) - 1, px(p.y - 2 + Math.sin(t) * r) - 1, 2, 2);
+          ctx.fillRect(px(p.x + Math.cos(t) * r) - 1, px(cy + Math.sin(t) * r) - 1, 2, 2);
         }
       }
-      if (s.immortal) pixelRing(p.x, p.y - 2, 12, "#e8c14a", 0.6);
+      if (s.immortal) pixelRing(p.x, cy, 14, "#e8c14a", 0.6);
       drawHealth(p, s);
       drawAmmo(p);
     }
 
-    // Right under the player, where the eyes are: the health, blinking when it runs low.
+    // Right under the player's feet: the health, blinking when it runs low.
     function drawHealth(p, s) {
-      const k = Math.max(0, Math.min(1, p.hp / s.stats.max_hp)), y = px(p.y + 10);
+      const k = Math.max(0, Math.min(1, p.hp / s.stats.max_hp)), y = px(p.y + HERO_FEET + 4);
       ctx.fillStyle = DARK;
       ctx.fillRect(px(p.x - 11), y - 2, 22, 5);
       ctx.fillStyle = "#4a2030";
@@ -765,7 +765,7 @@
     // Under the health: a bar while reloading, otherwise one mark per round; a big
     // magazine would be too wide for marks, so it shows the rounds left as a number.
     function drawAmmo(p) {
-      const y = px(p.y + 15);
+      const y = px(p.y + HERO_FEET + 9);
       if (p.reload > 0) {
         ctx.fillStyle = DARK;
         ctx.fillRect(px(p.x - 10), y - 2, 20, 4);
@@ -1110,7 +1110,7 @@
 
     // --- the frame ------------------------------------------------------------------
 
-    function draw(s, avatar) {
+    function draw(s, look) {
       if (s !== last) reset(s);
       if (floorId !== s.map.id + s.map.theme) {
         floor = paintMap(s.map);
@@ -1173,7 +1173,7 @@
       actors.push(p);
       actors.sort((a, b) => a.y - b.y);
       for (const o of actors) {
-        if (o === p) drawPlayer(p, s, avatar);
+        if (o === p) drawPlayer(p, s, look);
         else if (o.session !== undefined) drawAlly(o, s);
         else drawEnemy(o, s);
       }

@@ -823,7 +823,12 @@
     const o = options || {};
     const def = SPRITES[name];
     const rows = rowsOf(name, o.frame || 0, o.face);
-    const palette = Object.assign({}, def.palette, o.colors || {});
+    return decodeRows(rows, Object.assign({}, def.palette, o.colors || {}), o);
+  }
+
+  // The same for rows made elsewhere (the hero); options: outline, fill.
+  function decodeRows(rows, palette, options) {
+    const o = options || {};
     const w = rows[0].length + 2, h = rows.length + 2;
     const data = new Uint8ClampedArray(w * h * 4);
     const solid = new Uint8Array(w * h);
@@ -854,5 +859,5 @@
     return {width: w, height: h, data};
   }
 
-  root.LCSSprites = {SPRITES, decode, shade, rgb, OUTLINE};
+  root.LCSSprites = {SPRITES, decode, decodeRows, shade, rgb, OUTLINE};
 })(typeof window !== "undefined" ? window : globalThis);

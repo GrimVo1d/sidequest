@@ -25,7 +25,9 @@ globalThis.innerWidth = 1000; globalThis.innerHeight = 700; globalThis.devicePix
 globalThis.addEventListener = () => {};
 
 load(GAME + "/maps.js");
+load(GAME + "/avatar.js");
 load(GAME + "/sprites.js");
+load(GAME + "/hero.js");
 load(GAME + "/font.js");
 load(GAME + "/game.js");
 load(GAME + "/render.js");
@@ -53,6 +55,42 @@ for (const [name, def] of Object.entries(LCSSprites.SPRITES)) {
   }
   sizes[name] = [def.frames[0][0].length, def.frames[0].length];
 }
+
+// The hero: every choice of every slot in every frame, with and without recoil.
+const heroErrors = [];
+function checkHero(look, what) {
+  for (const [anim, a] of Object.entries(LCSHero.ANIMS)) {
+    for (let n = 0; n < a.frames; n++) {
+      for (const recoil of [false, true]) {
+        const f = LCSHero.frame(look, anim, n, recoil);
+        if (f.rows.length !== LCSHero.H) heroErrors.push(`${what} ${anim} ${n}: ${f.rows.length} rows`);
+        f.rows.forEach((row, i) => {
+          if (row.length !== LCSHero.W) heroErrors.push(`${what} ${anim} ${n} row ${i}: width ${row.length}`);
+          for (const c of row) if (c !== "." && !/^#[0-9a-f]{6}$/.test(f.palette[c] || "")) heroErrors.push(`${what}: no color for ${c}`);
+        });
+        try { LCSSprites.decodeRows(f.rows, f.palette); } catch (e) { heroErrors.push(`${what}: ${e}`); }
+      }
+    }
+  }
+}
+for (const slot of LCSHero.SLOTS) {
+  const table = slot.parts || SidequestAvatar.COLORS[slot.colors];
+  for (const id of Object.keys(table)) checkHero({[slot.key]: id}, `${slot.key}=${id}`);
+}
+const heroLooks = {
+  junk: LCSHero.clean({hair: "../x", top: "__proto__", skin: 5, hat: "constructor"}),
+  presets: SidequestAvatar.PRESETS.map((p) => LCSHero.fromAvatar(SidequestAvatar.preset(p.id))),
+  picture: LCSHero.fromAvatar({frames: [], parts: null}),
+};
+// What changes between frames: the walk moves the legs, recoil moves the gun and the
+// muzzle, the downed hero has no gun.
+const heroFrame = (anim, n, recoil) => LCSHero.frame(LCSHero.clean(null), anim, n, recoil);
+const heroFacts = {
+  walkFrames: new Set([0, 1, 2, 3].map((n) => heroFrame("walk", n).rows.join("|"))).size,
+  recoilMoves: heroFrame("idle", 0, true).rows.join("|") !== heroFrame("idle", 0).rows.join("|"),
+  muzzle: heroFrame("idle", 0).muzzle, muzzleRecoil: heroFrame("idle", 0, true).muzzle,
+  downMuzzle: heroFrame("down", 0).muzzle,
+};
 
 const fontErrors = [];
 for (const [ch, g] of Object.entries(LCSFont.GLYPHS)) {
@@ -89,7 +127,7 @@ function drawMatch(map, seed, mode) {
   const g = LCS.createGame(balance, {seed, map, mode});
   const s = g.state;
   const r = LCSRender.createRenderer(fakeCanvas(), balance);
-  const avatar = {width: 16};
+  const look = LCSHero.clean(null);
   const pic = fakeCanvas();
   pic.width = 136;
   pic.height = 102;
@@ -147,7 +185,7 @@ function drawMatch(map, seed, mode) {
       for (const fx of s.effects) {
         if (fx.type === "pickup" && !counted.has(fx)) { counted.add(fx); picked++; }
       }
-      r.draw(s, avatar);
+      r.draw(s, look);
       frames++;
     }
   } catch (e) {
@@ -193,7 +231,7 @@ function bossBarsEnd(bosses) {
   g.agentEvent({kind: "prompt", session: "a", project: "sidequest"});
   for (const type of bosses) g.dev.boss(type);
   g.step(1 / 60, {x: 0, y: 0});
-  r.draw(g.state, {width: 16});
+  r.draw(g.state, LCSHero.clean(null));
   return Math.round(r.bossBarsBottom());
 }
 const bossBars = {none: bossBarsEnd([]), one: bossBarsEnd([balance.bosses.order[0]]),
@@ -201,5 +239,5 @@ const bossBars = {none: bossBarsEnd([]), one: bossBarsEnd([balance.bosses.order[
 // The achievements screen draws each achievement's icon.
 const achievementIcons = balance.achievements.filter((a) => !LCSSprites.SPRITES[a.icon]).map((a) => a.id);
 
-print(JSON.stringify({spriteErrors, sizes, fontErrors, missing, missingInTexts, texts, maps, calls, badCall,
+print(JSON.stringify({spriteErrors, heroErrors, heroLooks, heroFacts, sizes, fontErrors, missing, missingInTexts, texts, maps, calls, badCall,
                       codexErrors, codexIds, hints, achievementIcons, bossBars, drawn: [...drawn]}));

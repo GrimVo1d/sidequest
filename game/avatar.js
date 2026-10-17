@@ -531,7 +531,7 @@
   }
 
   root.SidequestAvatar = {
-    CHARS, SIZE, OPTIONS, PRESETS, DEFAULT, DEFAULT_PARTS, MAX_COLORS: 32, MAX_FRAMES: 64,
+    CHARS, SIZE, OPTIONS, PRESETS, DEFAULT, DEFAULT_PARTS, COLORS, MAX_COLORS: 32, MAX_FRAMES: 64,
     compose, preset, resolve, isPicture, rgba, draw, animate,
   };
 })(typeof window !== "undefined" ? window : globalThis);

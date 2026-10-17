@@ -612,6 +612,34 @@ class ArenaArtTest(unittest.TestCase):
     def test_sprites_are_well_formed(self):
         self.assertEqual(self.result["spriteErrors"], [])
 
+    def test_hero_frames_are_well_formed(self):
+        self.assertEqual(self.result["heroErrors"], [])
+
+    def test_hero_look_is_cleaned(self):
+        default = self.result["heroLooks"]["picture"]
+        self.assertEqual(self.result["heroLooks"]["junk"], default)
+        self.assertEqual(default["top"], "hoodie")
+        presets = self.result["heroLooks"]["presets"]
+        reviewer = presets[2]  # skin "fair", gray short hair, a gray jacket, glasses
+        self.assertEqual(
+            (
+                reviewer["skin"],
+                reviewer["hair"],
+                reviewer["top"],
+                reviewer["face"],
+                reviewer["hat"],
+            ),
+            ("fair", "short", "jacket", "glasses", "none"),
+        )
+        self.assertIn("headphones", [look["hat"] for look in presets])
+
+    def test_hero_animates(self):
+        facts = self.result["heroFacts"]
+        self.assertEqual(facts["walkFrames"], 3)  # two strides and the pass between them
+        self.assertTrue(facts["recoilMoves"])
+        self.assertEqual(facts["muzzleRecoil"]["x"], facts["muzzle"]["x"] - 1)
+        self.assertIsNone(facts["downMuzzle"])
+
     def test_centered_sprites_do_not_jitter(self):
         # px(x - w / 2) rounds the edge, so a sprite and what hangs over it step apart by a
         # pixel as they walk; the renderer rounds the centre first: px(x) - (w >> 1).

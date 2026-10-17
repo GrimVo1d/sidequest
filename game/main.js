@@ -10,7 +10,6 @@
 
   let balance = null;
   let renderer = null;
-  let profile = null;
   let fpsLimit = 60;
   let game = null;
   let escOpen = false;
@@ -32,8 +31,7 @@
   let ghostRecords = {};
   let days = {};             // the daily task: best score per day
   const keys = new Set();
-  const sprite = document.createElement("canvas");
-  let stopSprite = () => {};
+  let look = null;           // the hero's look (hero.js)
 
   function el(tag, text, cls) {
     const node = document.createElement(tag);
@@ -116,11 +114,12 @@
     return {records, got, bests};
   }
 
-  // The player's picture walks the arena (shell.js draws it on the menu).
-  async function loadSprite() {
-    profile = await Sidequest.profile();
-    stopSprite();
-    stopSprite = SidequestAvatar.animate(sprite, profile.avatar);
+  // The hero walks the arena: the saved look, or until there is one, the look nearest to the
+  // avatar (shell.js draws the avatar itself on the menu).
+  async function loadLook() {
+    const profile = await Sidequest.profile();
+    const saved = await Sidequest.storage.get("character");
+    look = saved ? LCSHero.clean(saved) : LCSHero.fromAvatar(profile.avatar);
   }
 
   async function openMenu() {
@@ -128,7 +127,7 @@
     escOpen = false;
     $("hud").hidden = true;
     show("menu");
-    await loadSprite();
+    await loadLook();
     const prefs = (await Sidequest.storage.get("prefs")) || {};
     if (LCS_MAPS.some((m) => m.id === prefs.map)) mapId = prefs.map;
     if (MODES[prefs.mode]) mode = prefs.mode;
@@ -835,7 +834,7 @@
     } else {
       acc = 0;
     }
-    renderer.draw(game.state, sprite);
+    renderer.draw(game.state, look);
     updateOverlays();
     if (now - hudAt > 100) {
       hudAt = now;
@@ -851,7 +850,7 @@
   Sidequest.on("*", (e) => {
     if (game && !game.state.over) game.agentEvent(e);
   });
-  Sidequest.onProfile(loadSprite);
+  Sidequest.onProfile(loadLook);
 
   function dev(id, label, fn) {
     Sidequest.dev.command(id, label, () => { if (game && !game.state.over) fn(game.dev); });
