@@ -1,4 +1,4 @@
-// Last Commit Standing: drawing the arena. Sprites come from sprites.js, text is in the
+// The arena: drawing the arena. Sprites come from sprites.js, text is in the
 // pixel font from font.js. The canvas is small (balance.view) and scaled up in whole device
 // pixels, so pixels stay sharp. Everything here is looks only: particles, splats and screen
 // shake use Math.random and never touch the simulation.

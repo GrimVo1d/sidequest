@@ -2,7 +2,6 @@
 
 import argparse
 import os
-import shutil
 import sys
 
 from . import claude_settings, i18n, paths, replay, selfcheck
@@ -23,7 +22,7 @@ def _ask(question: str, assume_yes: bool) -> bool:
 def _stored_language() -> str:
     # Read only: the CLI must not create the database just to learn the language.
     if not os.path.exists(paths.DB_PATH):
-        return "auto"
+        return "en"
     try:
         store = Store(paths.DB_PATH)
         try:
@@ -32,7 +31,7 @@ def _stored_language() -> str:
         finally:
             store.close()
     except Exception:
-        return "auto"
+        return "en"
 
 
 def _open_store() -> Store:
@@ -110,20 +109,15 @@ def cmd_uninstall(args: argparse.Namespace) -> int:
         if os.path.exists(paths.DB_PATH):
             os.unlink(paths.DB_PATH)
         print(t("Данные ядра удалены.", "Core data deleted."))
-    if args.delete_dlc_data is not None:
-        ids = args.delete_dlc_data or (
-            os.listdir(paths.DLC_DATA_DIR) if os.path.isdir(paths.DLC_DATA_DIR) else []
-        )
-        for dlc_id in ids:
-            if not paths.DLC_ID_RE.match(dlc_id):
-                print(t(f"Нет такого DLC: {dlc_id!r}", f"No such DLC: {dlc_id!r}"), file=sys.stderr)
-                continue
-            target = os.path.join(paths.DLC_DATA_DIR, dlc_id)
-            if os.path.isdir(target) and _ask(
-                t(f"Удалить данные DLC {dlc_id}?", f"Delete the data of DLC {dlc_id}?"), args.yes
-            ):
-                shutil.rmtree(target)
-                print(t(f"Данные DLC {dlc_id} удалены.", f"DLC {dlc_id} data deleted."))
+    if args.delete_game_data and _ask(
+        t(
+            "Удалить сохранения игры: рекорды, ачивки, персонажа?",
+            "Delete the game's saves: records, achievements, the character?",
+        ),
+        args.yes,
+    ):
+        paths.delete_game_data(paths.GAME_DATA_DIR)
+        print(t("Сохранения игры удалены.", "The game's saves are deleted."))
     return 0
 
 
@@ -272,10 +266,9 @@ def main(argv: list[str] | None = None) -> int:
         help=t("удалить профиль и общую статистику", "delete the profile and the shared stats"),
     )
     p.add_argument(
-        "--delete-dlc-data",
-        nargs="*",
-        metavar="DLC",
-        help=t("удалить данные DLC (без списка — всех)", "delete DLC data (all without a list)"),
+        "--delete-game-data",
+        action="store_true",
+        help=t("удалить сохранения игры", "delete the game's saves"),
     )
     p.set_defaults(func=cmd_uninstall)
 

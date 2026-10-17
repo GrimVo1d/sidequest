@@ -1,4 +1,4 @@
-// Run by tests/test_hostile_keys.py through jsc: every DLC plays events whose ids, names
+// Run by tests/test_hostile_keys.py through jsc: the arena plays events whose ids, names
 // and kinds are the names of Object.prototype members, which a plain table lookup would
 // find. Usage: jsc hostile_keys_harness.js -- <project dir>
 "use strict";
@@ -47,11 +47,11 @@ function play(name, game, extra) {
   // The keys an agent's working style is counted under ("read", "edit", ...).
   const mixKeys = new Set();
   for (const a of s.agents || s.heroes || []) for (const k of Object.keys(a.mix || {})) mixKeys.add(k);
-  print(JSON.stringify({dlc: name, events: i, error: err, oddMet, oddCls: oddCls.length,
+  print(JSON.stringify({game: name, events: i, error: err, oddMet, oddCls: oddCls.length,
                         mixKeys: [...mixKeys].sort()}));
 }
 {
-  const D = project + "/dlc/last-commit-standing";
+  const D = project + "/game";
   load(D + "/maps.js"); load(D + "/game.js");
   const B = JSON.parse(readFile(D + "/balance.json"));
   play("arena", LCS.createGame(B, {seed: 1, mode: "agent"}), () => ({x: 0, y: 0}));

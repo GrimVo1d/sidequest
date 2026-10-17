@@ -1,14 +1,14 @@
 """Two languages for everything the user reads: ru and en.
 
-The setting "language" is "auto", "ru" or "en"; "auto" follows the system. Python code
-writes both texts in place: t("Хуки", "Hooks"). The hub and the DLC get the chosen
-language from the core (settings "lang"), so the window and the terminal always agree.
+The setting "language" is "en" (the default), "ru" or "auto", which follows the system. Python code
+writes both texts in place: t("Хуки", "Hooks"). The game page gets the chosen language
+from the core (settings "lang"), so the window and the terminal always agree.
 """
 
 import os
 
 LANGS = ("ru", "en")
-_lang = "ru"
+_lang = "en"
 
 
 def system_language() -> str:
@@ -33,7 +33,7 @@ def resolve(setting: str) -> str:
 
 def set_language(lang: str) -> None:
     global _lang
-    _lang = lang if lang in LANGS else "ru"
+    _lang = lang if lang in LANGS else "en"
 
 
 def language() -> str:

@@ -1,6 +1,6 @@
-// Two languages for every page: ru and en. Shared by the hub and the DLC, no DOM needed
-// except in apply(). The language comes from the core (settings "lang", or
-// Sidequest.info.lang in a DLC); like the Python side, texts are written in place:
+// Two languages for the whole page: ru and en, no DOM needed except in apply(). The
+// language comes from the core (settings "lang", also Sidequest.info.lang); like the
+// Python side, texts are written in place:
 //   SidequestI18n.set("en")
 //   SidequestI18n.t("Играть", "Play")                  // -> "Play"
 //   SidequestI18n.field(upgrade, "name")                // upgrade.name_en in English
@@ -10,12 +10,12 @@
 
 (function (root) {
   const LANGS = ["ru", "en"];
-  let lang = "ru";
+  let lang = "en";
 
   const I18n = {
     LANGS,
     get lang() { return lang; },
-    set(value) { lang = LANGS.includes(value) ? value : "ru"; },
+    set(value) { lang = LANGS.includes(value) ? value : "en"; },
     t(ru, en) { return lang === "en" ? en : ru; },
     // obj[name + "_en"] in English when it exists, otherwise obj[name].
     field(obj, name) {

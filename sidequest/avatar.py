@@ -8,7 +8,7 @@ Pixel avatar (presets, the builder, an upload turned into pixels):
 
     {"source": "preset" | "builder" | "upload",
      "preset": "<id>",                  # preset only
-     "parts": {"hair": "short", ...},   # preset and builder: lets a DLC redraw it
+     "parts": {"hair": "short", ...},   # preset and builder: lets the game redraw it
      "size": 16 | 32,
      "palette": ["#rrggbb", ...],       # up to 32 colors
      "frames": [{"pixels": "..0a1", "delay": 100}, ...]}

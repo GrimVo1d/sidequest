@@ -18,7 +18,7 @@
   const STILL_SIDE = 512;        // the same for a still picture
   const PICTURE_SIZE = 256, GIF_PICTURE_SIZE = 128;   // see PICTURE_SIZES in avatar.py
   const CHARS = "0123456789abcdefghijklmnopqrstuv";
-  // Tests run this file in jsc without sdk/i18n.js.
+  // Tests run this file in jsc without i18n.js.
   const tr = (ru, en) => root.SidequestI18n ? root.SidequestI18n.t(ru, en) : ru;
 
   // --- GIF ---------------------------------------------------------------------------

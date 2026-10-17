@@ -1,4 +1,4 @@
-// Last Commit Standing: screens, input, the loop and the link to Sidequest.
+// The arena: its screens, input, the loop and the link to the core (sidequest.js).
 "use strict";
 
 (function () {
@@ -34,7 +34,6 @@
   const keys = new Set();
   const sprite = document.createElement("canvas");
   let stopSprite = () => {};
-  let stopMenuAvatar = () => {};
 
   function el(tag, text, cls) {
     const node = document.createElement(tag);
@@ -117,9 +116,11 @@
     return {records, got, bests};
   }
 
-  function updateCard(records, got) {
-    const n = balance.achievements.filter((a) => got[a.id]).length;
-    return Sidequest.card(LCSProgress.card(records, n, balance.achievements.length));
+  // The player's picture walks the arena (shell.js draws it on the menu).
+  async function loadSprite() {
+    profile = await Sidequest.profile();
+    stopSprite();
+    stopSprite = SidequestAvatar.animate(sprite, profile.avatar);
   }
 
   async function openMenu() {
@@ -127,12 +128,7 @@
     escOpen = false;
     $("hud").hidden = true;
     show("menu");
-    profile = await Sidequest.profile();
-    $("menu-name").textContent = profile.name;
-    stopMenuAvatar();
-    stopMenuAvatar = SidequestAvatar.animate($("menu-avatar"), profile.avatar);
-    stopSprite();
-    stopSprite = SidequestAvatar.animate(sprite, profile.avatar);
+    await loadSprite();
     const prefs = (await Sidequest.storage.get("prefs")) || {};
     if (LCS_MAPS.some((m) => m.id === prefs.map)) mapId = prefs.map;
     if (MODES[prefs.mode]) mode = prefs.mode;
@@ -147,7 +143,6 @@
     menuRecords = records;
     renderModes();
     renderAchievements(got);
-    await updateCard(records, got);
     $("menu").scrollTop = 0;
     $("btn-play").focus({preventScroll: true});
   }
@@ -271,8 +266,8 @@
     $("achievements-count").textContent = `${earned.length}/${balance.achievements.length}`;
   }
 
-  // When an achievement was earned, in milliseconds: DLCs save Date.now(), the SDK's
-  // unlock() {at} in seconds. 0 when the save holds no time.
+  // When an achievement was earned, in milliseconds: the game saves Date.now(); old saves
+  // may hold {at} in seconds. 0 when the save holds no time.
   function earnedAt(v) {
     if (typeof v === "number") return v;
     return v && Number.isFinite(v.at) ? v.at * 1000 : 0;
@@ -379,7 +374,6 @@
     for (const id of fresh) got[id] = Date.now();
     if (fresh.length) await Sidequest.storage.set("achievements", got);
     await Sidequest.storage.set("bests", LCSProgress.addBests(before.bests, balance.achievements, res));
-    await updateCard(records, got);
     return balance.achievements.filter((a) => fresh.includes(a.id));
   }
 
@@ -767,7 +761,7 @@
   }
 
   // The first time ever the player meets an item or an enemy: a hint for a few seconds of
-  // game time, one after another. What was shown is remembered in the DLC storage.
+  // game time, one after another. What was shown is remembered in the game's saves.
   // An arena event gets its hint every time it starts, right away: it is easy to forget
   // what a deploy or an incident wants from you.
   function updateTips() {
@@ -825,7 +819,7 @@
     const dt = Math.min(0.25, (now - lastDraw) / 1000 || 0);
     lastDraw = now;
 
-    // The hub pauses the game while an agent waits for its user or goes silent.
+    // The shell pauses the game while an agent waits for its user or goes silent.
     const running = !escOpen && !Sidequest.paused && !document.hidden;
     if (running) {
       acc += dt;
@@ -857,6 +851,7 @@
   Sidequest.on("*", (e) => {
     if (game && !game.state.over) game.agentEvent(e);
   });
+  Sidequest.onProfile(loadSprite);
 
   function dev(id, label, fn) {
     Sidequest.dev.command(id, label, () => { if (game && !game.state.over) fn(game.dev); });
@@ -890,7 +885,6 @@
   $("btn-resume").addEventListener("click", () => { escOpen = false; window.focus(); });
   $("btn-quit").addEventListener("click", () => { escOpen = false; quit(); });
   $("btn-again").addEventListener("click", openMenu);
-  $("btn-hub").addEventListener("click", () => Sidequest.exit());
   $("btn-codex").addEventListener("click", () => openCodex("menu"));
   $("btn-esc-codex").addEventListener("click", () => openCodex("esc"));
   $("btn-codex-back").addEventListener("click", closeCodex);
@@ -901,14 +895,11 @@
   $("btn-banish").addEventListener("click", toggleBanish);
 
   Sidequest.ready().then(async () => {
-    SidequestI18n.apply(document);  // the SDK has set the language from the hub
     balance = await Sidequest.balance();
     const settings = await Sidequest.settings();
     fpsLimit = settings.fps_limit === 30 ? 30 : 60;
     renderer = LCSRender.createRenderer($("arena"), balance, $("top"));
     await openMenu();
-    // The hub's card links straight to the achievements.
-    if (Sidequest.info.screen === "achievements") await openAwards("menu");
     requestAnimationFrame((now) => { lastDraw = now; frame(now); });
   });
 })();

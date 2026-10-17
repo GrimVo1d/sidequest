@@ -2,8 +2,8 @@
 // Usage: jsc avatar_harness.js -- <project dir> <gif file>
 "use strict";
 const [project, gifPath] = arguments;
-load(project + "/sdk/avatar.js");
-load(project + "/hub/avatar-import.js");
+load(project + "/game/avatar.js");
+load(project + "/game/avatar-import.js");
 const A = globalThis.SidequestAvatar, I = globalThis.AvatarImport;
 
 const result = {builder: [], gif: null, gif_kept: null, quantized: null, fit: null};

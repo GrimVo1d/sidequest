@@ -1,4 +1,4 @@
-// Last Commit Standing: the simulation. No DOM here, so tests run it in jsc.
+// The arena: the simulation. No DOM here, so tests run it in jsc.
 //   const game = LCS.createGame(balance, {seed: 1, map: LCS_MAPS[0], mode: "agent"});
 //                                 // maps.js; mode "agent", "classic" (alone, 20 minutes),
 //                                 // "daily" (classic with the day's seed, LCS.daily) or
@@ -11,7 +11,7 @@
 
 (function (root) {
   const ALLY_COLORS = ["#4fbf6f", "#5b8bd0", "#d07ad0", "#e89a4a", "#7fe0e0", "#e86a6a"];
-  // Texts on the arena in the chosen language; jsc tests run without sdk/i18n.js.
+  // Texts on the arena in the chosen language; jsc tests run without i18n.js.
   const tr = (ru, en) => root.SidequestI18n ? root.SidequestI18n.t(ru, en) : ru;
   const REJOIN_KINDS = new Set(["session_start", "prompt", "tool", "tool_error",
                                 "subagent_start", "compact"]);

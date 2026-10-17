@@ -1,1 +1,1 @@
-"""Sidequest core: receiver, normalizer, storage and Claude Code integration."""
+"""Sidequest: a pixel game for macOS played while Claude Code works."""

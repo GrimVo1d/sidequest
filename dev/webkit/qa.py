@@ -1,25 +1,26 @@
-"""A deep pass over one DLC in a real window, for QA: every handbook tab, a match with an
-agent doing everything an agent can (errors, blocks, questions, subagents, git, tests,
-compaction, a second agent), every DLC button of the developer panel one by one, walking in
-four directions, the pause, the handbook from the pause and the results. After each step:
+"""A deep pass over the game in a real window, for QA: the Claude Code screen, the
+settings, the avatar editor, every handbook tab, a match with an agent doing everything an
+agent can (errors, blocks, questions, subagents, git, tests, compaction, a second agent),
+every game button of the developer panel one by one, walking in four directions, the pause,
+the handbook from the pause and the results. After each step:
 a snapshot, new JS errors, HUD elements that overlap or leave the window, clipped text,
 screens that do not fit the window and do not scroll and, in English, Russian letters left
 on screen. Text drawn on the canvas is not seen by any of these: look at the snapshots.
 
-    .venv/bin/python dev/webkit/qa.py arena <out> [ru|en] [--size WxH] [--no-dev] [--show]
+    .venv/bin/python dev/webkit/qa.py <out> [ru|en] [--size WxH] [--no-dev] [--show]
 
 An odd size (the default is 1201x801) catches what rounds differently on half pixels.
-Without the developer panel (--no-dev) the DLC buttons are skipped.
+Without the developer panel (--no-dev) its game buttons are skipped.
 """
 
 import sys
 
-from smoke import AGENT, DLCS, FILES
+from smoke import AGENT, FILES, HUD
 from webkit import run
 
 SECOND = "bbbb2222-0000-0000-0000-000000000002"
 
-# What is on screen in the frame: clipped boxes and, in English, Cyrillic text.
+# What is on screen: clipped boxes and, in English, Cyrillic text.
 LOOK = """(() => {
   const shown = (e) => { const r = e.getBoundingClientRect(); const st = w.getComputedStyle(e);
     return r.width > 0 && r.height > 0 && st.visibility !== 'hidden' && st.display !== 'none'
@@ -47,7 +48,7 @@ LOOK = """(() => {
 })()"""
 
 
-def drive(c, dlc, lang, with_dev):
+def drive(c, lang, with_dev):
     out = {"steps": []}
     seen_errors = []
 
@@ -55,7 +56,7 @@ def drive(c, dlc, lang, with_dev):
         c.wait(wait)
         # The arena may stop on a level-up choice: take the first card until it goes.
         for _ in range(10):
-            if c.frame("!d.getElementById('levelup') || d.getElementById('levelup').hidden"):
+            if c.page("!d.getElementById('levelup') || d.getElementById('levelup').hidden"):
                 break
             c.key("Digit1")
             c.wait(0.2)
@@ -63,11 +64,11 @@ def drive(c, dlc, lang, with_dev):
         errors = c.errors() or []
         new = errors[len(seen_errors) :]
         seen_errors[:] = errors
-        look = c.frame(LOOK) or {}
+        look = c.page(LOOK) or {}
         record = {
             "step": name,
             "errors": new,
-            "overlaps": c.overlaps(dlc["hud"]),
+            "overlaps": c.overlaps(HUD),
             "clipped": look.get("clipped", []),
             "unfit": look.get("unfit", []),
         }
@@ -75,21 +76,31 @@ def drive(c, dlc, lang, with_dev):
             record["russian"] = look.get("russian", [])
         out["steps"].append({k: v for k, v in record.items() if v or k == "step"})
 
-    c.open_dlc(dlc["name"])
+    c.open_game()
     step("01-menu")
-    c.frame("d.getElementById('btn-codex').click()")
-    tabs = c.frame("d.querySelectorAll('#codex-tabs button').length") or 0
+    c.page("d.getElementById('btn-agent').click()")
+    step("01-agent", 1)
+    c.key("Escape")
+    c.page("d.getElementById('btn-settings').click()")
+    step("01-settings", 0.4)
+    c.key("Escape")
+    c.page("d.getElementById('btn-avatar').click()")
+    step("01-avatar", 0.6)
+    c.key("Escape")
+    c.wait(0.3)
+    c.page("d.getElementById('btn-codex').click()")
+    tabs = c.page("d.querySelectorAll('#codex-tabs button').length") or 0
     for i in range(tabs):
-        c.frame(f"d.querySelectorAll('#codex-tabs button')[{i}].click()")
+        c.page(f"d.querySelectorAll('#codex-tabs button')[{i}].click()")
         step(f"02-codex-{i + 1}", 0.3)
-    c.frame("d.getElementById('btn-codex-back').click()")
+    c.page("d.getElementById('btn-codex-back').click()")
 
-    c.frame(
+    c.page(
         "(() => { const b = [...d.querySelectorAll('.mode')].find((x) => /агент|agent/i.test(x.textContent)); "
         "if (b) b.click(); return 1; })()"
     )
     c.wait(0.5)
-    c.frame("d.getElementById('btn-play').click()")
+    c.page("d.getElementById('btn-play').click()")
     c.wait(2)
     c.send(AGENT, "session_start", joined=False)
     c.send(AGENT, "prompt")
@@ -140,10 +151,7 @@ def drive(c, dlc, lang, with_dev):
     step("06-walked")
 
     if with_dev:
-        commands = (
-            c.hub("typeof dlcDevCommands === 'undefined' ? [] : dlcDevCommands.map((x) => x.id)")
-            or []
-        )
+        commands = c.page("Sidequest.dev.commands.map((x) => x.id)") or []
         out["dev_commands"] = commands
         for i, cmd in enumerate(commands):
             c.dev(cmd)
@@ -151,17 +159,17 @@ def drive(c, dlc, lang, with_dev):
 
     c.send(SECOND, "stop", ok=True, background=0, final=True)
     step("08-second-done", 2)
-    c.frame("w.focus()")
+    c.page("w.focus()")
     c.key("Escape")
     step("09-pause", 0.4)
-    if c.frame("Boolean(d.getElementById('btn-esc-codex'))"):
-        c.frame("d.getElementById('btn-esc-codex').click()")
+    if c.page("Boolean(d.getElementById('btn-esc-codex'))"):
+        c.page("d.getElementById('btn-esc-codex').click()")
         step("10-pause-codex", 0.4)
-        c.frame("d.getElementById('btn-codex-back').click()")
+        c.page("d.getElementById('btn-codex-back').click()")
         c.wait(0.3)
-    c.frame("d.getElementById('btn-quit').click()")
+    c.page("d.getElementById('btn-quit').click()")
     step("11-results", 1)
-    c.frame("d.getElementById('btn-again').click()")
+    c.page("d.getElementById('btn-again').click()")
     step("12-menu-again", 1)
     out["problems"] = sum(1 for s in out["steps"] if len(s) > 1)
     return out
@@ -169,18 +177,17 @@ def drive(c, dlc, lang, with_dev):
 
 if __name__ == "__main__":
     args = sys.argv[1:]
-    if len(args) < 2 or args[0] not in DLCS:
+    if not args:
         sys.exit(__doc__)
     size = [1201, 801]
     if "--size" in args:
         i = args.index("--size")
         size = [int(v) for v in args[i + 1].split("x")]
         del args[i : i + 2]
-    lang = args[2] if len(args) > 2 and args[2] in ("ru", "en") else "ru"
-    which = DLCS[args[0]]
+    lang = args[1] if len(args) > 1 and args[1] in ("ru", "en") else "ru"
     run(
-        lambda c: drive(c, which, lang, "--no-dev" not in args),
-        args[1:],
+        lambda c: drive(c, lang, "--no-dev" not in args),
+        args,
         width=size[0],
         height=size[1],
     )

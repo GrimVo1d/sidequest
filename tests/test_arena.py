@@ -12,7 +12,7 @@ from .test_avatar import JSC
 
 HARNESS = os.path.join(os.path.dirname(__file__), "arena_harness.js")
 ART_HARNESS = os.path.join(os.path.dirname(__file__), "art_harness.js")
-DLC = os.path.join(paths.PROJECT_DIR, "dlc", "last-commit-standing")
+GAME = paths.GAME_DIR
 
 
 @unittest.skipUnless(os.path.exists(JSC), "JavaScriptCore jsc not found")
@@ -25,7 +25,7 @@ class ArenaTest(unittest.TestCase):
         if run.returncode:
             raise AssertionError(run.stdout + run.stderr)
         cls.result = json.loads(run.stdout)
-        with open(os.path.join(DLC, "balance.json"), encoding="utf-8") as f:
+        with open(os.path.join(GAME, "balance.json"), encoding="utf-8") as f:
             cls.balance = json.load(f)
 
     def matches(self):
@@ -532,17 +532,6 @@ class ArenaTest(unittest.TestCase):
         self.assertIn("reviewer", p["worked"])
         self.assertIn("atomic", p["worked"])
 
-    def test_card_rows_fit_the_hub(self):
-        card = self.result["progress"]["card"]
-        self.assertLessEqual(len(card), 4)
-        for label, value, *_screen in card:
-            self.assertEqual(set(label), {"ru", "en"})
-            for text in label.values():
-                self.assertLessEqual(len(text), 24)
-            self.assertLessEqual(len(str(value)), 16)
-        # The achievements row is a link to the achievements screen.
-        self.assertEqual([row[2] for row in card if len(row) == 3], ["achievements"])
-
     def test_achievement_progress(self):
         p = self.result["progress"]
         # The best single match of each field an achievement asks of one match; nothing else.
@@ -590,7 +579,7 @@ class ArenaArtTest(unittest.TestCase):
 
     def test_handbook_covers_everything(self):
         self.assertEqual(self.result["codexErrors"], [])
-        with open(os.path.join(DLC, "balance.json"), encoding="utf-8") as f:
+        with open(os.path.join(GAME, "balance.json"), encoding="utf-8") as f:
             balance = json.load(f)
         ids = self.result["codexIds"]
         self.assertEqual(ids["gear"], [g["id"] for g in balance["gear"]])
@@ -625,14 +614,10 @@ class ArenaArtTest(unittest.TestCase):
 
     def test_centered_sprites_do_not_jitter(self):
         # px(x - w / 2) rounds the edge, so a sprite and what hangs over it step apart by a
-        # pixel as they walk; every DLC rounds the centre first: px(x) - (w >> 1).
-        for dlc in ("last-commit-standing",):
-            with open(
-                os.path.join(paths.PROJECT_DIR, "dlc", dlc, "render.js"), encoding="utf-8"
-            ) as f:
-                code = f.read()
-            with self.subTest(dlc):
-                self.assertEqual(re.findall(r"px\([\w.]+\.[xy] - [\w.]+ / 2\)", code), [])
+        # pixel as they walk; the renderer rounds the centre first: px(x) - (w >> 1).
+        with open(os.path.join(GAME, "render.js"), encoding="utf-8") as f:
+            code = f.read()
+        self.assertEqual(re.findall(r"px\([\w.]+\.[xy] - [\w.]+ / 2\)", code), [])
 
     def test_every_live_boss_has_a_bar(self):
         # The bars stack under the HUD: each boss lowers their end, the fourth on is a «+N».

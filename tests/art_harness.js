@@ -3,7 +3,7 @@
 // Usage: jsc art_harness.js -- <project dir>
 "use strict";
 const [project] = arguments;
-const DLC = project + "/dlc/last-commit-standing";
+const GAME = project + "/game";
 
 // A canvas that only checks its arguments: every number must be finite.
 let calls = 0, badCall = null;
@@ -24,13 +24,13 @@ globalThis.document = {createElement: fakeCanvas};
 globalThis.innerWidth = 1000; globalThis.innerHeight = 700; globalThis.devicePixelRatio = 2;
 globalThis.addEventListener = () => {};
 
-load(DLC + "/maps.js");
-load(DLC + "/sprites.js");
-load(DLC + "/font.js");
-load(DLC + "/game.js");
-load(DLC + "/render.js");
-load(DLC + "/codex.js");
-const balance = JSON.parse(readFile(DLC + "/balance.json"));
+load(GAME + "/maps.js");
+load(GAME + "/sprites.js");
+load(GAME + "/font.js");
+load(GAME + "/game.js");
+load(GAME + "/render.js");
+load(GAME + "/codex.js");
+const balance = JSON.parse(readFile(GAME + "/balance.json"));
 
 // --- sprites and font ---------------------------------------------------------------
 
@@ -66,13 +66,13 @@ const missing = [...ALPHABET].filter((ch) => !LCSFont.has(ch));
 // Every text the game shows on the arena: string literals in text(...) calls and the
 // boss name.
 const texts = [];
-for (const call of readFile(DLC + "/game.js").match(/\btext\([^;]*\);/g) || []) {
+for (const call of readFile(GAME + "/game.js").match(/\btext\([^;]*\);/g) || []) {
   for (const m of call.match(/"[^"]*"|`[^`]*`/g) || []) {
     const value = m.slice(1, -1).replace(/\$\{[^}]*\}/g, "");
     if (!value.startsWith("#")) texts.push(value);
   }
 }
-const RENDER = readFile(DLC + "/render.js");
+const RENDER = readFile(GAME + "/render.js");
 for (const name of ["BOSS_NAME", "FINAL_NAME"]) {
   const pair = new RegExp(name + " = \\[([^\\]]+)\\]").exec(RENDER)[1];
   for (const m of pair.match(/"[^"]*"/g)) texts.push(m.slice(1, -1));

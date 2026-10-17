@@ -1,4 +1,4 @@
-// Last Commit Standing: the maps. Walls are rectangles [x, y, width, height]; the player
+// The arena: the maps. Walls are rectangles [x, y, width, height]; the player
 // starts in the middle, so no wall may cover it, and every open area must stay reachable.
 // The theme picks how render.js draws the floor and the walls; `special` is the map's own
 // enemy (balance.json, enemies).

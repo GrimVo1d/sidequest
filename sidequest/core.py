@@ -166,7 +166,7 @@ class Core:
             return dict(self._paused)
 
     def session_status(self, session: str) -> str:
-        """ "waiting" / "silent" / "working" / "idle" for the hub's session list."""
+        """ "waiting" / "silent" / "working" / "idle" for the sessions on the Claude Code screen."""
         with self._lock:
             if session in self._paused:
                 return self._paused[session]

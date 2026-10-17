@@ -1,4 +1,4 @@
-"""The JS bridge without a window: what the hub and DLC can and cannot reach."""
+"""The JS bridge without a window: what the game page can and cannot reach."""
 
 import json
 import os
@@ -19,7 +19,7 @@ class BridgeTest(unittest.TestCase):
         )
         self.addCleanup(core.store.close)
         settings = os.path.join(self.dir, "settings.json")
-        for name, folder in (("DLC_DATA_DIR", "dlc"), ("BACKUPS_DIR", "backups")):
+        for name, folder in (("GAME_DATA_DIR", "game"), ("BACKUPS_DIR", "backups")):
             patcher = mock.patch.object(paths, name, os.path.join(self.dir, folder))
             patcher.start()
             self.addCleanup(patcher.stop)
@@ -50,11 +50,6 @@ class BridgeTest(unittest.TestCase):
         # there is nothing to walk a dotted name like "_core.store._db.execute" through.
         self.assertNotIn("_core", dir(exposed["drain"]))
 
-    def test_dlc_pages_are_served_by_the_scheme(self):
-        _, bridge = self.make()
-        for dlc in bridge.list_dlc():
-            self.assertTrue(dlc["url"].startswith("sidequest://app/dlc/"), dlc["url"])
-
     def test_quit_closes_the_window(self):
         _, bridge = self.make()
         bridge.quit()  # no window yet: nothing to close
@@ -75,7 +70,7 @@ class BridgeTest(unittest.TestCase):
 
     def test_dev_send_is_not_stored_and_taints_match(self):
         core, bridge = self.make(dev=True)
-        bridge.match_start("arena")
+        bridge.match_start()
         bridge.dev_send("tool", {"tool": "Edit", "nested": {"x": 1}})
         sent = bridge.drain()[-1]
         self.assertTrue(sent["replay"])
@@ -85,7 +80,7 @@ class BridgeTest(unittest.TestCase):
         self.assertEqual(sent["git"], ["commit", "push"])
         self.assertNotIn("bad", sent)
         self.assertEqual(core.store.session_events("dev"), [])
-        self.assertEqual(bridge.match_end("arena", {"score": 1}), {"counted": False})
+        self.assertEqual(bridge.match_end({"score": 1}), {"counted": False})
         with self.assertRaises(ValueError):
             bridge.dev_send("session_end")
 
@@ -114,87 +109,61 @@ class BridgeTest(unittest.TestCase):
             )
         other = "99999999-2222-3333-4444-555555555555"
         core.on_payload(raw("SessionStart", sid=other, source="startup"), 200.0)
-        sessions = bridge.dlc_sessions("arena")
+        sessions = bridge.past_sessions()
         self.assertEqual([s["session"] for s in sessions], [SID])  # too short: not listed
         self.assertEqual(sessions[0]["actions"], app.GHOST_MIN_ACTIONS)
         self.assertEqual(sessions[0]["duration"], 10.5)
-        events = bridge.dlc_session_events("arena", SID)
+        events = bridge.session_events(SID)
         self.assertEqual(events[0]["t"], 0)
         self.assertEqual(events[-1]["t"], 10.5)
         self.assertTrue(all("ts" not in e for e in events))
-        self.assertEqual(bridge.dlc_session_events("arena", "nope"), [])
+        self.assertEqual(bridge.session_events("nope"), [])
         json.dumps(sessions + events)
-
-    def test_dlc_card_rows_are_plain_and_short(self):
-        _, bridge = self.make()
-        bridge.dlc_save(
-            "last-commit-standing",
-            "card",
-            [["Лучший счёт", 1200], ["x" * 50, "y" * 50], ["bad"], {"a": 1}, ["4", 4], ["5", 5]],
-        )
-        found = {d["id"]: d for d in bridge.list_dlc()}
-        card = found["last-commit-standing"]["card"]
-        self.assertEqual(card[0], ["Лучший счёт", "1200"])
-        self.assertEqual(card[1], ["x" * 24, "y" * 16])
-        self.assertEqual(len(card), 2)  # only the first 4 rows are read; broken ones are dropped
-        bridge.dlc_save("last-commit-standing", "card", "not a list")
-        found = {d["id"]: d for d in bridge.list_dlc()}
-        self.assertEqual(found["last-commit-standing"]["card"], [])
-
-    def test_dlc_card_row_may_open_a_screen(self):
-        _, bridge = self.make()
-        bridge.dlc_save(
-            "last-commit-standing",
-            "card",
-            [["Ачивки", "3/9", "achievements"], ["a", 1, "Bad Screen!"], ["b", 2, 7]],
-        )
-        card = {d["id"]: d for d in bridge.list_dlc()}["last-commit-standing"]["card"]
-        self.assertEqual(card, [["Ачивки", "3/9", "achievements"], ["a", "1"], ["b", "2"]])
 
     def test_language_setting(self):
         _, bridge = self.make()
         self.addCleanup(i18n.set_language, i18n.language())
-        self.assertEqual(bridge.get_settings()["language"], "auto")
-        self.assertEqual(bridge.set_setting("language", "fr"), "auto")  # unknown -> auto
+        self.assertEqual(bridge.get_settings()["language"], "en")  # English by default
+        self.assertEqual(bridge.set_setting("language", "fr"), "en")  # unknown -> English
+        self.assertEqual(bridge.set_setting("language", "auto"), "auto")
         self.assertEqual(bridge.set_setting("language", "en"), "en")
         self.assertEqual(bridge.get_settings()["lang"], "en")
         self.assertEqual(bridge.profile()["name"], "Player")
-        bridge.dlc_save("last-commit-standing", "card", [[{"ru": "Матчей", "en": "Matches"}, 3]])
-        found = {d["id"]: d for d in bridge.list_dlc()}
-        self.assertEqual(found["last-commit-standing"]["card"], [["Matches", "3"]])
         bridge.set_setting("language", "ru")
         self.assertEqual(bridge.get_settings()["lang"], "ru")
-        found = {d["id"]: d for d in bridge.list_dlc()}
-        self.assertEqual(found["last-commit-standing"]["card"], [["Матчей", "3"]])
 
-    def test_dlc_storage_is_confined(self):
+    def test_saves_are_confined(self):
         _, bridge = self.make()
-        bridge.dlc_save("arena", "save", {"level": 3})
-        self.assertEqual(bridge.dlc_load("arena", "save"), {"level": 3})
-        self.assertIsNone(bridge.dlc_load("arena", "missing"))
-        for dlc_id, key in (
-            ("../x", "save"),
-            ("arena", "../../db"),
-            ("Arena", "s"),
-            ("arena", "a/b"),
-            ("", "s"),
-        ):
-            with self.assertRaises(ValueError):
-                bridge.dlc_save(dlc_id, key, 1)
+        bridge.save("save", {"level": 3})
+        self.assertEqual(bridge.load("save"), {"level": 3})
+        self.assertIsNone(bridge.load("missing"))
+        for key in ("../../db", "Save", "a/b", "", "save\n", None, ["save"]):
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                bridge.save(key, 1)
+        self.assertEqual(os.listdir(os.path.join(self.dir, "game")), ["save.json"])
 
-    def test_balance_is_read_from_the_dlc_folder(self):
-        _, bridge = self.make(dev=True)
-        self.assertIsNone(bridge.dlc_balance("sdk-test"))
-        arena = bridge.dlc_balance("last-commit-standing")
-        self.assertIn("player", arena)
+    def test_saves_refuse_a_linked_folder(self):
+        _, bridge = self.make()
+        outside = temp_dir(self)
+        os.symlink(outside, os.path.join(self.dir, "game"))
         with self.assertRaises(ValueError):
-            bridge.dlc_balance("../sidequest")
+            bridge.save("save", 1)
+        self.assertEqual(os.listdir(outside), [])
+
+    def test_saves_refuse_nan(self):
+        _, bridge = self.make()
+        with self.assertRaises(ValueError):
+            bridge.save("save", {"x": float("nan")})
+
+    def test_balance_is_the_games(self):
+        _, bridge = self.make()
+        self.assertIn("player", bridge.balance())
 
     def test_match_counted_normally(self):
         _, bridge = self.make()
-        bridge.match_start("arena")
-        self.assertEqual(bridge.match_end("arena", {"score": 7}), {"counted": True})
-        self.assertEqual(bridge.dlc_load("arena", "stats")["matches"], 1)
+        bridge.match_start()
+        self.assertEqual(bridge.match_end({"score": 7}), {"counted": True})
+        self.assertEqual(bridge.load("stats")["matches"], 1)
 
     def test_avatar_is_checked_and_stored(self):
         _, bridge = self.make()
@@ -221,7 +190,7 @@ class BridgeTest(unittest.TestCase):
         self.assertEqual(bridge.set_setting("fps_limit", 45), 60)
         self.assertEqual(bridge.get_settings()["silence_pause_seconds"], 10)
 
-    def test_install_and_uninstall_from_hub(self):
+    def test_install_and_uninstall_from_the_page(self):
         _, bridge = self.make()
         preview = bridge.install_preview()
         self.assertTrue(preview["ok"] and preview["changes"])
@@ -237,6 +206,18 @@ class BridgeTest(unittest.TestCase):
         self.assertTrue(result["backup"].startswith(os.path.join(self.dir, "backups")))
         self.assertFalse(bridge.status()["connected"])
 
+    def test_uninstall_may_delete_the_saves(self):
+        _, bridge = self.make()
+        bridge.save("records", {"x": 1})
+        self.assertTrue(bridge.install_apply()["ok"])
+        self.assertTrue(bridge.uninstall_apply(False, "yes")["ok"])  # only True deletes
+        self.assertEqual(bridge.load("records"), {"x": 1})
+        self.assertTrue(bridge.install_apply()["ok"])
+        os.makedirs(os.path.join(self.dir, "dlc", "last-commit-standing"))
+        self.assertTrue(bridge.uninstall_apply(False, True)["ok"])
+        self.assertIsNone(bridge.load("records"))
+        self.assertFalse(os.path.exists(os.path.join(self.dir, "dlc")))
+
     def test_live_session_status(self):
         core, bridge = self.make()
         core.on_payload(raw("SessionStart", source="startup"), 1.0)
@@ -247,7 +228,7 @@ class BridgeTest(unittest.TestCase):
             status["sessions"], [{"session": SID, "project": "my-app", "status": "waiting"}]
         )
         self.assertEqual(status["paused"][0]["reason"], "waiting")
-        self.assertEqual(bridge.dlc_live_sessions("arena"), status["sessions"])
+        self.assertEqual(bridge.live_sessions(), status["sessions"])
 
 
 if __name__ == "__main__":

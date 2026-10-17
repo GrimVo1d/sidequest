@@ -1,5 +1,5 @@
-// Avatar editor in the hub: presets, the builder and an uploaded picture or GIF.
-// Uses the hub helpers from hub.js (el, button, clear, modal, closeModal, api).
+// The avatar editor: presets, the builder and an uploaded picture or GIF.
+// Uses the helpers of shell.js (el, button, clear, modal, closeModal, api).
 "use strict";
 
 const AV = window.SidequestAvatar;
@@ -60,7 +60,7 @@ function openAvatarEditor(current, onSaved) {
         let b;
         if (o.type === "color") {
           b = button("", pick, "av-swatch" + (c.color ? "" : " none"));
-          if (c.color) b.style.backgroundColor = c.color;   // constant from sdk/avatar.js
+          if (c.color) b.style.backgroundColor = c.color;   // constant from avatar.js
           b.title = tf(c, "label");
         } else {
           b = button(tf(c, "label"), pick);

@@ -1,4 +1,4 @@
-// Last Commit Standing: records and achievements. No DOM and no storage here: main.js
+// The arena: records and achievements. No DOM and no storage here: main.js
 // reads and saves through the SDK, tests run this in jsc.
 //   records = LCSProgress.addMatch(records, results)   // only for counted matches
 //   LCSProgress.earned(balance.achievements, results, records, mapIds)  // ids, met now
@@ -156,16 +156,5 @@
     return Object.assign(p, {have: Math.min(p.have, p.need)});
   }
 
-  // Rows for the card in the hub; the hub shows each label in its own language and
-  // makes the achievements row a link to the achievements screen.
-  function card(records, unlocked, total) {
-    const rows = [[{ru: "Лучший счёт", en: "Best score"},
-                   Math.max(...MODES.map((m) => records[m].best_score))],
-                  [{ru: "Матчей", en: "Matches"}, records.totals.matches],
-                  [{ru: "Ачивки", en: "Achievements"}, `${unlocked}/${total}`, "achievements"]];
-    if (records.classic.wins) rows.push([{ru: "Побед в классике", en: "Classic wins"}, records.classic.wins]);
-    return rows;
-  }
-
-  root.LCSProgress = {migrate, addMatch, earned, addBests, progressOf, card, addDay, streak, addGhost, MODES};
+  root.LCSProgress = {migrate, addMatch, earned, addBests, progressOf, addDay, streak, addGhost, MODES};
 })(typeof window !== "undefined" ? window : globalThis);

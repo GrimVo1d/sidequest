@@ -11,22 +11,15 @@ import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-JS_GLOBS = [
-    "sdk/*.js",
-    "hub/*.js",
-    "dlc/*/*.js",
-    "dlc/*/sim/*.js",
-    "dev/dlc/*/*.js",
-    "landing/*.js",
-]
+JS_GLOBS = ["game/*.js", "landing/*.js"]
 PY_GLOBS = ["sidequest/*.py", "tests/*.py", "dev/webkit/*.py", "landing/*.py"]
 
 MAX_LINES = 1000
 # Files written before the size budget, with the size they may not grow past. Shrink the
 # number when a file gets smaller; remove the entry once the file is under MAX_LINES.
 LEGACY_SIZE = {
-    "dlc/last-commit-standing/game.js": 2120,
-    "dlc/last-commit-standing/render.js": 1243,
+    "game/game.js": 2120,
+    "game/render.js": 1243,
 }
 
 FORBIDDEN_SINKS = re.compile(
@@ -107,7 +100,7 @@ def where(path, code, pattern):
 class JavaScriptStyle(unittest.TestCase):
     def setUp(self):
         self.js = files(JS_GLOBS)
-        self.assertGreater(len(self.js), 30)
+        self.assertGreater(len(self.js), 15)
 
     def test_header_comment_and_strict_mode(self):
         bad = []

@@ -1,14 +1,15 @@
-"""Checks in a real WebKit window: the hub with a DLC open, driven from Python.
+"""Checks in a real WebKit window: the game, driven from Python.
 
-The window runs on a throwaway database and DLC data under .tmp/, never the real data/.
+The window runs on a throwaway database and game saves under .tmp/, never the real data/.
 Events go straight into the core, as if the hook had sent them.
 
     from webkit import run
 
     def drive(c):                      # c: a Check
-        c.frame("d.getElementById('btn-play').click()"); c.wait(2)
+        c.open_game()
+        c.page("d.getElementById('btn-play').click()"); c.wait(2)
         c.snapshot("start")
-        return {"hud": c.frame("d.getElementById('top').textContent")}
+        return {"hud": c.page("d.getElementById('top').textContent")}
 
     run(drive)                         # argv: <out dir> [ru|en] [--no-dev] [--show]
 
@@ -38,102 +39,45 @@ sys.path.insert(0, ROOT)
 from sidequest import app, i18n, paths  # noqa: E402
 from sidequest.core import Core  # noqa: E402
 
-# The DLC frame is sandboxed (hub/index.html), so the hub page cannot look inside it. A
-# user script in every frame reports the frame to Python, and frame() runs code in it.
-FRAME_SCRIPT = (
-    "if (window !== window.top) window.webkit.messageHandlers.sidequestCheck.postMessage(1)"
-)
-
-
-class _Frames:
-    """Remembers the DLC frame (WKFrameInfo) each time it loads."""
-
-    def __init__(self):
-        self.info = None
-        self.handler = None
-
-    def install(self, view):
-        import WebKit
-        from Foundation import NSObject
-
-        frames = self
-
-        class SidequestCheckFrames(NSObject):
-            def userContentController_didReceiveScriptMessage_(self, controller, message):  # noqa: N802
-                frames.info = message.frameInfo()
-
-        self.handler = SidequestCheckFrames.alloc().init()
-        content = view.configuration().userContentController()
-        content.addScriptMessageHandler_name_(self.handler, "sidequestCheck")
-        script = WebKit.WKUserScript.alloc().initWithSource_injectionTime_forMainFrameOnly_(
-            FRAME_SCRIPT, WebKit.WKUserScriptInjectionTimeAtDocumentStart, False
-        )
-        content.addUserScript_(script)
-
 
 class Check:
-    def __init__(self, window, core, bridge, out, frames):
+    def __init__(self, window, core, bridge, out):
         self.window, self.core, self.bridge, self.out = window, core, bridge, out
-        self._frames = frames
 
-    # --- pages ---------------------------------------------------------------------
+    # --- the page ------------------------------------------------------------------
 
-    def hub(self, code):
-        """Evaluate JS in the hub page."""
-        return self.window.evaluate_js(code)
-
-    def frame(self, code):
-        """Evaluate a JS expression in the DLC's frame: `w` is its window, `d` its document."""
-        import WebKit
-        from PyObjCTools import AppHelper
-        from webview.platforms.cocoa import BrowserView
-
-        info = self._frames.info
-        if info is None:
-            raise RuntimeError("the DLC frame has not loaded")
-        view = BrowserView.instances[self.window.uid].webview
+    def page(self, code):
+        """Evaluate a JS expression in the game page: `w` is its window, `d` its document."""
         js = f"JSON.stringify((() => {{ const w = window, d = document; return {code}; }})())"
-        done, out = threading.Event(), {}
-
-        def handler(result, error):
-            out["result"], out["error"] = result, error
-            done.set()
-
-        AppHelper.callAfter(
-            lambda: view.evaluateJavaScript_inFrame_inContentWorld_completionHandler_(
-                js, info, WebKit.WKContentWorld.pageWorld(), handler
-            )
-        )
-        if not done.wait(10):
-            raise RuntimeError("the DLC frame did not answer")
-        if out["error"] is not None:
-            raise RuntimeError(str(out["error"].localizedDescription()) + " in: " + code[:200])
-        result = out["result"]
+        result = self.window.evaluate_js(js)
         return json.loads(result) if isinstance(result, str) else None
 
     def wait(self, seconds):
         time.sleep(seconds)
 
-    def open_dlc(self, name):
-        """Open the DLC whose hub card mentions `name`, and start collecting its JS errors."""
-        self.hub(
-            f"[...document.querySelectorAll('.dlc')].find((c) => c.textContent.includes({json.dumps(name)}))"
-            ".querySelector('button').click()"
-        )
-        time.sleep(3)
-        self.frame(
+    def open_game(self):
+        """Wait for the menu and start collecting the page's JS errors."""
+        for _ in range(50):
+            if self.page(
+                "!!d.getElementById('btn-play') && !d.getElementById('btn-play').disabled"
+            ):
+                break
+            time.sleep(0.2)
+        time.sleep(1)
+        self.page(
             "(w.__errors = [], w.addEventListener('error', (e) => w.__errors.push(e.message + ' :' + e.lineno)), 1)"
         )
 
     def errors(self):
-        return self.frame("w.__errors ? w.__errors.slice() : null")
+        return self.page("w.__errors ? w.__errors.slice() : null")
 
     # --- input ---------------------------------------------------------------------
 
     def key(self, code, kind="keydown", ctrl=False, shift=False):
-        self.frame(
-            f"w.dispatchEvent(new w.KeyboardEvent('{kind}', {{code: '{code}', ctrlKey: {str(ctrl).lower()}, "
-            f"shiftKey: {str(shift).lower()}, bubbles: true}}))"
+        """A key on what has the focus, as a real key press: the shell's overlays see it first."""
+        self.page(
+            f"(d.activeElement || d.body).dispatchEvent(new w.KeyboardEvent('{kind}', {{code: '{code}', "
+            f"ctrlKey: {str(ctrl).lower()}, shiftKey: {str(shift).lower()}, bubbles: true}}))"
         )
 
     def hold(self, code, seconds):
@@ -143,7 +87,7 @@ class Check:
 
     def mouse(self, kind, x, y, button=0, shift=False, target="map"):
         """A mouse event at window coordinates on the element with id `target`."""
-        self.frame(
+        self.page(
             f"(d.getElementById('{target}').dispatchEvent(new w.MouseEvent('{kind}', {{clientX: {x}, "
             f"clientY: {y}, button: {button}, shiftKey: {str(shift).lower()}, bubbles: true}})), 1)"
         )
@@ -157,12 +101,12 @@ class Check:
         self.core.publish(
             dict({"ts": time.time(), "session": session, "project": "demo", "kind": kind}, **fields)
         )
-        self.hub("window.__sidequestWake && window.__sidequestWake()")
+        self.page("(w.__sidequestWake && w.__sidequestWake(), 1)")
 
     def dev(self, command):
-        """A DLC command of the developer panel (only with the panel on): like its button, it
+        """A game command of the developer panel (only with the panel on): like its button, it
         marks the match as made with the panel, so it is not counted."""
-        self.hub(f"(api.dev_taint(), toGame({{kind: 'dev_command', id: {json.dumps(command)}}}))")
+        self.page(f"(api.dev_taint(), Sidequest.dev.run({json.dumps(command)}), 1)")
 
     # --- looking -------------------------------------------------------------------
 
@@ -191,7 +135,7 @@ class Check:
         """[top, bottom, left, right] of what each element shows, None for hidden or missing ones.
         A box with children is measured by them: a full-width row with its content in the
         middle covers only the middle."""
-        return self.frame(
+        return self.page(
             f"Object.fromEntries({json.dumps(ids)}.map((id) => {{ const e = d.getElementById(id); "
             "if (!e) return [id, null]; "
             "const shown = (r) => r.width > 0 && r.height > 0; "
@@ -205,7 +149,7 @@ class Check:
     def overlaps(self, ids):
         """Pairs of shown elements whose boxes overlap, and elements that leave the window."""
         boxes = {k: v for k, v in self.rects(ids).items() if v}
-        size = self.frame("[w.innerWidth, w.innerHeight]")
+        size = self.page("[w.innerWidth, w.innerHeight]")
         out = []
         names = list(boxes)
         for i, a in enumerate(names):
@@ -253,7 +197,7 @@ def _awake(stop):
 
 
 def run(drive, argv=None, width=1200, height=800):
-    """Open the hub on throwaway data, call drive(Check), print its result as JSON."""
+    """Open the game on throwaway data, call drive(Check), print its result as JSON."""
     import webview
 
     args = list(sys.argv[1:] if argv is None else argv)
@@ -261,7 +205,7 @@ def run(drive, argv=None, width=1200, height=800):
     show = "--show" in args
     args = [a for a in args if a not in ("--no-dev", "--show")]
     out = os.path.abspath(args[0] if args else os.path.join(ROOT, ".tmp", "webkit"))
-    lang = args[1] if len(args) > 1 else "ru"
+    lang = args[1] if len(args) > 1 else "en"
     os.makedirs(out, exist_ok=True)
     os.makedirs(os.path.join(ROOT, ".tmp"), exist_ok=True)
     tmp = tempfile.mkdtemp(dir=os.path.join(ROOT, ".tmp"))
@@ -269,7 +213,7 @@ def run(drive, argv=None, width=1200, height=800):
     stop = threading.Event()
     threading.Thread(target=_awake, args=(stop,), daemon=True).start()
     try:
-        with mock.patch.object(paths, "DLC_DATA_DIR", os.path.join(tmp, "dlc")):
+        with mock.patch.object(paths, "GAME_DATA_DIR", os.path.join(tmp, "game")):
             core = Core(
                 db_path=os.path.join(tmp, "check.db"), socket_path=os.path.join(tmp, "s.sock")
             )
@@ -277,20 +221,13 @@ def run(drive, argv=None, width=1200, height=800):
             i18n.set_language(lang)
             bridge = app.Bridge(core, with_dev, os.path.join(tmp, "settings.json"))
             window = app.create_window(bridge, "check", width=width, height=height)
-            frames = _Frames()
 
             def go(window):
-                from PyObjCTools import AppHelper
-                from webview.platforms.cocoa import BrowserView
-
-                AppHelper.callAfter(
-                    lambda: frames.install(BrowserView.instances[window.uid].webview)
-                )
                 time.sleep(1)
                 _front(window, show)
                 time.sleep(1)
                 try:
-                    result.update(drive(Check(window, core, bridge, out, frames)) or {})
+                    result.update(drive(Check(window, core, bridge, out)) or {})
                 except Exception:
                     result["error"] = traceback.format_exc()
                 window.destroy()

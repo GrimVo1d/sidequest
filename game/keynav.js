@@ -1,5 +1,5 @@
 // Menus without a mouse: the arrow keys move between the buttons on screen, to the nearest
-// one in that direction, and Enter presses the focused one. Shared by the hub and the DLC.
+// one in that direction, and Enter presses the focused one. Used by the arena and the shell.
 //   if (SidequestKeys.handle(event, screenElement)) return;   // in a keydown handler
 "use strict";
 

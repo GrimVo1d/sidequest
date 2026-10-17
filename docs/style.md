@@ -22,7 +22,7 @@ and always come first.
   Nesting deeper than 4 levels is a sign to extract a function.
 - **No dead code.** No commented-out code, unused functions, parameters or imports
   **[ruff]**. Git remembers.
-- **No magic numbers.** Balance numbers live in `dlc/<id>/balance.json`; other constants are
+- **No magic numbers.** Balance numbers live in `game/balance.json`; other constants are
   named `UPPER_CASE` at the top of the module with a comment on units (px, cells, seconds).
 - **Names say what, not how.** `waveTypes(count, minutes)`, not `calc2`. Units in names when
   they matter: `delaySec`, `radiusPx`, `ttlMs`. Abbreviations only when universal in the
@@ -94,7 +94,7 @@ and always come first.
 
 ### Tests
 
-- `unittest`, one `tests/test_<module>.py` per module or DLC. Test names say the behaviour:
+- `unittest`, one `tests/test_<module>.py` per module. Test names say the behaviour:
   `test_denied_tool_is_blocked`, not `test_case3`.
 - Tests never touch the real home folder: temporary dirs via `tests.helpers.temp_dir`,
   temporary `settings.json` copies.
@@ -102,8 +102,8 @@ and always come first.
 
 ## 3. JavaScript
 
-There is no bundler and no Node. Every file is a classic script loaded by `<script>` in the
-hub or a DLC iframe, and by `load()` in the `jsc` harnesses. The style follows from that.
+There is no bundler and no Node. Every file is a classic script loaded by `<script>` in
+`game/index.html`, and by `load()` in the `jsc` harnesses. The style follows from that.
 
 ### Files and modules
 
@@ -118,14 +118,15 @@ hub or a DLC iframe, and by `load()` in the `jsc` harnesses. The style follows f
   })(typeof window !== "undefined" ? window : globalThis);
   ```
 
-Load order is the order of `<script>` tags in `index.html` and of `load()` in the harness —
-keep both the same.
+  Namespaces: `Sidequest`, `SidequestI18n`, `SidequestAvatar`, `SidequestKeys` (the core's
+  link and shared helpers), `LCS*` (the arena). Load order is the order of
+  `<script>` tags in `index.html` and of `load()` in the harness — keep both the same.
 - **Simulation without DOM.** `game.js` and everything it loads never touch `document`,
   `window` APIs, canvas or time; time arrives as `dt`, randomness from the seeded generator.
   That is what lets the bots play whole matches in `jsc`.
-- **Layers of a DLC:** simulation (`game.js` + its systems) → `codex.js`, `progress.js`
+- **Layers of the game:** simulation (`game.js` + its systems) → `codex.js`, `progress.js`
   (data, no DOM) → `render.js` (canvas, reads state, never writes it) → `main.js` (DOM,
-  input, SDK). A lower layer never calls a higher one.
+  input, `Sidequest`). A lower layer never calls a higher one.
 
 ### State and behaviour
 
@@ -144,8 +145,8 @@ keep both the same.
 
 The numbers for each type stay in `balance.json`; the table holds only code. Adding a new
 enemy means one new entry in the table, one in the balance, one sprite. Keys that come from
-outside (event kinds, actions) are looked up with an own-key check (`CC.sim.has`), so
-`"constructor"` never reaches `Object`'s members.
+outside (event kinds, actions) are looked up with an own-key check (`Object.hasOwn` or a
+null-prototype table), so `"constructor"` never reaches `Object`'s members.
 - **Classes** (`class`) are allowed for small self-contained data structures with
   invariants (a heap, a random generator); not for entities and not with inheritance.
 
@@ -184,12 +185,12 @@ outside (event kinds, actions) are looked up with an own-key check (`CC.sim.has`
 - Colours and sizes as custom properties in `:root`; no raw colour values repeated across
   rules.
 - Class and id names in `kebab-case`. No `!important` except for `[hidden]`.
-- Shared rules for all DLCs move to `sdk/` instead of being copied into each DLC.
+- Shared rules go to `style.css`; `shell.css` styles only the shell around the arena.
 
 ## 5. Tests and checks
 
 - A new mechanic comes with a `jsc` harness block that checks the mechanic itself (not
-  only "it did not crash") and assertions in `tests/test_<dlc>.py` with the numbers taken
+  only "it did not crash") and assertions in `tests/test_arena.py` with the numbers taken
   from the balance.
 - Interface changes are checked in the real WebKit window (`dev/webkit/smoke.py`, both
   languages) before they are called done.

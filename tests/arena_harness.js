@@ -3,11 +3,11 @@
 // Usage: jsc arena_harness.js -- <project dir>
 "use strict";
 const [project] = arguments;
-const DLC = project + "/dlc/last-commit-standing";
-load(DLC + "/maps.js");
-load(DLC + "/game.js");
-load(DLC + "/progress.js");
-const balance = JSON.parse(readFile(DLC + "/balance.json"));
+const GAME = project + "/game";
+load(GAME + "/maps.js");
+load(GAME + "/game.js");
+load(GAME + "/progress.js");
+const balance = JSON.parse(readFile(GAME + "/balance.json"));
 const DT = 1 / 60;
 
 function readScenario(name) {
@@ -990,7 +990,6 @@ result.bestiary = {};
   const work = Object.assign({}, busy, {commits: 5, reviews: 1});
   const worked = P.earned(balance.achievements, work, P.addMatch(null, work), ids);
   result.progress = {migrated, junk, records: r, after_win: afterWin, tourist, busy: ach, worked,
-                     card: P.card(r, 3, balance.achievements.length),
                      ids: balance.achievements.map((a) => a.id)};
   // The achievements screen: the best single match and how far each locked one is.
   const bests = P.addBests({kills: 40, junk: 3}, balance.achievements, Object.assign({}, won, {time: 900}));

@@ -1,11 +1,10 @@
-// Hub: main menu, pause banner, journal, self-check, DLC host and dev panel.
+// The page around the arena: the status bar, the Claude Code screen (connection,
+// self-check, sessions, journal), settings, the agents' pause and the dev panel.
 // Event data is only ever shown with textContent, never as HTML.
 "use strict";
 
 let api = null;
 let status = null;
-let currentDlc = null;          // {id, name, url, screen} while a DLC is open
-let dlcDevCommands = [];
 let replayInfo = null;
 const JOURNAL_MAX = 200;
 
@@ -105,7 +104,7 @@ async function drain() {
   let refresh = false;
   for (const e of events) {
     addJournal(e, true);
-    toGame({kind: "event", event: e});
+    Sidequest.shell.deliver(e);
     if (["waiting", "resumed", "silent", "session_start", "session_end", "stop", "prompt"].includes(e.kind)) {
       refresh = true;
     }
@@ -113,7 +112,7 @@ async function drain() {
   if (refresh) refreshStatus();
 }
 
-window.__sidequestWake = () => { drain(); };
+window.__sidequestWake = () => { if (api) drain(); };
 
 // --- status, pause, self-check -----------------------------------------------------
 
@@ -124,7 +123,7 @@ const STATUS_TEXT = {working: ["работает", "working"], idle: ["ждёт 
 
 async function refreshStatus() {
   status = await api.status();
-  const ind = $("indicator");
+  const ind = $("btn-agent");
   ind.className = "indicator " + status.indicator;
   let text = pair(INDICATOR_TEXT, status.indicator);
   if (!status.connected) text = t("Не подключено к Claude Code", "Not connected to Claude Code");
@@ -181,24 +180,23 @@ function renderChecks(checks) {
 
 let lastPauseKey = "";
 function renderPause(paused) {
-  const overlay = $("pause");
+  const overlay = $("agent-pause");
   const key = JSON.stringify(paused);
   if (key === lastPauseKey) return;
   lastPauseKey = key;
   const wasHidden = overlay.hidden;
   overlay.hidden = paused.length === 0;
-  toGame({kind: "pause", paused: paused.length > 0, sessions: paused});
+  Sidequest.shell.setPaused(paused.length > 0, paused);
   // The keys follow the overlay: to its buttons while it is up, back to the game after.
   if (!paused.length) {
-    if (!wasHidden && !$("game").hidden) $("game-frame").focus();
+    if (!wasHidden && document.activeElement) document.activeElement.blur();
     return;
   }
-  $("btn-quit-game").hidden = !currentDlc;
   const anyWaiting = paused.some((p) => p.reason === "waiting");
-  $("pause-title").textContent = anyWaiting
+  $("agent-pause-title").textContent = anyWaiting
     ? t("Claude ждёт ответа в терминале", "Claude is waiting for an answer in the terminal")
     : t("Агент молчит — возможно, его прервали", "The agent is silent — maybe it was interrupted");
-  const list = $("pause-list");
+  const list = $("agent-pause-list");
   clear(list);
   for (const p of paused) {
     const li = el("li");
@@ -208,7 +206,7 @@ function renderPause(paused) {
     }
     list.appendChild(li);
   }
-  if (wasHidden) $("btn-resume").focus();
+  if (wasHidden) $("btn-agent-resume").focus();
 }
 
 async function runCheck() {
@@ -261,20 +259,19 @@ async function disconnectFlow() {
   const p = await api.uninstall_preview();
   if (!p.ok) return modal(t("Не получилось", "Failed"), [el("p", p.error)], [[t("Закрыть", "Close"), closeModal]]);
   const core = el("input"); core.type = "checkbox";
-  const dlcBox = el("input"); dlcBox.type = "checkbox";
+  const saves = el("input"); saves.type = "checkbox";
   const coreLabel = el("label"); coreLabel.appendChild(core); coreLabel.appendChild(el("span", t(" Профиль и общая статистика", " Profile and shared stats")));
-  const dlcLabel = el("label"); dlcLabel.appendChild(dlcBox); dlcLabel.appendChild(el("span", t(" Данные всех DLC", " Data of every DLC")));
+  const savesLabel = el("label"); savesLabel.appendChild(saves); savesLabel.appendChild(el("span", t(" Сохранения игры: рекорды, ачивки, персонаж", " The game's saves: records, achievements, the character")));
   modal(t("Отключить от Claude Code", "Disconnect from Claude Code"), [
     el("p", t(`Из ${p.path} будут удалены только записи Sidequest (${p.changes.length}). Будет сделана резервная копия.`,
               `Only Sidequest entries (${p.changes.length}) will be removed from ${p.path}. A backup is made.`)),
-    el("p", t("Заодно удалить данные:", "Also delete data:")), coreLabel, dlcLabel,
+    el("p", t("Заодно удалить данные:", "Also delete data:")), coreLabel, savesLabel,
   ], [[t("Отмена", "Cancel"), closeModal], [t("Отключить", "Disconnect"), async () => {
-    const dlcIds = dlcBox.checked ? (await api.list_dlc()).map((d) => d.id) : [];
-    const r = await api.uninstall_apply(core.checked, dlcIds);
+    const r = await api.uninstall_apply(core.checked, saves.checked);
     modal(r.ok ? t("Отключено", "Disconnected") : t("Ошибка", "Error"),
           [el("p", r.ok ? t("Хуки Sidequest удалены.", "Sidequest hooks removed.") : r.error)],
           [[t("Закрыть", "Close"), closeModal]]);
-    refreshStatus(); loadProfile();
+    refreshStatus(); loadProfile(); Sidequest.shell.profileChanged();
   }, "primary"]]);
 }
 
@@ -285,11 +282,11 @@ async function settingsFlow() {
   const fps = el("select");
   for (const v of [30, 60]) { const o = el("option", v); o.value = v; o.selected = v === s.fps_limit; fps.appendChild(o); }
   const language = el("select");
-  for (const [v, label] of [["auto", t("Как в системе", "System")], ["ru", "Русский"], ["en", "English"]]) {
+  for (const [v, label] of [["en", "English"], ["ru", "Русский"], ["auto", t("Как в системе", "System")]]) {
     const o = el("option", label); o.value = v; o.selected = v === s.language; language.appendChild(o);
   }
   const l1 = el("label");
-  l1.appendChild(el("span", t("Пауза, если агент молчит дольше, с: ", "Pause when the agent is silent longer than, s: ")));
+  l1.appendChild(el("span", t("Пауза, если агент молчит дольше, сек: ", "Pause when the agent is silent longer than, sec: ")));
   l1.appendChild(silence);
   const l2 = el("label"); l2.appendChild(el("span", t("Ограничение FPS: ", "FPS limit: "))); l2.appendChild(fps);
   const l3 = el("label"); l3.appendChild(el("span", t("Язык: ", "Language: "))); l3.appendChild(language);
@@ -299,15 +296,17 @@ async function settingsFlow() {
     const changed = language.value !== s.language;
     await api.set_setting("language", language.value);
     closeModal();
-    if (changed) setLanguage((await api.get_settings()).lang);
+    // The whole page is drawn again in the other language; the core keeps running.
+    if (changed) location.reload();
   }, "primary"]]);
 }
 
-// --- profile and DLC list ----------------------------------------------------------
+// --- profile -------------------------------------------------------------------------
 
 let profile = null;
 let stopAvatar = () => {};
 
+// The name and the picture on the menu, the agent's work on the Claude Code screen.
 async function loadProfile() {
   const p = profile = await api.profile();
   $("profile-name").value = p.name;
@@ -322,110 +321,21 @@ async function loadProfile() {
   for (const [k, v] of rows) { dl.appendChild(el("dt", k)); dl.appendChild(el("dd", v)); }
 }
 
-async function loadDlc() {
-  const list = await api.list_dlc();
-  const grid = $("dlc-list");
-  clear(grid);
-  for (const d of list) {
-    const card = el("div", null, "dlc");
-    card.appendChild(el("div", d.name, "name"));
-    card.appendChild(el("div", d.dev_only ? t("только --dev", "--dev only") : "", "tag"));
-    if (d.card && d.card.length) {
-      const dl = el("dl", null, "card-stats");
-      for (const [k, v, screen] of d.card) {
-        dl.appendChild(el("dt", k));
-        const dd = el("dd");
-        // A row that names a screen of the DLC opens the DLC right on it.
-        if (screen) dd.appendChild(button(v + " ›", () => openDlc(d, screen), "small link"));
-        else dd.textContent = v;
-        dl.appendChild(dd);
-      }
-      card.appendChild(dl);
-    }
-    card.appendChild(button(t("Играть", "Play"), () => openDlc(d), "primary"));
-    grid.appendChild(card);
-  }
-  if (!list.length) grid.appendChild(el("p", t("Пока нет ни одного режима.", "No modes yet."), "hint"));
-}
+// --- the Claude Code screen: over the menu, back to it ------------------------------
 
-// --- DLC host: the DLC talks to the core only through these messages ----------------
-
-const DLC_METHODS = {
-  load: (id, args) => api.dlc_load(id, String(args[0])),
-  save: (id, args) => api.dlc_save(id, String(args[0]), args[1]),
-  match_start: (id) => api.match_start(id),
-  match_end: (id, args) => api.match_end(id, args[0]),
-  balance: (id) => api.dlc_balance(id),
-  profile: () => api.profile(),
-  settings: () => api.get_settings(),
-  sessions: (id) => api.dlc_sessions(id),
-  live_sessions: (id) => api.dlc_live_sessions(id),
-  session_events: (id, args) => api.dlc_session_events(id, String(args[0])),
-};
-
-// `screen`: a screen of the DLC to open instead of its menu, passed on in "hello".
-function openDlc(d, screen) {
-  currentDlc = Object.assign({}, d, {screen: screen || null});
-  dlcDevCommands = [];
-  renderDlcDev();
-  $("hub").hidden = true;
-  $("game").hidden = false;
-  document.body.classList.add("playing");
-  const frame = $("game-frame");
-  // Keys go to the game right away, without a click into it first.
-  frame.onload = () => frame.contentWindow && frame.focus();
-  frame.src = d.url;
-}
-
-function closeDlc() {
-  currentDlc = null;
-  dlcDevCommands = [];
-  renderDlcDev();
-  $("game-frame").onload = null;
-  $("game-frame").src = "about:blank";
-  $("game").hidden = true;
-  document.body.classList.remove("playing");
-  $("hub").hidden = false;
-  $("btn-quit-game").hidden = true;
+function openAgent() {
+  $("menu").hidden = true;
+  $("agent").hidden = false;
   loadProfile();
-  loadDlc();  // the card may show new records
+  runCheck();
+  $("btn-agent-back").focus({preventScroll: true});
 }
 
-function toGame(message) {
-  const frame = $("game-frame");
-  if (currentDlc && frame.contentWindow) {
-    frame.contentWindow.postMessage(Object.assign({sidequest: true}, message), "*");
-  }
+function closeAgent() {
+  $("agent").hidden = true;
+  $("menu").hidden = false;
+  $("btn-agent").focus({preventScroll: true});
 }
-
-window.addEventListener("message", async (msg) => {
-  if (!currentDlc || msg.source !== $("game-frame").contentWindow) return;
-  const m = msg.data;
-  if (!m || m.sidequest !== true) return;
-  if (m.kind === "ready") {
-    toGame({kind: "hello", dlc: currentDlc.id, dev: status ? status.dev : false,
-            lang: SidequestI18n.lang, screen: currentDlc.screen});
-    lastPauseKey = "";
-    if (status) renderPause(status.paused);
-  } else if (m.kind === "call") {
-    // Own keys only: "constructor" or "toString" from a DLC is not a method.
-    const fn = Object.hasOwn(DLC_METHODS, m.method) ? DLC_METHODS[m.method] : null;
-    let reply;
-    try {
-      if (!fn) throw new Error("unknown method " + m.method);
-      // The DLC id is fixed by the hub: a DLC can only reach its own data.
-      reply = {kind: "reply", id: m.id, result: await fn(currentDlc.id, m.args || [])};
-    } catch (e) {
-      reply = {kind: "reply", id: m.id, error: String(e && e.message || e)};
-    }
-    toGame(reply);
-  } else if (m.kind === "exit") {
-    closeDlc();
-  } else if (m.kind === "dev_register" && Array.isArray(m.commands)) {
-    dlcDevCommands = m.commands.slice(0, 40).map((c) => ({id: String(c.id), label: String(c.label)}));
-    renderDlcDev();
-  }
-});
 
 // --- dev panel ---------------------------------------------------------------------
 
@@ -451,15 +361,14 @@ const DEV_EVENTS = [
   ["Задача закончена", "stop", {ok: true, background: 0, final: true}],
 ];
 
-function renderDlcDev() {
-  const row = $("dev-dlc");
+function renderGameDev() {
+  const row = $("dev-game");
   clear(row);
-  if (!dlcDevCommands.length) return;
-  row.appendChild(el("span", "DLC:", "tag"));
-  for (const c of dlcDevCommands) {
+  row.appendChild(el("span", "Игра:", "tag"));
+  for (const c of Sidequest.dev.commands) {
     row.appendChild(button(c.label, () => {
       api.dev_taint();
-      toGame({kind: "dev_command", id: c.id});
+      Sidequest.dev.run(c.id);
     }));
   }
 }
@@ -508,6 +417,7 @@ async function devPoll() {
 
 let devPaused = false;
 function bindDev() {
+  $("dev-toggle").addEventListener("click", () => { $("dev-body").hidden = !$("dev-body").hidden; });
   $("dev-play").addEventListener("click", devPlay);
   $("dev-pause").addEventListener("click", () => {
     devPaused = !devPaused;
@@ -536,25 +446,16 @@ function bindDev() {
 
 // --- start -------------------------------------------------------------------------
 
-// Arrows and Enter in the hub's menus; a game in the frame handles its own keys.
-const TYPING = new Set(["INPUT", "TEXTAREA", "SELECT"]);
-function passToGame(e) {
-  const frame = $("game-frame");
-  if (!frame.contentWindow || (document.activeElement && TYPING.has(document.activeElement.tagName))) return;
-  frame.focus();
-  toGame({kind: "key", type: e.type, code: e.code, key: e.key});
-  e.preventDefault();
-}
+// Arrows and Enter on the shell's overlays and its screen. Caught before the arena's own
+// keys: while one of them is up, the game under it does not move.
 window.addEventListener("keydown", (e) => {
-  const overlay = [$("modal"), $("pause")].find((x) => !x.hidden);
-  if (overlay || $("game").hidden) { SidequestKeys.handle(e, overlay || $("hub")); return; }
-  // A click on the hub's panels took the keys from the game: give them back.
-  passToGame(e);
-});
-window.addEventListener("keyup", (e) => {
-  if ($("game").hidden || [$("modal"), $("pause")].some((x) => !x.hidden)) return;
-  passToGame(e);
-});
+  const overlay = [$("modal"), $("agent-pause"), $("agent")].find((x) => !x.hidden);
+  if (!overlay) return;
+  e.stopImmediatePropagation();
+  if (e.code === "Escape" && overlay === $("agent")) { closeAgent(); e.preventDefault(); return; }
+  if (e.code === "Escape" && overlay === $("modal")) { closeModal(); e.preventDefault(); return; }
+  SidequestKeys.handle(e, overlay);
+}, true);
 
 window.addEventListener("error", (e) => {
   if (api) api.report_error(`${e.message} at ${e.filename}:${e.lineno}`);
@@ -563,35 +464,19 @@ window.addEventListener("unhandledrejection", (e) => {
   if (api) api.report_error(`unhandled: ${e.reason && (e.reason.stack || e.reason.message) || e.reason}`);
 });
 
-// Everything on the hub is drawn again; the self-check runs again for its texts.
-function setLanguage(lang) {
-  SidequestI18n.set(lang);
-  SidequestI18n.apply(document);
-  const events = journalEvents.slice().reverse();
-  journalEvents = [];
-  clear($("journal"));
-  for (const e of events) addJournal(e, true);
-  loadProfile();
-  loadDlc();
-  lastPauseKey = "";
-  runCheck();
-}
-
-window.addEventListener("pywebviewready", async () => {
+Sidequest.ready().then(async () => {
   api = window.pywebview.api;
-  SidequestI18n.set((await api.get_settings()).lang);
-  SidequestI18n.apply(document);
+  $("btn-agent").addEventListener("click", openAgent);
+  $("btn-agent-back").addEventListener("click", closeAgent);
   $("btn-check").addEventListener("click", runCheck);
   $("btn-connect").addEventListener("click", connectFlow);
   $("btn-settings").addEventListener("click", settingsFlow);
   $("btn-exit").addEventListener("click", () => api.quit());
-  $("btn-resume").addEventListener("click", () => api.resume(null).then(refreshStatus));
-  // Leaving the game is enough of an answer: the pause goes away with it.
-  $("btn-quit-game").addEventListener("click", () => {
-    closeDlc();
-    api.resume(null).then(refreshStatus);
+  $("btn-agent-resume").addEventListener("click", () => api.resume(null).then(refreshStatus));
+  const editAvatar = () => openAvatarEditor(profile && profile.avatar, () => {
+    loadProfile();
+    Sidequest.shell.profileChanged();
   });
-  const editAvatar = () => openAvatarEditor(profile && profile.avatar, loadProfile);
   $("avatar").addEventListener("click", editAvatar);
   $("btn-avatar").addEventListener("click", editAvatar);
   $("profile-name").addEventListener("change", async (e) => {
@@ -600,8 +485,7 @@ window.addEventListener("pywebviewready", async () => {
   await refreshStatus();
   for (const e of (await api.journal(100)).reverse()) addJournal(e, true);
   loadProfile();
-  loadDlc();
-  if (status.dev) { bindDev(); setupDev(); setInterval(devPoll, 500); }
+  if (status.dev) { bindDev(); setupDev(); renderGameDev(); setInterval(devPoll, 500); }
   setInterval(refreshStatus, 1000);
   drain();
 });

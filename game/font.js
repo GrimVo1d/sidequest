@@ -1,4 +1,4 @@
-// Last Commit Standing: a pixel font for text on the arena, Latin and Cyrillic, upper case.
+// The arena: a pixel font for text on the arena, Latin and Cyrillic, upper case.
 // Glyphs are 5 rows high ("|" separates rows); Д, Ц and Щ have a sixth row below the line.
 // No DOM here: layout() returns the lit pixels, render.js paints them.
 "use strict";

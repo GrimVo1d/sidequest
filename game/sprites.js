@@ -1,4 +1,4 @@
-// Last Commit Standing: the sprites, drawn in code as rows of palette letters, like avatars.
+// The arena: the sprites, drawn in code as rows of palette letters, like avatars.
 // "." is transparent. decode() adds a one-pixel outline and returns RGBA bytes, so the
 // sprites are checked in jsc; render.js turns them into canvases once and caches them.
 "use strict";

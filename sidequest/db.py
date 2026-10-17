@@ -44,13 +44,13 @@ CREATE TABLE IF NOT EXISTS meta (
 );
 """
 
-# Core settings editable from the hub; values are JSON. Code reads them via get_setting.
+# Core settings editable in the game; values are JSON. Code reads them via get_setting.
 DEFAULT_SETTINGS: dict[str, Any] = {
     # Seconds without events before the "agent is silent" pause (PLAN.md 3.4).
     "silence_pause_seconds": 90,
     "fps_limit": 60,
-    # "auto" follows the system language (sidequest/i18n.py).
-    "language": "auto",
+    # English unless the player picks Russian; "auto" follows the system (sidequest/i18n.py).
+    "language": "en",
 }
 
 # Last Claude Code version whose events were verified (stage 0, docs/events.md).

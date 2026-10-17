@@ -1,4 +1,4 @@
-"""The window: pywebview on the system WebKit, the hub page and the JS bridge.
+"""The window: pywebview on the system WebKit, the game page and the JS bridge.
 
 Data only ever crosses into the page as return values of bridge calls. Python never
 builds JavaScript from event data: it only runs one constant wake-up call, and the page
@@ -8,14 +8,13 @@ then pulls the events through `Bridge.drain()`.
 import contextlib
 import json
 import os
-import re
 import sys
 import threading
 import time
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, TypedDict
 
-from . import avatar, claude_settings, dlc_scheme, i18n, paths, replay, selfcheck
+from . import avatar, claude_settings, i18n, paths, replay, selfcheck
 from .core import Core
 from .db import DEFAULT_SETTINGS, Row
 from .i18n import t
@@ -28,8 +27,6 @@ WAKE_JS = "window.__sidequestWake && window.__sidequestWake()"
 MAX_QUEUE = 5000
 GHOST_MIN_ACTIONS = 10  # shorter sessions make no match
 GHOST_MAX_EVENTS = 20000
-_ID_RE = paths.DLC_ID_RE
-_SCREEN_RE = re.compile(r"^[a-z][a-z-]{0,23}\Z")  # a DLC screen a hub card row may open
 
 # A JSON object a bridge call returns to the page. Arguments that come from the page are
 # typed Any: they are whatever the page sent.
@@ -42,21 +39,13 @@ class LiveSession(TypedDict):
     status: str
 
 
-class DlcInfo(TypedDict):
-    id: str
-    name: str
-    dev_only: bool
-    card: list[list[str]]
-    url: str
-
-
 def _file_url(path: str) -> str:
     # A file:// URL (not a bare path) keeps pywebview from starting its HTTP server.
     return "file://" + os.path.abspath(path)
 
 
 class Bridge:
-    """Methods callable from the hub page as window.pywebview.api.<name>(...).
+    """Methods callable from the game page as window.pywebview.api.<name>(...).
 
     The page never gets the Bridge itself: see `exposed()` and `create_window()`."""
 
@@ -99,10 +88,8 @@ class Bridge:
         return events
 
     def report_error(self, message: Any) -> None:
-        """JS errors of the hub end up in the terminal log."""
-        import sys
-
-        print(f"[hub error] {str(message)[:2000]}", file=sys.stderr, flush=True)
+        """JS errors of the page end up in the terminal log."""
+        print(f"[page error] {str(message)[:2000]}", file=sys.stderr, flush=True)
 
     # --- status and self-check --------------------------------------------------
 
@@ -208,19 +195,14 @@ class Bridge:
     def uninstall_preview(self) -> Reply:
         return self._preview(claude_settings.plan_uninstall)
 
-    def uninstall_apply(self, delete_core: Any = False, delete_dlc: Any = ()) -> Reply:
+    def uninstall_apply(self, delete_core: Any = False, delete_game: Any = False) -> Reply:
         result = self._apply(claude_settings.plan_uninstall)
         if not result["ok"]:
             return result
-        if delete_core:
+        if delete_core is True:
             self._core.store.delete_all()
-        for dlc_id in delete_dlc or ():
-            if _ID_RE.match(dlc_id or ""):
-                target = os.path.join(paths.DLC_DATA_DIR, dlc_id)
-                if os.path.isdir(target):
-                    import shutil
-
-                    shutil.rmtree(target)
+        if delete_game is True:
+            paths.delete_game_data(paths.GAME_DATA_DIR)
         return result
 
     def _preview(self, planner: claude_settings.Planner) -> Reply:
@@ -250,7 +232,7 @@ class Bridge:
 
     def profile(self) -> Reply:
         store = self._core.store
-        # avatar None means the default one (SidequestAvatar.DEFAULT in sdk/avatar.js).
+        # avatar None means the default one (SidequestAvatar.DEFAULT in game/avatar.js).
         return {
             "name": store.get_meta("profile.name", t("Игрок", "Player")),
             "avatar": store.get_meta("profile.avatar"),
@@ -283,115 +265,60 @@ class Bridge:
         elif name == "fps_limit":
             value = 30 if int(value) <= 30 else 60
         elif name == "language":
-            value = value if value in i18n.LANGS else "auto"
+            value = value if value in (*i18n.LANGS, "auto") else "en"
             i18n.set_language(i18n.resolve(value))
         self._core.store.set_setting(name, value)
         return value
 
-    # --- DLC --------------------------------------------------------------------
+    # --- the game's own data -----------------------------------------------------
 
-    def _dlc_roots(self) -> list[str]:
-        roots = [os.path.join(paths.PROJECT_DIR, "dlc")]
-        if self._dev:
-            roots.append(os.path.join(paths.PROJECT_DIR, "dev", "dlc"))
-        return roots
+    def balance(self) -> Any:
+        """game/balance.json: the numbers and texts that ship with the game."""
+        with open(os.path.join(paths.GAME_DIR, "balance.json"), encoding="utf-8") as f:
+            return json.load(f)
 
-    def list_dlc(self) -> list[DlcInfo]:
-        roots = self._dlc_roots()
-        found: list[DlcInfo] = []
-        for root in roots:
-            if not os.path.isdir(root):
-                continue
-            for name in sorted(os.listdir(root)):
-                manifest = os.path.join(root, name, "manifest.json")
-                if not _ID_RE.match(name) or not os.path.isfile(manifest):
-                    continue
-                try:
-                    with open(manifest, encoding="utf-8") as f:
-                        data = json.load(f)
-                except (OSError, ValueError):
-                    continue
-                entry = os.path.join(root, name, data.get("entry", "index.html"))
-                found.append(
-                    {
-                        "id": name,
-                        "name": str(data.get("name", name)),
-                        "dev_only": root != roots[0],
-                        "card": self._card(name),
-                        "url": dlc_scheme.url_for(entry),
-                    }
-                )
-        return found
-
-    def _card(self, dlc_id: str) -> list[list[str]]:
-        """A few "label: value" rows the DLC wrote for its card in the hub (Sidequest.card).
-
-        A label is a string or {"ru": .., "en": ..}. A third item names a screen of the DLC
-        (like "achievements"): the row becomes a link that opens the DLC on that screen."""
+    def load(self, key: Any) -> Any:
         try:
-            rows = self.dlc_load(dlc_id, "card")
-        except (OSError, ValueError):
-            return []
-        if not isinstance(rows, list):
-            return []
-        card = []
-        for row in rows[:4]:
-            if isinstance(row, list) and len(row) in (2, 3):
-                label = row[0]
-                if isinstance(label, dict):  # {"ru": .., "en": ..}: shown in the chosen language
-                    label = label.get(i18n.language(), label.get("ru", ""))
-                item = [str(label)[:24], str(row[1])[:16]]
-                if len(row) == 3 and isinstance(row[2], str) and _SCREEN_RE.match(row[2]):
-                    item.append(row[2])
-                card.append(item)
-        return card
-
-    def dlc_balance(self, dlc_id: Any) -> Any:
-        """The DLC's balance.json (read-only numbers that ship with the DLC)."""
-        if not _ID_RE.match(str(dlc_id)):
-            raise ValueError("bad dlc id")
-        for root in self._dlc_roots():
-            path = os.path.join(root, dlc_id, "balance.json")
-            if os.path.isfile(path):
-                with open(path, encoding="utf-8") as f:
-                    return json.load(f)
-        return None
-
-    def dlc_load(self, dlc_id: Any, key: Any) -> Any:
-        path = self._dlc_file(dlc_id, key)
-        try:
-            with open(path, encoding="utf-8") as f:
+            with open(self._save_file(key), encoding="utf-8") as f:
                 return json.load(f)
         except FileNotFoundError:
             return None
 
-    def dlc_save(self, dlc_id: Any, key: Any, value: Any) -> bool:
-        path = self._dlc_file(dlc_id, key)
-        os.makedirs(os.path.dirname(path), mode=0o700, exist_ok=True)
+    def save(self, key: Any, value: Any) -> bool:
+        path = self._save_file(key)
+        os.makedirs(paths.GAME_DATA_DIR, mode=0o700, exist_ok=True)
         tmp = path + ".tmp"
         with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(value, f, ensure_ascii=False)
+            json.dump(value, f, ensure_ascii=False, allow_nan=False)
         os.replace(tmp, path)
         return True
 
-    def match_start(self, dlc_id: Any) -> Reply:
+    def _save_file(self, key: Any) -> str:
+        if not isinstance(key, str) or not paths.KEY_RE.match(key):
+            raise ValueError("bad save key")
+        # Saves stay inside the project: a link in place of the folder is refused.
+        if os.path.islink(paths.GAME_DATA_DIR):
+            raise ValueError("the saves folder is a link")
+        return os.path.join(paths.GAME_DATA_DIR, key + ".json")
+
+    def match_start(self) -> Reply:
         self._tainted = self._core.replaying
         return {"counted": not self._tainted}
 
-    def match_end(self, dlc_id: Any, result: Any) -> Reply:
+    def match_end(self, result: Any) -> Reply:
         """Record a finished match unless the dev panel or a replay touched it."""
         counted = not self._tainted and not self._core.replaying
         if counted:
-            stats = self.dlc_load(dlc_id, "stats") or {"matches": 0, "results": []}
+            stats = self.load("stats") or {"matches": 0, "results": []}
             stats["matches"] += 1
             stats["results"] = (stats["results"] + [result])[-100:]
-            self.dlc_save(dlc_id, "stats", stats)
+            self.save("stats", stats)
         self._tainted = False
         return {"counted": counted}
 
-    # --- past sessions: a DLC replays one by itself, on its own clock (a "ghost") ------
+    # --- past sessions: the game replays one by itself, on its own clock (a "ghost") --
 
-    def dlc_sessions(self, dlc_id: Any = None) -> list[Reply]:
+    def past_sessions(self) -> list[Reply]:
         """Past sessions to replay: when, which project, how long and how busy."""
         rows = self._core.store.session_summaries(30, GHOST_MIN_ACTIONS)
         return [
@@ -405,12 +332,12 @@ class Bridge:
             for r in rows
         ]
 
-    def dlc_live_sessions(self, dlc_id: Any = None) -> list[LiveSession]:
+    def live_sessions(self) -> list[LiveSession]:
         """Sessions open right now with their status, so a new match can pick up an agent
         that is already at work instead of waiting for its next event."""
         return self._live_sessions()
 
-    def dlc_session_events(self, dlc_id: Any, session: Any) -> list[Event]:
+    def session_events(self, session: Any) -> list[Event]:
         """One past session's events, already normalized, with "t" in seconds from its start."""
         events = self._core.store.session_events(str(session))[:GHOST_MAX_EVENTS]
         if not events:
@@ -423,11 +350,6 @@ class Bridge:
             out.append(e)
         return out
 
-    def _dlc_file(self, dlc_id: Any, key: Any) -> str:
-        if not _ID_RE.match(str(dlc_id)) or not _ID_RE.match(str(key)):
-            raise ValueError("bad dlc id or key")
-        return os.path.join(paths.DLC_DATA_DIR, dlc_id, key + ".json")
-
     # --- dev panel (only with --dev) ----------------------------------------------
 
     def _require_dev(self) -> None:
@@ -435,7 +357,7 @@ class Bridge:
             raise PermissionError("dev panel is only available with --dev")
 
     def dev_taint(self) -> None:
-        """A DLC dev command was used: the current match is not counted."""
+        """A game command of the dev panel was used: the current match is not counted."""
         self._require_dev()
         self._tainted = True
 
@@ -559,17 +481,16 @@ def exposed(bridge: Bridge) -> list[Callable[..., Any]]:
     ]
 
 
-HUB_PAGE = os.path.join(paths.PROJECT_DIR, "hub", "index.html")
 _guarded = False
 
 
 def _main_frame_only() -> None:
-    """Drop bridge messages that do not come from the hub page itself.
+    """Drop bridge messages that do not come from the game page itself.
 
-    The DLC frame is sandboxed and cannot reach the hub's pywebview object, but WebKit
-    gives every frame window.webkit.messageHandlers.jsBridge. pywebview's handler does
-    not look at the frame, so ours does (pywebview is pinned in requirements.txt): the
-    main frame, and only while it shows the hub."""
+    WebKit gives every frame and every page the window navigates to
+    window.webkit.messageHandlers.jsBridge, and pywebview's handler does not look at the
+    sender, so ours does (pywebview is pinned in requirements.txt): the main frame, and
+    only while it shows the game."""
     global _guarded
     if _guarded or sys.platform != "darwin":
         return
@@ -579,23 +500,22 @@ def _main_frame_only() -> None:
     forward = handler.userContentController_didReceiveScriptMessage_
 
     # The method is replaced in place: pywebview creates BrowserView.JSBridge by that name.
-    def from_hub_only(self: Any, controller: Any, message: Any) -> None:
+    def from_game_only(self: Any, controller: Any, message: Any) -> None:
         frame = message.frameInfo()
         url = frame.request().URL()
-        if frame.isMainFrame() and url.isFileURL() and url.path() == HUB_PAGE:
+        if frame.isMainFrame() and url.isFileURL() and url.path() == paths.GAME_PAGE:
             forward(self, controller, message)
 
-    handler.userContentController_didReceiveScriptMessage_ = from_hub_only  # type: ignore[method-assign]
+    handler.userContentController_didReceiveScriptMessage_ = from_game_only  # type: ignore[method-assign]
     _guarded = True
 
 
 def create_window(bridge: Bridge, title: str, **options: Any) -> "webview.Window":
-    """The hub window with the bridge exposed function by function, never as an object."""
+    """The game window with the bridge exposed function by function, never as an object."""
     import webview
 
     _main_frame_only()
-    dlc_scheme.install([*bridge._dlc_roots(), os.path.join(paths.PROJECT_DIR, "sdk")])
-    window = webview.create_window(title, _file_url(HUB_PAGE), **options)
+    window = webview.create_window(title, _file_url(paths.GAME_PAGE), **options)
     # None only when a window is created while the GUI runs and its "initialized"
     # handler cancels it; this one is made before webview.start().
     assert window is not None
@@ -609,6 +529,7 @@ def run(dev: bool = False, settings_path: str = paths.CLAUDE_SETTINGS) -> None:
 
     os.umask(0o077)
     paths.ensure_data_dir()
+    paths.migrate_game_data()
     core = Core()
     core.start()
     i18n.set_language(i18n.resolve(core.store.get_setting("language")))
@@ -651,8 +572,6 @@ def run(dev: bool = False, settings_path: str = paths.CLAUDE_SETTINGS) -> None:
         cleanup()
         # pywebview's bridge call threads are not daemons and can hang on a closed
         # window; everything is cleaned up, so leave without waiting for them.
-        import sys
-
         sys.stdout.flush()
         sys.stderr.flush()
         os._exit(0)

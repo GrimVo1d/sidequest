@@ -1,4 +1,4 @@
-// Last Commit Standing: the handbook. Everything the arena has, with a sprite and a text in
+// The arena: the handbook. Everything the arena has, with a sprite and a text in
 // both languages; numbers come from balance.json, so the texts never drift from the game.
 // Weapons, passives and gear are read straight from balance.json. No DOM here: tests run it in jsc.
 //   LCSCodex.sections(balance)   // [{id, name: [ru, en], entries: [{id, icon, gold, name, text}]}]

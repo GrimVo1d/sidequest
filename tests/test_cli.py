@@ -50,31 +50,58 @@ class SessionsCommandTest(unittest.TestCase):
 
 
 class UninstallCommandTest(unittest.TestCase):
-    def test_dlc_data_outside_its_folder_is_never_deleted(self):
+    def test_game_saves_are_deleted_and_nothing_else(self):
         root = temp_dir(self)
-        dlc_data = os.path.join(root, "data", "dlc")
-        os.makedirs(os.path.join(dlc_data, "arena"))
+        data = os.path.join(root, "data")
+        for folder in ("game", os.path.join("dlc", "last-commit-standing"), "backups"):
+            os.makedirs(os.path.join(data, folder))
         settings = os.path.join(root, "settings.json")
-        with mock.patch.object(cli.paths, "DLC_DATA_DIR", dlc_data):
-            err = io.StringIO()
-            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(err):
-                cli.main(
-                    [
-                        "uninstall",
-                        "--settings",
-                        settings,
-                        "--yes",
-                        "--delete-dlc-data",
-                        "..",
-                        "arena",
-                    ]
-                )
-        self.assertTrue(os.path.isdir(dlc_data))
-        self.assertFalse(os.path.exists(os.path.join(dlc_data, "arena")))
-        self.assertIn("..", err.getvalue())
+        with (
+            mock.patch.object(cli.paths, "DATA_DIR", data),
+            mock.patch.object(cli.paths, "GAME_DATA_DIR", os.path.join(data, "game")),
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            cli.main(["uninstall", "--settings", settings, "--yes", "--delete-game-data"])
+        self.assertEqual(os.listdir(data), ["backups"])
 
-    def test_dlc_id_with_a_newline_is_refused(self):
-        self.assertIsNone(cli.paths.DLC_ID_RE.match("arena\n"))
+    def test_a_linked_saves_folder_loses_only_the_link(self):
+        root = temp_dir(self)
+        outside = temp_dir(self)
+        with open(os.path.join(outside, "keep.json"), "w") as f:
+            f.write("{}")
+        os.symlink(outside, os.path.join(root, "game"))
+        cli.paths.delete_game_data(os.path.join(root, "game"))
+        self.assertEqual(os.listdir(root), [])
+        self.assertEqual(os.listdir(outside), ["keep.json"])
+
+    def test_save_key_with_a_newline_is_refused(self):
+        self.assertIsNone(cli.paths.KEY_RE.match("records\n"))
+
+
+class MigrationTest(unittest.TestCase):
+    def test_arena_saves_move_once(self):
+        data = temp_dir(self)
+        old = os.path.join(data, "dlc", "last-commit-standing")
+        os.makedirs(old)
+        with open(os.path.join(old, "records.json"), "w") as f:
+            f.write("{}")
+        cli.paths.migrate_game_data(data)
+        self.assertEqual(os.listdir(os.path.join(data, "game")), ["records.json"])
+        self.assertFalse(os.path.exists(old))
+
+        # Saves already in place are never overwritten by an old copy.
+        os.makedirs(old)
+        cli.paths.migrate_game_data(data)
+        self.assertTrue(os.path.isdir(old))
+        self.assertEqual(os.listdir(os.path.join(data, "game")), ["records.json"])
+
+    def test_a_linked_arena_folder_is_not_moved(self):
+        data = temp_dir(self)
+        outside = temp_dir(self)
+        os.makedirs(os.path.join(data, "dlc"))
+        os.symlink(outside, os.path.join(data, "dlc", "last-commit-standing"))
+        cli.paths.migrate_game_data(data)
+        self.assertFalse(os.path.lexists(os.path.join(data, "game")))
 
 
 class InstallCommandTest(unittest.TestCase):

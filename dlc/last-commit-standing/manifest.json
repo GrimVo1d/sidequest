@@ -1,7 +1,0 @@
-{
-  "id": "last-commit-standing",
-  "name": "Last Commit Standing",
-  "entry": "index.html",
-  "events": ["*"],
-  "sdk": 1
-}

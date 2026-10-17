@@ -229,7 +229,7 @@ arrived.
   fallback.
 - **The agent is silent.** After Esc the game thinks the agent is working, and there will
   be no signal to the contrary. The solution is an "Agent is silent" pause after a
-  threshold without events (90 s by default, changeable in the hub settings). The match
+  threshold without events (90 s by default, changeable in the settings). The match
   does not end on the timeout. Details in PLAN.md 3.4.
 - **End of the task** is `Stop` with an empty `background_tasks`. After that the session
   waits for a new prompt; there is no pause, and the match finale begins.

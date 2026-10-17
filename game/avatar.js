@@ -1,9 +1,7 @@
 // Avatars: drawing, the builder and the presets. Format: sidequest/avatar.py.
-// The hub uses it, and a DLC may too:
-//   <script src="../../sdk/avatar.js"></script>
 //   const p = await Sidequest.profile();
 //   SidequestAvatar.animate(canvas, p.avatar)    // null avatar = the default one
-//   p.avatar && p.avatar.parts                   // builder parts, to redraw in the DLC's style
+//   p.avatar && p.avatar.parts                   // builder parts, to redraw in the game's style
 "use strict";
 
 (function (root) {
