@@ -46,7 +46,7 @@ CREATE TABLE IF NOT EXISTS meta (
 
 # Core settings editable in the game; values are JSON. Code reads them via get_setting.
 DEFAULT_SETTINGS: dict[str, Any] = {
-    # Seconds without events before the "agent is silent" pause (PLAN.md 3.4).
+    # Seconds without events before the "agent is silent" pause.
     "silence_pause_seconds": 90,
     "fps_limit": 60,
     # English unless the player picks Russian; "auto" follows the system (sidequest/i18n.py).

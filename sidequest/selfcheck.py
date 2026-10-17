@@ -1,4 +1,4 @@
-"""Self-check (PLAN.md 3.5): quick checks on start, control session, running counters."""
+"""Self-check: quick checks on start, control session, running counters."""
 
 import hashlib
 import json

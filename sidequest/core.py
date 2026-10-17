@@ -1,7 +1,7 @@
 """Core of the running app: receiver -> normalizer -> storage -> listeners (the window).
 
-Also owns the pause state (PLAN.md 3.4): sessions waiting for an answer and sessions
-that went silent, plus the "continue" / "end match" buttons.
+Also owns the pause state: sessions waiting for an answer and sessions that went silent,
+plus the "continue" / "end match" buttons.
 """
 
 import threading

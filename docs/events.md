@@ -230,7 +230,7 @@ arrived.
 - **The agent is silent.** After Esc the game thinks the agent is working, and there will
   be no signal to the contrary. The solution is an "Agent is silent" pause after a
   threshold without events (90 s by default, changeable in the settings). The match
-  does not end on the timeout. Details in PLAN.md 3.4.
+  does not end on the timeout.
 - **End of the task** is `Stop` with an empty `background_tasks`. After that the session
   waits for a new prompt; there is no pause, and the match finale begins.
 - In `auto` mode permissions are not requested, so `PermissionRequest` arrives only for
@@ -244,12 +244,12 @@ arrived.
 | `StopFailure` | the turn broke off with an API error — hard to trigger, catch it when it happens |
 | `TaskCreated` / `TaskCompleted` | there is no task list tool, see above |
 | `PreCompact` / `PostCompact` with `trigger: auto` | there was only a manual `/compact` |
-| hook with `async: true` | not checked: it was decided to run the hook synchronously (PLAN.md 3.3) |
+| hook with `async: true` | not checked: it was decided to run the hook synchronously |
 | `UserPromptExpansion`, `CwdChanged`, `FileChanged`, `DirectoryAdded`, `ConfigChange`, `Setup`, `Pre/PostModelSwitch`, `Worktree*`, `Elicitation*`, `TeammateIdle` | the names were accepted (settings loaded without errors), but the events did not occur; not needed for the game |
 | `WebSearch`, `WebFetch`, `NotebookEdit` | were not called |
 | a subagent started synchronously (not in the background) | only a background one was seen |
 
-## Mapping to game events (PLAN.md 3.2)
+## Mapping to game events
 
 | `kind` | Source |
 |---|---|
@@ -267,10 +267,14 @@ arrived.
 | `stop` | `Stop`; the finale only when `background_tasks` is empty |
 | `unknown` | everything else |
 
-Conclusions for the plan (decisions are in PLAN.md, section 9):
+Conclusions for the game:
 
 - **There is no `Grep` / `Glob`**, scouting goes through `Bash`. Decided: a `Bash` command
   category `search` (`grep`, `rg`, `find`, `ls`, `cat`, …) with `action: scout`.
 - **Commit and push** (arena 0.4). For the `git` category the normalizer adds a `git`
   field — a list of words from `commit` and `push` only (`git commit`; `git push`,
   `gh pr create`, `gh pr merge`). The command itself does not go further.
+- **There is no todo list.** Decided: level-up in the arena is for experience from the
+  agent's actions.
+- **There is no context fill level.** What depends on it counts the actions since the
+  last compaction.

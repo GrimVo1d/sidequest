@@ -1,4 +1,4 @@
-"""Install and uninstall Sidequest hooks in Claude Code's settings.json (PLAN.md 3.3).
+"""Install and uninstall Sidequest hooks in Claude Code's settings.json.
 
 Sidequest entries are recognised by the unique file name of the hook script, so they
 are found even if the project folder was moved. Nothing else in the file is changed.

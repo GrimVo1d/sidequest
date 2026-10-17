@@ -28,9 +28,9 @@ and always come first.
   they matter: `delaySec`, `radiusPx`, `ttlMs`. Abbreviations only when universal in the
   project (`hp`, `dt`, `cx`/`cy` for cells, `B` for the balance object).
 - **Comments explain why.** What the code does should be visible from names; a comment says
-  why it is done this way, which constraint it obeys, and points to `PLAN.md` (`PLAN.md
-  3.4`) when a design decision is behind it. Every module starts with a header comment: what
-  the module is and how it is used.
+  why it is done this way, which constraint it obeys, and names the design decision behind
+  it when there is one. Every module starts with a header comment: what the module is and
+  how it is used.
 - **English** in code, identifiers and comments; player-facing text only through `t()` /
   `tr()` / `data-en` (see `CLAUDE.md`).
 - **Errors are handled where something can be done about them.** Elsewhere let them
@@ -143,10 +143,22 @@ There is no bundler and no Node. Every file is a classic script loaded by `<scri
   ENEMY_AI[e.type].update(e, dt);
   ```
 
-The numbers for each type stay in `balance.json`; the table holds only code. Adding a new
-enemy means one new entry in the table, one in the balance, one sprite. Keys that come from
-outside (event kinds, actions) are looked up with an own-key check (`Object.hasOwn` or a
-null-prototype table), so `"constructor"` never reaches `Object`'s members.
+  The numbers for each type stay in `balance.json`; the table holds only code. Adding a
+  new enemy means one new entry in the table, one in the balance, one sprite. When the
+  types differ only by which shared tricks they have, flags in their balance entries
+  (`spawn`, `fire`, `burrow`) are fine instead of a table.
+  Keys that come from outside (event kinds, actions) are looked up with an own-key check
+  (`Object.hasOwn` or a null-prototype table), so `"constructor"` never reaches `Object`'s members.
+- **Systems are factories.** A big simulation is split into systems (map and fog, paths,
+  agents, units, enemies, combat, orders), each a factory in `sim/` that gets a shared
+  context `g` (`{s, B, random, effect, text, …}`) and returns its functions; `createGame`
+  puts them on `g`, wires the step in a fixed order and exposes the public API. A system
+  destructures only data from `g` at creation and calls other systems as `g.fn()` at run
+  time; two systems never define the same name (createGame throws), `g` is frozen after
+  wiring, and the harness checks that every `g.<name>` in the code exists. **A function
+  lives with the state it owns**: the ground rules in the map, gold with the agents,
+  damage in combat; the orders system only turns the player's input into calls. The arena's
+  `game.js` is split this way next.
 - **Classes** (`class`) are allowed for small self-contained data structures with
   invariants (a heap, a random generator); not for entities and not with inheritance.
 

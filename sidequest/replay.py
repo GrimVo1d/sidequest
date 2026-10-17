@@ -1,4 +1,4 @@
-"""Replay mode (PLAN.md 3.6): feed recorded or hand-written events with original pauses.
+"""Replay mode: feed recorded or hand-written events with original pauses.
 
 A recording / scenario is JSONL: one game event per line plus "t", seconds from the
 start of the session. The player re-stamps "ts" with the current time when it emits.
