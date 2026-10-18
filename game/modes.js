@@ -2,6 +2,9 @@
 //   const random = LCSModes.makeRandom(seed)      // the seeded random the whole match uses
 //   LCSModes.daily(balance, LCS_MAPS, "2026-10-09")   // the day's seed, map and modifiers
 //   LCSModes.ghostSchedule(balance.ghost, events)     // a past session as the ghost's schedule
+//   LCSModes.stage(balance, options)    // the campaign's stage options.stage, or null
+//   LCSModes.carry(state)               // what the next stage takes from this one
+//   LCSModes.resume(state, balance, stage, carried)   // a new stage's state from the last one
 "use strict";
 
 (function (root) {
@@ -51,5 +54,38 @@
     return out;
   }
 
-  root.LCSModes = {makeRandom, daily, ghostSchedule};
+  // --- the campaign (0.9) ------------------------------------------------------------
+  // Five maps in a row; a boss closes each, the last one is the final boss. A stage starts
+  // where the last one ended on the clock, so the arena keeps getting harder, and the build
+  // comes along: weapons, passives, gear, level, score and the counters of the results.
+
+  const CARRY = ["time", "stats", "weapons", "taken", "gear", "gearLevels", "level", "xp", "xpNext",
+                 "rerolls", "banishes", "banished", "score", "kills", "bosses", "bossKinds",
+                 "evolutions", "damageTaken", "deaths", "bestStreak", "maxMultiplier", "elites",
+                 "incidents", "deploys", "picked", "synced", "commits", "pushes", "turretsBuilt",
+                 "reviews", "crits", "everAlly", "withAgent", "met"];
+
+  function stage(B, options) {
+    const K = B.campaign, i = options && options.mode === "campaign" ? options.stage | 0 : -1;
+    if (i < 0 || i >= K.stages.length) return null;
+    const last = i === K.stages.length - 1, st = K.stages[i];
+    return {index: i, count: K.stages.length, final: last, map: st.map, boss: st.boss,
+            hp: last ? K.final_hp : K.boss_hp, score: last ? K.final_score : K.boss_score};
+  }
+
+  const carry = (s) => JSON.parse(JSON.stringify(Object.fromEntries(CARRY.map((k) => [k, s[k]]))));
+
+  // The timers that count from the start of a match count from the stage's start instead.
+  function resume(s, B, st, carried) {
+    if (carried) Object.assign(s, carry(carried));
+    const t = s.time;
+    s.stage = Object.assign({start: t, until: t + B.campaign.stage_seconds}, st);
+    s.finalAt = s.stage.until;
+    s.itemAt += t;
+    s.eventAt += t;
+    s.nextBoss += t;
+    s.player.hp = s.stats.max_hp;
+  }
+
+  root.LCSModes = {makeRandom, daily, ghostSchedule, stage, carry, resume};
 })(typeof window !== "undefined" ? window : globalThis);

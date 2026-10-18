@@ -32,6 +32,7 @@ load(GAME + "/font.js");
 load(GAME + "/terrain.js");
 load(GAME + "/modes.js");
 load(GAME + "/build.js");
+load(GAME + "/classes.js");
 load(GAME + "/game.js");
 load(GAME + "/themes.js");
 load(GAME + "/terrain-art.js");

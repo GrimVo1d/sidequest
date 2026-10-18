@@ -2,8 +2,9 @@
 //   const game = LCS.createGame(balance, {seed: 1, map: LCS_MAPS[0], mode: "agent"});
 //                                 // maps.js; mode "agent", "classic" (alone, 20 minutes),
 //                                 // "daily" (classic with the day's seed, LCS.daily) or
-//                                 // "ghost" (a past session plays the ally: ghost.events);
-//                                 // modifiers: ids from balance.modifiers
+//                                 // "ghost" (a past session plays the ally: ghost.events) or
+//                                 // "campaign" (stage, carry: modes.js); modifiers: ids
+//                                 // from balance.modifiers; cls, perks: classes.js
 //   game.agentEvent(event)        // a game event from Sidequest.on("*")
 //   game.step(1 / 60, {x, y})      // input: movement direction, each -1..1
 //   game.state                     // everything render.js draws
@@ -56,11 +57,13 @@
     const PISTOL = WEAPONS.get("pistol").base;
     const CELL = 32;   // px per cell of the enemies' grid for nearby()
     const TEXT_PILE = 5;   // floating texts over one spot at once
-    const modeName = ["classic", "daily", "ghost"].includes(options && options.mode) ? options.mode : "agent";
-    // Classic and the daily task are played alone: crystals, a final boss, death ends it.
-    const classic = modeName === "classic" || modeName === "daily";
+    const modeName = ["classic", "daily", "ghost", "campaign"].includes(options && options.mode)
+      ? options.mode : "agent";
+    // Classic, the daily task and the campaign are played alone: crystals, a final boss, death ends it.
+    const classic = modeName === "classic" || modeName === "daily" || modeName === "campaign";
+    const stage = root.LCSModes.stage(B, options);
     // Only the ghost's own events reach a ghost match; the daily task ignores agents.
-    const ownAgents = modeName === "agent" || modeName === "classic";
+    const ownAgents = modeName === "agent" || modeName === "classic" || modeName === "campaign";
     const MODS = new Set((options && options.modifiers || []).filter((id) => B.modifiers.some((m) => m.id === id)));
     const mod = (id) => (MODS.has(id) ? B.modifiers.find((m) => m.id === id) : null);
     const EV = B.events, EL = B.elites;
@@ -89,7 +92,7 @@
                dead: 0, sticky: 1, ammo: PISTOL.magazine, magazine: PISTOL.magazine, reload: 0,
                reloadTotal: 0, shield: 0, moving: false, aim: 0, firedAt: -1, hurtAt: -1},
       // Passives and gear: multipliers and bonuses on top of every weapon (see weaponStats).
-      stats: {damage: 1, cooldown: 1, amount: 0, area: 1, pierce: 0, magazine: 0, reload: 1,
+      stats: {damage: 1, cooldown: 1, amount: 0, area: 1, pierce: 0, magazine: 0, reload: 1, xp: 1,
               speed: B.player.speed, max_hp: B.player.hp, regen: 0,
               ally_damage: 1, ally_missiles: 0,
               pickup: 0, rage: 1, shield_bonus: 0, coffee: 1},
@@ -308,6 +311,7 @@
     function hurtEnemy(e, damage) {
       if (e.dead) return;
       e.flash = 0.1;
+      damage *= kit.crit(e);
       if (e.head) { hurtEnemy(e.head, damage * B.enemies.boss_loop.segment_share); return; }
       if (e.shield > 0) {
         const taken = Math.min(e.shield, damage);
@@ -378,7 +382,7 @@
         drop("chest", e.x, e.y, true);
       }
       if (e.boss) {
-        if (e.final && classic) { bossDown(e, false); win(e); return; }
+        if (e.final && classic && pairDone) { bossDown(e, false); win(e); return; }
         // Twins are down only both at once.
         if (pairDone) bossDown(e, true);
       } else if (!e.elite && !e.noLoot && random() < I.drop_chance) {
@@ -402,7 +406,7 @@
       const at = e.revive, cfg = B.enemies[e.type];
       e.revive = null;
       // A boss twin comes back weaker and is worth nothing the second time.
-      const twin = spawn(e.type, {x: at.x, y: at.y}, Object.assign({partner: e},
+      const twin = spawn(e.type, {x: at.x, y: at.y}, Object.assign({partner: e, final: e.final},
         cfg.revive_hp ? {hpScale: cfg.revive_hp, score: 0, noLoot: true} : {}));
       twin.twinB = !e.twinB;
       e.partner = twin;
@@ -436,9 +440,11 @@
       s.hazards = [];
       s.enemyShots = [];
       s.comebacks = [];
-      text(boss.x, boss.y - 30, tr("КОНФЛИКТ РАЗРЕШЁН", "CONFLICT RESOLVED"), "#e8c14a", 3);
+      const next = s.stage && !s.stage.final;
+      text(boss.x, boss.y - 30, next ? tr("ЭТАП ПРОЙДЕН", "STAGE CLEAR")
+        : tr("КОНФЛИКТ РАЗРЕШЁН", "CONFLICT RESOLVED"), "#e8c14a", 3);
       s.endAt = s.time + C.win_delay;
-      s.endReason = "win";
+      s.endReason = next ? "stage" : "win";
     }
 
     // --- crystals of experience (classic) ---------------------------------------------
@@ -898,6 +904,11 @@
     };
     const {addXp, choose, reroll, banish, nextChoice, chestLeft, offers, take} = root.LCSBuild.create(B, s,
       {random, text, effect, tr, mod, magazine, levelText});
+    // The class and the stars' bonuses (classes.js); a campaign's next stage takes the run on.
+    const kit = root.LCSClasses.create(B, s, {random, effect, text, tr, pushOut}, options);
+    if (!(stage && options.carry)) kit.start();
+    if (stage) root.LCSModes.resume(s, B, stage, options.carry);
+    s.player.ammo = s.player.magazine = magazine();
 
     // --- allies: the agents ------------------------------------------------------
 
@@ -1320,14 +1331,21 @@
       } else if (s.time >= s.nextBoss) {
         s.nextBoss += B.spawn.boss_every_minutes * 60;
         // In a classic run the final boss takes the last boss's place.
-        if (!classic || s.time < C.seconds - 1) spawnBoss(bossOrder[s.bossIndex++ % bossOrder.length]);
+        if (s.finalAt === null ? !classic : s.time < s.finalAt - 1) spawnBoss(bossOrder[s.bossIndex++ % bossOrder.length]);
       }
     }
 
+    // The final boss, or a campaign stage's boss: twins are both final.
     function spawnFinal() {
-      const boss = spawn("boss", null, {final: true, hpScale: C.final_hp, score: C.final_score});
-      if (boss) text(s.player.x, s.player.y - 30, tr("ФИНАЛЬНЫЙ БОСС", "FINAL BOSS"), "#e8c14a", 3);
-      else s.finalAt = s.time + 1;
+      const F = s.stage || {boss: "boss", hp: C.final_hp, score: C.final_score, final: true};
+      const boss = spawnAny(F.boss), cfg = B.enemies[F.boss];
+      if (!boss) { s.finalAt = s.time + 1; return; }
+      for (const e of [boss, boss.partner].filter(Boolean)) {
+        Object.assign(e, {final: true, hp: e.hp * F.hp, maxHp: e.hp * F.hp, score: F.score});
+      }
+      s.met.final = true;
+      const name = F.final ? tr("ФИНАЛЬНЫЙ БОСС", "FINAL BOSS") : tr(cfg.name, cfg.name_en).toUpperCase();
+      text(s.player.x, s.player.y - 30, name, "#e8c14a", 3);
     }
 
     // What each kind of enemy does besides walking at the player; true: it moved itself.
@@ -1675,6 +1693,7 @@
       updateHazards();
       T.update(dt, s);
       updatePlayer(dt, input || {});
+      kit.update(dt, input);
       if (ghost) updateGhost();
       updateAllies(dt);
       updateOrchestra();
@@ -1715,7 +1734,9 @@
                    elites: s.elites, incidents: s.incidents, deploys: s.deploys,
                    boss_kinds: Object.keys(s.bossKinds).length,
                    modifiers: s.modifiers.length, modifier_ids: s.modifiers.slice(),
-                   score_mul: Math.round(s.scoreMul * 100) / 100};
+                   score_mul: Math.round(s.scoreMul * 100) / 100, class: s.cls.id, crits: s.crits || 0,
+                   stage: s.stage ? s.stage.index + 1 : 0, weapon_ids: s.weapons.map((w) => w.id),
+                   evolved_ids: s.weapons.filter((w) => w.evolved).map((w) => w.id)};
       if (ghost) s.results.ghost = ghost.session;
       if (s.mode === "daily") s.results.day = s.day;
       return s.results;
@@ -1753,6 +1774,11 @@
       },
       event(kind) { if (!s.deploy && !s.incident) startEvent(kind === "deploy" ? "deploy" : "incident"); },
       final() { spawnFinal(); },
+      // The final boss (or a stage's boss) comes and goes down at once: a campaign's next stage.
+      stage() {
+        spawnFinal();
+        for (const e of s.enemies.filter((x) => x.final && !x.dead)) hurtEnemy(e, e.hp + 1);
+      },
       item() { drop(pickItem(), s.player.x + 30, s.player.y); },
       chest() { drop("chest", s.player.x + 30, s.player.y, true); },
       enemy(type) { spawnAny(B.enemies[type] ? type : s.map.special || "grunt"); },
@@ -1767,7 +1793,7 @@
       if (Number.isFinite(width) && Number.isFinite(height)) s.view = {width, height};
     }
 
-    return {state: s, step, agentEvent, choose, reroll, banish, finish, setView, dev};
+    return {state: s, step, agentEvent, choose, reroll, banish, finish, setView, dev, ability: kit.use};
   }
 
   root.LCS = {createGame, levelText};

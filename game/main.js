@@ -32,6 +32,11 @@
   let days = {};             // the daily task: best score per day
   const keys = new Set();
   let look = null;           // the hero's look (hero.js)
+  let matchLook = null;      // the look with the class's own parts on top, for the arena
+  let cls = "developer";     // the class picked for the next match (classes.js)
+  let menuGot = {};          // the achievements earned, for the locked classes
+  let meta = null;           // stars, bonuses and the collection (meta.js)
+  let screens = null;        // screens.js
 
   function el(tag, text, cls) {
     const node = document.createElement(tag);
@@ -42,7 +47,7 @@
 
   function clear(node) { while (node.firstChild) node.removeChild(node.firstChild); }
 
-  const SCREENS = ["menu", "levelup", "esc", "codex", "awards", "results", "character"];
+  const SCREENS = ["menu", "levelup", "esc", "codex", "awards", "results", "character", "stars"];
 
   function show(id) {
     for (const s of SCREENS) $(s).hidden = s !== id;
@@ -85,6 +90,11 @@
               text_en: "Alone, 20 minutes: experience comes as crystals from enemies, the "
                        + "final boss comes at the end. Death ends the run. An agent that "
                        + "starts working joins in to help."},
+    campaign: {name: "Кампания", name_en: "Campaign",
+               text: "Пять карт подряд, в конце каждой — босс. Оружие, вещи и уровень идут дальше, "
+                     + "смерть заканчивает кампанию. Агент, начавший работу, придёт на помощь.",
+               text_en: "Five maps in a row, a boss at the end of each. Weapons, gear and level carry "
+                        + "over; death ends the campaign. An agent that starts working joins in to help."},
     ghost: {name: "Призрак сессии", name_en: "Session ghost",
             text: "Союзник — твоя прошлая сессия Claude Code: её действия повторяются, "
                   + "долгие паузы сжаты. Живые агенты в этом режиме не участвуют.",
@@ -106,7 +116,7 @@
   const modifier = (id) => balance.modifiers.find((m) => m.id === id);
 
   async function savePrefs() {
-    await Sidequest.storage.set("prefs", {map: mapId, mode, mods, ghost: ghostId});
+    await Sidequest.storage.set("prefs", {map: mapId, mode, mods, ghost: ghostId, cls});
   }
 
   async function progress() {
@@ -136,6 +146,9 @@
     if (Array.isArray(prefs.mods)) mods = prefs.mods.filter((id) => modifier(id));
     if (typeof prefs.ghost === "string") ghostId = prefs.ghost;
     const {records, got} = await progress();
+    menuGot = got;
+    cls = LCSClasses.isOpen(balance, prefs.cls, got) ? prefs.cls : "developer";
+    meta = LCSMeta.clean(await Sidequest.storage.get("meta"), balance);
     seen = (await Sidequest.storage.get("seen")) || {};
     ghostRecords = LCSProgress.addGhost(await Sidequest.storage.get("ghosts"), {});
     days = LCSProgress.addDay(await Sidequest.storage.get("days"), {});
@@ -143,7 +156,7 @@
     if (!ghostList.some((g) => g.session === ghostId)) ghostId = ghostList.length ? ghostList[0].session : null;
     menuRecords = records;
     renderModes();
-    renderAchievements(got);
+    screens.achievements(got);
     document.querySelector("#menu .menu-body").scrollTop = 0;
     $("btn-play").focus({preventScroll: true});
   }
@@ -157,7 +170,7 @@
                   [t("Дольше всего", "Longest"), clock(r.best_time)],
                   [t("Лучший уровень", "Best level"), r.best_level],
                   [t("Матчей", "Matches"), r.matches], [t("Убито", "Kills"), r.kills]];
-    if (mode === "classic" || mode === "daily") rows.push([t("Побед", "Wins"), r.wins]);
+    if (["classic", "daily", "campaign"].includes(mode)) rows.push([t("Побед", "Wins"), r.wins]);
     if (mode === "daily") {
       rows.push([t("Рекорд дня", "Today's best"), days[today()] || 0],
                 [t("Дней подряд", "Days in a row"), LCSProgress.streak(days, today())]);
@@ -185,6 +198,7 @@
     renderDaily();
     renderMaps();
     renderMods();
+    renderClasses();
     $("btn-play").disabled = mode === "ghost" && !ghostId;
   }
 
@@ -231,6 +245,14 @@
       + task.modifiers.map((id) => tf(modifier(id), "name")).join(", ") + ".";
   }
 
+  function renderClasses() {
+    screens.classes(cls, menuGot, (id) => {
+      cls = id;
+      renderClasses();
+      savePrefs();
+    });
+  }
+
   // The modifiers of the next match; the daily task has its own, fixed.
   function renderMods() {
     const box = $("mods");
@@ -252,91 +274,16 @@
     $("mods-text").textContent = on.map((id) => `${tf(modifier(id), "name")}: ${tf(modifier(id), "text")}`).join("; ");
   }
 
-  // The menu shows the count and the latest one; all of them are on the achievements screen.
-  function renderAchievements(got) {
-    const list = $("achievements");
-    clear(list);
-    const earned = earnedList(got);
-    for (const a of earned.slice(0, 1)) {
-      const li = el("li", null, "got");
-      li.appendChild(el("span", tf(a, "name"), "name"));
-      li.appendChild(el("span", tf(a, "text"), "text"));
-      list.appendChild(li);
-    }
-    $("achievements-none").hidden = earned.length > 0;
-    $("achievements-count").textContent = `${earned.length}/${balance.achievements.length}`;
-  }
-
-  // When an achievement was earned, in milliseconds: the game saves Date.now(); old saves
-  // may hold {at} in seconds. 0 when the save holds no time.
-  function earnedAt(v) {
-    if (typeof v === "number") return v;
-    return v && Number.isFinite(v.at) ? v.at * 1000 : 0;
-  }
-
-  // The earned achievements, the latest first.
-  function earnedList(got) {
-    return balance.achievements.filter((a) => got[a.id])
-      .sort((a, b) => earnedAt(got[b.id]) - earnedAt(got[a.id]));
-  }
-
-  const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  function earnedDay(v) {
-    const ms = earnedAt(v);
-    if (!ms) return t("получена", "earned");
-    const d = new Date(ms), day = String(d.getDate()).padStart(2, "0");
-    return t(`получена ${day}.${String(d.getMonth() + 1).padStart(2, "0")}.${d.getFullYear()}`,
-             `earned ${MONTHS[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`);
-  }
-
-  function progressText(p) {
-    const n = (v) => (p.field === "time" ? clock(v) : String(v));
-    const of = p.field === "daily_streak" ? t("дней подряд", "days in a row")
-      : p.of === "match" ? t("лучший матч", "best match") : t("всего", "so far");
-    return `${of}: ${n(p.have)} / ${n(p.need)}`;
-  }
-
-  // Every achievement with its icon: the earned ones first with the day, then the locked
-  // ones, the closest first, with how far they are when there is something to count.
-  function renderAwards({records, got, bests}) {
-    const list = $("awards-list");
-    clear(list);
-    const earned = earnedList(got);
-    const share = (x) => (x.p ? x.p.have / x.p.need : -1);
-    const locked = balance.achievements.filter((a) => !got[a.id])
-      .map((a) => ({a, p: LCSProgress.progressOf(a, records, bests, LCS_MAPS.map((m) => m.id))}))
-      .sort((x, y) => share(y) - share(x));
-    const item = (a, done, note, p) => {
-      const li = el("li", null, done ? "got" : "");
-      const icon = el("div", null, "icon");
-      icon.appendChild(iconCanvas(a.icon, 40));
-      li.appendChild(icon);
-      const body = el("div", null, "body");
-      body.appendChild(el("div", tf(a, "name"), "name"));
-      body.appendChild(el("div", tf(a, "text"), "text"));
-      body.appendChild(el("div", note, "when"));
-      if (p) {
-        const meter = el("div", null, "meter"), fill = el("div");
-        fill.style.width = Math.round(100 * p.have / p.need) + "%";
-        meter.appendChild(fill);
-        body.appendChild(meter);
-      }
-      li.appendChild(body);
-      list.appendChild(li);
-    };
-    for (const a of earned) item(a, true, earnedDay(got[a.id]), null);
-    for (const {a, p} of locked) item(a, false, p ? progressText(p) : t("ещё не получена", "not earned yet"), p);
-    $("awards-count").textContent = `${earned.length}/${balance.achievements.length}`;
-  }
-
   // Small cards with a name; what the chosen map is like is said once, under the grid.
   function renderMaps() {
     const box = $("maps");
     clear(box);
     const daily = mode === "daily" ? todayTask().map : null;
+    const chain = mode === "campaign" ? balance.campaign.stages.map((st) => st.map) : null;
     for (const m of LCS_MAPS) {
-      const b = el("button", null, "map" + ((daily || mapId) === m.id ? " on" : ""));
-      b.disabled = daily !== null && daily !== m.id;
+      const on = chain ? chain.includes(m.id) : (daily || mapId) === m.id;
+      const b = el("button", null, "map" + (on ? " on" : ""));
+      b.disabled = (daily !== null && daily !== m.id) || (chain !== null && !chain.includes(m.id));
       b.title = tf(m, "text");
       const pic = el("canvas", null, "preview");
       pic.width = 80;
@@ -352,7 +299,9 @@
       box.appendChild(b);
     }
     const chosen = LCS_MAPS.find((m) => m.id === (daily || mapId)) || LCS_MAPS[0];
-    $("map-text").textContent = `${tf(chosen, "name")} · ${tf(chosen, "text")}`;
+    $("map-text").textContent = chain
+      ? chain.map((id) => tf(LCS_MAPS.find((m) => m.id === id), "name")).join(" → ")
+      : `${tf(chosen, "name")} · ${tf(chosen, "text")}`;
   }
 
   // Records and achievements: only for counted matches. Returns the new achievements.
@@ -378,6 +327,8 @@
     for (const id of fresh) got[id] = Date.now();
     if (fresh.length) await Sidequest.storage.set("achievements", got);
     await Sidequest.storage.set("bests", LCSProgress.addBests(before.bests, balance.achievements, res));
+    meta = LCSMeta.addMatch(await Sidequest.storage.get("meta"), balance, res);
+    await Sidequest.storage.set("meta", meta);
     return balance.achievements.filter((a) => fresh.includes(a.id));
   }
 
@@ -395,7 +346,8 @@
     }
   }
 
-  async function startMatch() {
+  // A campaign's next stage comes with the run so far: `carry` (modes.js).
+  async function startMatch(stage = 0, carry = null) {
     let options = {seed: Date.now(), map: LCS_MAPS.find((m) => m.id === mapId), mode, modifiers: mods};
     if (mode === "daily") {
       const task = todayTask();
@@ -405,7 +357,13 @@
       if (!ghostId) return;
       const events = await Sidequest.history.events(ghostId);
       options.ghost = {session: ghostId, events};
+    } else if (mode === "campaign") {
+      const st = balance.campaign.stages[stage];
+      Object.assign(options, {map: LCS_MAPS.find((m) => m.id === st.map), stage, carry});
     }
+    // The daily task is the same for everyone: no bonuses bought with stars there.
+    Object.assign(options, {cls, perks: mode === "daily" ? {} : meta.perks});
+    matchLook = LCSHero.clean(Object.assign({}, look, LCSClasses.byId(balance, cls).look));
     game = LCS.createGame(balance, options);
     const v = renderer.view();
     game.setView(v.width, v.height);
@@ -423,7 +381,8 @@
     keys.clear();
     show(null);
     $("hud").hidden = false;
-    Sidequest.match.start();
+    // A campaign is one match for the records, however many stages it lasts.
+    if (!carry) Sidequest.match.start();
     joinLiveAgents();
     window.focus();
   }
@@ -434,13 +393,19 @@
 
   async function endMatch() {
     const res = game.state.results;
+    if (res.reason === "stage") { startMatch(res.stage, LCSModes.carry(game.state)); return; }
     $("hud").hidden = true;
     codexFrom = null;
-    $("results-title").textContent = t(...(TITLES[res.reason] || TITLES.quit));
+    const ending = res.mode === "campaign" && res.reason === "win" ? balance.campaign.ending : null;
+    $("results-title").textContent = ending ? tf(ending, "title") : t(...(TITLES[res.reason] || TITLES.quit));
+    $("results-ending").textContent = ending ? tf(ending, "text") : "";
+    $("results-ending").hidden = !ending;
     // The mode, the map and the modifiers in one line; the score big; then the rest.
     const sub = [tf(MODES[res.mode], "name")
       + (res.mode === "classic" && res.with_agent ? t(" с агентом", " with an agent") : ""),
                  tf(game.state.map, "name")];
+    if (res.stage) sub.push(`${t("этап", "stage")} ${res.stage}/${balance.campaign.stages.length}`);
+    if (res.class !== "developer") sub.push(tf(LCSClasses.byId(balance, res.class), "name"));
     if (res.modifiers) {
       sub.push(res.modifier_ids.map((id) => tf(modifier(id), "name")).join(", ") + ` ×${res.score_mul}`);
     }
@@ -474,6 +439,9 @@
     const {counted} = await Sidequest.match.end(res);
     if (!counted) { $("results-note").hidden = false; return; }
     const fresh = await saveProgress(res);
+    const dl = $("results-list");
+    dl.appendChild(el("dt", t("Звёзд", "Stars")));
+    dl.appendChild(el("dd", `+${LCSMeta.starsFor(balance.stars, res)} ★`));
     if (fresh.length) {
       const list = $("results-achievements");
       clear(list);
@@ -535,6 +503,7 @@
     const screen = SCREENS.find((id) => !$(id).hidden);
     if (screen && SidequestKeys.handle(e, $(screen))) return;
     if (screen === "character" && e.code === "Escape") { LCSCharacter.cancel(); e.preventDefault(); return; }
+    if (screen === "stars" && e.code === "Escape") { closeStars(); e.preventDefault(); return; }
     if (codexFrom && e.code === "Escape") { closeCodex(); e.preventDefault(); return; }
     if (codexFrom) return;
     if (!game || game.state.over) return;
@@ -556,6 +525,7 @@
       if (e.code === "KeyR") { reroll(); return; }
       if (e.code === "KeyX") { toggleBanish(); return; }
     }
+    if (e.code === "Space" && !escOpen && !game.state.choices) { game.ability(); e.preventDefault(); return; }
     if (MOVE[e.code]) { keys.add(e.code); e.preventDefault(); }
   });
   addEventListener("keyup", (e) => keys.delete(e.code));
@@ -574,8 +544,10 @@
     const s = game.state, p = s.player;
     $("xp-fill").style.width = Math.min(100, s.xp / s.xpNext * 100) + "%";
     $("xp-text").textContent = t("ур. ", "lv. ") + s.level;
-    $("time").textContent = s.solo
-      ? `${clock(s.time)} / ${clock(balance.classic.seconds)}` : clock(s.time);
+    $("time").textContent = s.stage
+      ? `${t("этап", "stage")} ${s.stage.index + 1}/${s.stage.count} · ${clock(s.time - s.stage.start)}`
+        + ` / ${clock(balance.campaign.stage_seconds)}`
+      : s.solo ? `${clock(s.time)} / ${clock(balance.classic.seconds)}` : clock(s.time);
     $("score").textContent = `${t("счёт", "score")} ${Math.floor(s.score * s.scoreMul)}`;
     $("multiplier").textContent = s.multiplier > 1 ? `×${s.multiplier}` : "";
 
@@ -596,7 +568,9 @@
 
     const notice = $("notice");
     let message = "";
-    if (s.finaleAt !== null) {
+    if (s.stage && s.time - s.stage.start < 4) {
+      message = `${t("Этап", "Stage")} ${s.stage.index + 1}/${s.stage.count}: ${tf(s.map, "name")}`;
+    } else if (s.finaleAt !== null) {
       message = t("Все задачи готовы — финал через ", "All tasks done — the finale in ")
         + Math.ceil(s.finaleAt - s.time);
     } else if (!s.everAlly && s.mode === "ghost") {
@@ -612,8 +586,10 @@
   // What is on right now, with the seconds left; one about to end blinks.
   function activeBuffs(s) {
     const I = balance.items, AG = balance.agent, p = s.player, list = [];
-    const timed = (id, icon, name, left, total, cls) =>
-      list.push({id, icon, cls, text: `${name} ${Math.ceil(left)}`, ending: left / total < 0.25});
+    const timed = (id, icon, name, left, total, kind) =>
+      list.push({id, icon, cls: kind, text: `${name} ${Math.ceil(left)}`, ending: left / total < 0.25});
+    const ability = screens.abilityChip(s);
+    if (ability) list.push(ability);
     if (s.buffs.coffee > 0) timed("coffee", "coffee", t("кофе", "coffee"), s.buffs.coffee, I.coffee.seconds);
     if (s.buffs.duck > 0) timed("duck", "duck", t("уточка", "duck"), s.buffs.duck, I.duck.seconds);
     if (p.shield > 0) list.push({id: "shield", icon: "shield", cls: "blue", text: "×" + p.shield});
@@ -742,6 +718,30 @@
     });
   }
 
+  // --- stars -------------------------------------------------------------------------
+
+  function openStars() {
+    show("stars");
+    screens.stars(meta, buyPerk);
+    $("btn-stars-back").focus({preventScroll: true});
+  }
+
+  async function buyPerk(id) {
+    const r = LCSMeta.buy(await Sidequest.storage.get("meta"), balance, id);
+    if (r.ok) await Sidequest.storage.set("meta", r.meta);
+    meta = r.meta;
+    const at = [...$("perks").querySelectorAll("button")].indexOf(document.activeElement);
+    screens.stars(meta, buyPerk);
+    // The keys stay on the same row, or go back when it is sold out.
+    const next = $("perks").querySelectorAll("button")[at];
+    (next && !next.disabled ? next : $("btn-stars-back")).focus({preventScroll: true});
+  }
+
+  function closeStars() {
+    show("menu");
+    $("btn-stars").focus({preventScroll: true});
+  }
+
   // --- handbook and first-time hints ----------------------------------------------
 
   // The handbook and the achievements screen open over the menu or the pause and go back there.
@@ -754,7 +754,7 @@
   }
 
   async function openAwards(from) {
-    renderAwards(await progress());
+    screens.awards(await progress());
     openCodex(from, "awards");
   }
 
@@ -789,6 +789,11 @@
       const body = el("div");
       body.appendChild(el("div", t(...e.name), "name"));
       body.appendChild(el("div", t(...e.text), "text"));
+      if (sec.id === "weapons" && !screens.found(e, meta)) {
+        li.className = "unfound";
+        body.appendChild(el("div", t("Ещё не найдено: возьми в матче, чтобы пополнить коллекцию.",
+                                     "Not found yet: take it in a match to add it to the collection."), "when"));
+      }
       li.appendChild(body);
       list.appendChild(li);
     }
@@ -869,7 +874,7 @@
     } else {
       acc = 0;
     }
-    renderer.draw(game.state, look);
+    renderer.draw(game.state, matchLook);
     updateOverlays();
     if (now - hudAt > 100) {
       hudAt = now;
@@ -913,9 +918,12 @@
   dev("chest", "Сундук", (d) => d.chest());
   dev("enemy", "Враг карты", (d) => d.enemy());
   dev("final", "Финальный босс", (d) => d.final());
+  dev("stage", "Пройти этап", (d) => d.stage());
   dev("finale", "Финал", (d) => d.finale());
 
-  $("btn-play").addEventListener("click", startMatch);
+  $("btn-play").addEventListener("click", () => startMatch());
+  $("btn-stars").addEventListener("click", openStars);
+  $("btn-stars-back").addEventListener("click", closeStars);
   $("btn-resume").addEventListener("click", () => { escOpen = false; window.focus(); });
   $("btn-quit").addEventListener("click", () => { escOpen = false; quit(); });
   $("btn-again").addEventListener("click", openMenu);
@@ -934,6 +942,7 @@
     const settings = await Sidequest.settings();
     fpsLimit = settings.fps_limit === 30 ? 30 : 60;
     renderer = LCSRender.createRenderer($("arena"), balance, $("top"));
+    screens = LCSScreens.create({balance, el, clear, iconCanvas, clock});
     await openMenu();
     requestAnimationFrame((now) => { lastDraw = now; frame(now); });
   });

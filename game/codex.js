@@ -255,6 +255,26 @@
                              text: [x.text, x.text_en]}));
   }
 
+  // The classes (0.9): what each starts with, its ability and what opens it; first, the
+  // ability itself, which gets a hint at the start of the first match with a class.
+  function classes(B) {
+    const ICONS = {developer: "pistol", junior: "gem", backender: "turret"};
+    const ach = (id) => B.achievements.find((a) => a.id === id);
+    const list = [{id: "ability", icon: "keyboard", name: ["Способность класса", "Class ability"],
+                   text: ["Пробел: способность твоего класса. Пока она перезаряжается, в нижней панели видно, сколько секунд осталось. Класс выбирается в меню.",
+                          "Space: your class's ability. While it recharges, the bottom panel shows the seconds left. The class is picked in the menu."]}];
+    for (const c of B.classes) {
+      const A = c.ability, a = c.unlock ? ach(c.unlock) : null;
+      const ability = A ? [` Способность: ${A.name} — ${A.text}, раз в ${A.cooldown} сек.`,
+                           ` Ability: ${A.name_en} — ${A.text_en}, every ${A.cooldown} sec.`] : ["", ""];
+      const unlock = a ? [` Открывается ачивкой «${a.name}».`, ` Unlocked by the achievement "${a.name_en}".`]
+        : [" Открыт сразу.", " Open from the start."];
+      list.push({id: "class_" + c.id, icon: ICONS[c.id] || c.weapon, name: [c.name, c.name_en],
+                 text: [c.text + ability[0] + unlock[0], c.text_en + ability[1] + unlock[1]]});
+    }
+    return list;
+  }
+
   // Every weapon, then every evolution with what it takes.
   function weapons(B) {
     const passive = (id) => B.upgrades.find((u) => u.id === id);
@@ -281,6 +301,7 @@
       {id: "gear", name: ["Снаряжение", "Gear"], entries: gear(B)},
       {id: "enemies", name: ["Враги", "Enemies"], entries: enemies(B)},
       {id: "allies", name: ["Ты и союзники", "You and allies"], entries: allies(B)},
+      {id: "classes", name: ["Классы", "Classes"], entries: classes(B)},
       {id: "work", name: ["Работа агента", "Agent's work"], entries: work(B)},
       {id: "events", name: ["События", "Events"], entries: events(B)},
       {id: "map", name: ["Карта", "Map"], entries: terrain(B)},
@@ -295,6 +316,7 @@
       .concat(spirits(B).concat(work(B)).map((e) => Object.assign({kind: "ally"}, e)))
       .concat(events(B).map((e) => Object.assign({kind: "event"}, e)))
       .concat(terrain(B).map((e) => Object.assign({kind: "map"}, e)))
+      .concat(classes(B).slice(0, 1).map((e) => Object.assign({kind: "item"}, e)))
       .find((e) => e.id === id);
     return found || null;
   }

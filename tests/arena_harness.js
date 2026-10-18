@@ -8,6 +8,7 @@ load(GAME + "/maps.js");
 load(GAME + "/terrain.js");
 load(GAME + "/modes.js");
 load(GAME + "/build.js");
+load(GAME + "/classes.js");
 load(GAME + "/game.js");
 load(GAME + "/progress.js");
 const balance = JSON.parse(readFile(GAME + "/balance.json"));

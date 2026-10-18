@@ -53,6 +53,8 @@ button.primary { background: var(--btn-primary); }
 #buffs .violet { color: var(--violet); }
 #buffs .orange { color: var(--orange); }
 #buffs .blue { color: var(--sky); }
+#buffs .pink { color: var(--accent); }
+#buffs .dim { color: var(--dim); }
 #buffs .ending { animation: ending 0.25s steps(1) infinite; }
 @keyframes ending { 50% { opacity: 0.3; } }
 /* The build: weapons, then passives, each with its level. */
@@ -95,7 +97,7 @@ body:has(.screen:not([hidden])) :is(#tip, #notice) { display: none; }
 .screen { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center;
   justify-content: center; gap: 10px; background: var(--screen); }
 /* Screens of their own are solid; only the pause and the level-up let the match show through. */
-#menu, #character, #codex, #awards { background: var(--bg); }
+#menu, #character, #codex, #awards, #stars { background: var(--bg); }
 .screen h1 { color: var(--title); font-size: 22px; margin: 0; }
 .screen h2 { color: var(--title); font-size: 18px; margin: 0; }
 .screen h3 { color: var(--title); font-size: 13px; margin: 6px 0 0; }
@@ -210,8 +212,8 @@ button:disabled { opacity: 0.4; cursor: default; }
 #awards-list .meter { height: 4px; background: var(--bg); border: 1px solid var(--edge); }
 #awards-list .meter > div { height: 100%; background: var(--title); }
 #codex { justify-content: flex-start; padding: 16px 0; box-sizing: border-box; }
-/* One row for nine sections: smaller on a narrow window, and it scrolls rather than wraps. */
-#codex-tabs { display: flex; gap: 6px; flex-wrap: nowrap; max-width: 96vw; overflow-x: auto;
+/* One row for ten sections: smaller on a narrow window, and it scrolls rather than wraps. */
+#codex-tabs { display: flex; flex: none; gap: 6px; flex-wrap: nowrap; max-width: 96vw; overflow-x: auto;
   padding: 0 4px 4px; box-sizing: border-box; }
 #codex-tabs button { box-shadow: none; flex: none; }
 @media (max-width: 1060px) {
@@ -228,6 +230,28 @@ button:disabled { opacity: 0.4; cursor: default; }
 #codex-list .icon { flex: none; width: 48px; display: flex; justify-content: center; }
 #codex-list .name { color: var(--title); }
 #codex-list .text { font-size: 12px; }
+#codex-list .when { font-size: 11px; color: var(--dim); }
+#codex-list li.unfound .icon canvas { filter: grayscale(1) brightness(0.55); }
+#codex-list li.unfound .name { color: var(--text); }
+/* Classes: a row like the modifiers; a locked one says on hover what opens it. */
+#classes { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; }
+#classes .locked { text-decoration: line-through; }
+/* Stars: the bonuses in two columns, each with its levels and a price. */
+#stars { justify-content: flex-start; padding: 16px 0; box-sizing: border-box; }
+#stars > .hint { max-width: min(760px, 94vw); margin: 0; }
+#stars-count { color: var(--yellow); }
+#perks { list-style: none; margin: 0; padding: 0 4px; width: min(760px, 94vw); flex: 0 1 auto;
+  min-height: 0; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 8px; }
+#perks li { display: flex; gap: 10px; align-items: center; padding: 8px; background: var(--panel);
+  border: 2px solid var(--edge); }
+#perks .body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+#perks .name { color: var(--title); }
+#perks .text { font-size: 12px; }
+#perks .pips { font-size: 11px; color: var(--yellow); letter-spacing: 1px; }
+#perks button { flex: none; font-size: 12px; }
+#collection { max-width: min(760px, 94vw); margin: 0; }
+.results-box .ending { max-width: 520px; margin: 4px auto; color: var(--title); text-align: center; }
 /* The button the arrow keys are on: filled with the accent and ringed in white, so it is the
    one thing on screen that looks like that. The primary button is only a darker fill. */
 button:focus { outline: 2px solid var(--text); outline-offset: 2px; border-color: var(--accent); }
