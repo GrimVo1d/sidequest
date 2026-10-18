@@ -474,7 +474,16 @@
   const MOVE = {KeyW: [0, -1], ArrowUp: [0, -1], KeyS: [0, 1], ArrowDown: [0, 1],
                 KeyA: [-1, 0], ArrowLeft: [-1, 0], KeyD: [1, 0], ArrowRight: [1, 0]};
 
+  // A gamepad's buttons arrive as the keys below; its stick moves the hero (gamepad.js).
+  const pad = LCSGamepad.create({
+    read: () => (navigator.getGamepads ? navigator.getGamepads() : []),
+    press: (code) => (document.activeElement || document.body)
+      .dispatchEvent(new KeyboardEvent("keydown", {code, bubbles: true, cancelable: true})),
+  });
+  let padMove = {x: 0, y: 0};
+
   function input() {
+    if (padMove.x || padMove.y) return padMove;
     let x = 0, y = 0;
     for (const code of keys) {
       const m = MOVE[code];
@@ -877,6 +886,8 @@
 
   function frame(now) {
     requestAnimationFrame(frame);
+    padMove = pad.poll(now, !game || game.state.over || escOpen
+                       || Boolean(document.querySelector(".screen:not([hidden]), .overlay:not([hidden])")));
     if (!game || game.state.over) return;
     if (now - lastDraw < 1000 / fpsLimit - 2) return;
     const dt = Math.min(0.25, (now - lastDraw) / 1000 || 0);
