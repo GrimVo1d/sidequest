@@ -942,6 +942,12 @@
     const settings = await Sidequest.settings();
     fpsLimit = settings.fps_limit === 30 ? 30 : 60;
     renderer = LCSRender.createRenderer($("arena"), balance, $("top"));
+    renderer.setOptions({shake: settings.screen_shake, outline: settings.outline});
+    // The interface grows as far as the window still holds the menu at its smallest size.
+    const scale = () => document.documentElement.style.setProperty(
+      "--ui-scale", String(Math.max(1, Math.min(settings.ui_scale || 1, innerWidth / 800, innerHeight / 560))));
+    scale();
+    addEventListener("resize", scale);
     screens = LCSScreens.create({balance, el, clear, iconCanvas, clock});
     await openMenu();
     requestAnimationFrame((now) => { lastDraw = now; frame(now); });

@@ -25,6 +25,10 @@ button.primary { background: var(--btn-primary); }
 .hint { color: var(--dim); font-size: 12px; text-align: center; }
 .note { color: var(--title); }
 
+/* The interface size from the settings: the menus, the HUD and the dialogs grow, the arena
+   does not. Zoomed, each still covers exactly the window. */
+#hud, .screen, .overlay { zoom: var(--ui-scale, 1); box-sizing: border-box; right: auto; bottom: auto;
+  width: calc(100vw / var(--ui-scale, 1)); height: calc(100vh / var(--ui-scale, 1)); }
 #hud { position: fixed; inset: 0; pointer-events: none; padding: 8px 10px; }
 .hud-row { display: flex; gap: 14px; align-items: center; margin-bottom: 4px;
   text-shadow: 1px 1px 0 var(--edge); }

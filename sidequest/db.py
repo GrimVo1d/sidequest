@@ -51,6 +51,11 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "fps_limit": 60,
     # English unless the player picks Russian; "auto" follows the system (sidequest/i18n.py).
     "language": "en",
+    # How the arena looks (1.0): screen shake 0, 0.5 or 1; outlines for colorblind players;
+    # the size of the menus and the HUD.
+    "screen_shake": 1,
+    "outline": False,
+    "ui_scale": 1,
 }
 
 # Last Claude Code version whose events were verified (stage 0, docs/events.md).
