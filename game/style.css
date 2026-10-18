@@ -264,6 +264,9 @@ input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 1p
 .char-row button { position: relative; }
 .char-row button.on { border-color: var(--text); color: var(--accent); }
 .char-row .char-swatch { width: 22px; height: 22px; padding: 0; }
+.char-row .char-thumb { padding: 4px; line-height: 0; min-width: 40px; min-height: 40px;
+                        display: flex; align-items: center; justify-content: center; }
+.char-row .char-thumb canvas { image-rendering: pixelated; }
 .char-row .char-swatch.on { outline: 2px solid var(--text); outline-offset: 1px; }
 /* A swatch keeps its own color under the focus: the ring is the accent's. */
 .char-row .char-swatch:focus { outline: 2px solid var(--accent); outline-offset: 1px; }

@@ -12,6 +12,10 @@
   const HERO = root.LCSHero;
   const SCALE = 6;      // preview pixels per hero pixel
   const PRESET_SCALE = 2;
+  // A part's button shows the hero wearing it, cut to the rows where the part is: [first
+  // row, last row + 1, pixels per hero pixel]; the face's small parts are drawn bigger.
+  const THUMB_ROWS = {hair: [0, 12, 3], eyes: [4, 9, 4], mouth: [6, 11, 4], face: [4, 9, 4], hat: [0, 9, 3],
+                      top: [10, 20, 3], bottom: [16, 24, 3], shoes: [20, 24, 3]};
 
   const TABS = [
     {id: "looks", name: ["Внешность", "Looks"],
@@ -78,15 +82,35 @@
   // hint has its own line under the buttons.
   function status(text) { $("char-status").textContent = text; }
 
-  // A choice button: a part by name or a color swatch; a locked one only tells what opens it.
+  // The draft with `id` in the slot `key`, standing, cut to THUMB_ROWS and to its columns.
+  function thumb(key, id) {
+    const f = HERO.frame(Object.assign({}, draft, {[key]: id}), "idle", 0, {rest: true});
+    const [top, bottom, scale] = THUMB_ROWS[key];
+    const rows = f.rows.slice(top, bottom);
+    const used = (x) => rows.some((r) => r[x] !== ".");
+    let left = 0, right = HERO.W - 1;
+    while (left < right && !used(left)) left++;
+    while (right > left && !used(right)) right--;
+    const img = LCSSprites.decodeRows(rows.map((r) => r.slice(left, right + 1)), f.palette);
+    const pic = el("canvas");
+    pic.width = img.width;
+    pic.height = img.height;
+    pic.getContext("2d").putImageData(new ImageData(img.data, img.width, img.height), 0, 0);
+    pic.style.width = img.width * scale + "px";
+    pic.style.height = img.height * scale + "px";
+    return pic;
+  }
+
+  // A choice button: a part as a picture or a color swatch, its name in the status line; a
+  // locked one only tells what opens it.
   function choiceButton(key, id) {
-    const color = HERO.isColor(key);
+    const color = HERO.isColor(key), pictured = !color && THUMB_ROWS[key];
     const name = t(...HERO.choiceName(key, id));
-    const b = el("button", color ? "" : name, color ? "char-swatch" : "");
-    if (color) {
-      b.style.backgroundColor = HERO.swatch(key, id);   // a constant from avatar.js / hero.js
-      b.title = name;
-    }
+    const b = el("button", color || pictured ? "" : name, color ? "char-swatch" : pictured ? "char-thumb" : "");
+    b.title = name;
+    b.setAttribute("aria-label", name);
+    if (color) b.style.backgroundColor = HERO.swatch(key, id);   // a constant from avatar.js / hero.js
+    if (pictured) b.appendChild(thumb(key, id));
     const open = isOpen(key, id), rare = HERO.rarity(unlocks(), key, id);
     if (!open) b.classList.add("locked");
     if (rare !== "common") b.classList.add("rarity-" + rare);
