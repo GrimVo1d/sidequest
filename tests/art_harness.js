@@ -140,6 +140,16 @@ heroEditor.crown = [LCSHero.lockedBy(unlocks, "hat", "crown"), LCSHero.rarity(un
 const owned = LCSHero.fromAvatar({parts: {acc: "crown", body: "armor"}});
 heroEditor.owned = [LCSHero.isOpen(unlocks, {}, "hat", "crown", owned), LCSHero.isOpen(unlocks, {}, "top", "armor", owned),
                     LCSHero.isOpen(unlocks, {}, "hat", "halo", owned)];
+// No hair above the lower edge of a cloth hat (one drawn in the hat letters C and c).
+heroEditor.hairThroughHats = [];
+for (const hat of LCSHero.choiceIds("hat")) {
+  const bald = LCSHero.frame({hair: "none", hat}, "idle", 0).rows;
+  const edge = bald.reduce((last, row, i) => (/[Cc]/.test(row) ? i : last), -1);
+  for (const hair of LCSHero.choiceIds("hair")) {
+    const rows = LCSHero.frame({hair, hat}, "idle", 0).rows;
+    if (rows.slice(0, edge + 1).some((row) => /[Hh]/.test(row))) heroEditor.hairThroughHats.push(`${hair}+${hat}`);
+  }
+}
 heroEditor.gold = ["top_color", "bottom_color", "shoes_color"].map((k) => LCSHero.lockedBy(unlocks, k, "gold"));
 
 const fontErrors = [];

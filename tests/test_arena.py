@@ -647,6 +647,7 @@ class ArenaArtTest(unittest.TestCase):
         self.assertEqual(editor["crown"], ["classic_win", "epic", False, True])
         # A rare clothes color is locked for the top, the bottom and the shoes alike.
         self.assertEqual(editor["gold"], ["kills_total"] * 3)
+        self.assertEqual(editor["hairThroughHats"], [])
         # What an old avatar already wears stays open: the "Merge king" keeps its crown.
         self.assertEqual(editor["owned"], [True, True, False])
 

@@ -278,6 +278,10 @@
     ]]],
   };
 
+  // A cloth hat sits on the head: no hair above its lower edge, or spikes, a crest and a
+  // knot would show through it. The crown, the halo and the headphones leave the hair be.
+  const HAT_HIDES = {cap: 4, beanie: 5, wizard: 4};   // hair rows above this one are hidden
+
   // --- the look --------------------------------------------------------------------
 
   // Slots of a look in the order the editor shows them; `parts` or `colors` names the
@@ -523,7 +527,11 @@
     }
     const parts = [].concat(HAIR[L.hair], pose.eyes || EYES[L.eyes], MOUTH[L.mouth], FACE[L.face],
                             top.layers || [], bottom.layers || [], HATS[L.hat]);
-    for (const [slot, y, rows] of parts) layers[slot].push([y, rows]);
+    const hides = HAT_HIDES[L.hat] || 0;
+    for (const [slot, y, rows] of parts) {
+      const cut = slot === "hair" || slot === "hair_back" ? hides - y : 0;
+      layers[slot].push([y, cut > 0 ? rows.map((row, i) => (i < cut ? "" : row)) : rows]);
+    }
 
     const grid = Array.from({length: H}, () => Array(W).fill("."));
     const back = o.recoil ? -1 : 0;
