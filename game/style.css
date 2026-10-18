@@ -123,7 +123,7 @@ body:has(.screen:not([hidden])) :is(#tip, #notice) { display: none; }
 .menu-side dl { font-size: 12px; }
 .menu-side h3 { margin-top: 8px; }
 .menu-main { display: flex; flex-direction: column; align-items: center; gap: 8px;
-  width: min(620px, calc(100vw - 272px)); }
+  width: min(620px, calc(100vw / var(--ui-scale, 1) - 272px)); }   /* the screen is zoomed */
 .menu-main .hint { margin: 0; max-width: 100%; }
 .menu-actions { flex: none; align-self: stretch; display: flex; flex-direction: column; align-items: center;
   gap: 4px; padding: 8px 12px 6px; background: var(--bar); border-top: 2px solid var(--edge); }
