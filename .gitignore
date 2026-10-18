@@ -1,5 +1,5 @@
 
-# Game data: database, socket, DLC saves
+# Game data: database, socket, the game's saves
 data/
 
 # Recorded sessions carry the names of real projects; the repository is public
@@ -9,6 +9,9 @@ dev/recordings/
 .tmp/
 __pycache__/
 .venv/
+
+# Claude Code: local agents, skills and settings
+.claude/
 
 # macOS
 .DS_Store

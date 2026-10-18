@@ -1,52 +1,72 @@
-"""The window: pywebview on the system WebKit, the hub page and the JS bridge.
+"""The window: pywebview on the system WebKit, the game page and the JS bridge.
 
 Data only ever crosses into the page as return values of bridge calls. Python never
 builds JavaScript from event data: it only runs one constant wake-up call, and the page
 then pulls the events through `Bridge.drain()`.
 """
+
+import contextlib
 import json
 import os
-import re
+import sys
+import tempfile
 import threading
 import time
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any, TypedDict
 
-from . import avatar, claude_settings, i18n, paths, replay, selfcheck
+from . import __version__, avatar, claude_settings, i18n, paths, replay, selfcheck
 from .core import Core
-from .db import DEFAULT_SETTINGS
+from .db import DEFAULT_SETTINGS, Row
 from .i18n import t
+from .normalizer import Event
+
+if TYPE_CHECKING:
+    import webview  # only for the window's type; imported for real in run()
 
 WAKE_JS = "window.__sidequestWake && window.__sidequestWake()"
 MAX_QUEUE = 5000
-GHOST_MIN_ACTIONS = 10       # shorter sessions make no match
+GHOST_MIN_ACTIONS = 10  # shorter sessions make no match
 GHOST_MAX_EVENTS = 20000
-_ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
+
+# A JSON object a bridge call returns to the page. Arguments that come from the page are
+# typed Any: they are whatever the page sent.
+Reply = dict[str, Any]
 
 
-def _file_url(path):
+class LiveSession(TypedDict):
+    session: str
+    project: str | None
+    status: str
+
+
+def _file_url(path: str) -> str:
     # A file:// URL (not a bare path) keeps pywebview from starting its HTTP server.
     return "file://" + os.path.abspath(path)
 
 
 class Bridge:
-    """Methods callable from the hub page as window.pywebview.api.<name>(...)."""
+    """Methods callable from the game page as window.pywebview.api.<name>(...).
 
-    def __init__(self, core, dev, settings_path):
+    The page never gets the Bridge itself: see `exposed()` and `create_window()`."""
+
+    def __init__(self, core: Core, dev: bool, settings_path: str) -> None:
         self._core = core
         self._dev = dev
         self._settings_path = settings_path
-        self._queue = []
+        self._queue: list[Event] = []
         self._queue_lock = threading.Lock()
-        self._window = None
+        self._window: webview.Window | None = None
         self._wake_pending = threading.Event()
-        self._checks = []
+        self._checks: list[selfcheck.Result] = []
         self._first_event_seen = False
-        self._player = None
-        self._tainted = False      # dev panel or replay used during the current match
+        self._player: replay.Player | None = None
+        self._tainted = False  # dev panel or replay used during the current match
         core.subscribe(self._on_event)
 
     # --- events to the page -----------------------------------------------------
 
-    def _on_event(self, event):
+    def _on_event(self, event: Event) -> None:
         if not event.get("replay"):
             self._first_event_seen = True
         with self._queue_lock:
@@ -54,42 +74,44 @@ class Bridge:
             del self._queue[:-MAX_QUEUE]
         self._wake_pending.set()
 
-    def _pusher(self):
+    def _pusher(self) -> None:
         while True:
             self._wake_pending.wait()
             self._wake_pending.clear()
             if self._window is not None:
-                try:
+                with contextlib.suppress(Exception):
                     self._window.evaluate_js(WAKE_JS)
-                except Exception:
-                    pass
             time.sleep(0.02)  # coalesce bursts into one wake-up
 
-    def drain(self):
+    def drain(self) -> list[Event]:
         with self._queue_lock:
             events, self._queue = self._queue, []
         return events
 
-    def report_error(self, message):
-        """JS errors of the hub end up in the terminal log."""
-        import sys
-        print(f"[hub error] {str(message)[:2000]}", file=sys.stderr, flush=True)
+    def report_error(self, message: Any) -> None:
+        """JS errors of the page end up in the terminal log."""
+        print(f"[page error] {str(message)[:2000]}", file=sys.stderr, flush=True)
 
     # --- status and self-check --------------------------------------------------
 
-    def status(self):
+    def status(self) -> Reply:
         core = self._core
-        paused = [{"session": s, "reason": reason,
-                   "project": self._project(s)} for s, reason in core.paused_sessions().items()]
+        paused = [
+            {"session": s, "reason": reason, "project": self._project(s)}
+            for s, reason in core.paused_sessions().items()
+        ]
         return {
+            "version": __version__,
             "dev": self._dev,
             "connected": self._connected(),
             "indicator": self._indicator(),
             "checks": [r.as_dict() for r in self._checks],
             "waiting_first_event": not self._first_event_seen,
-            "control": {"active": core.control is not None,
-                        "version": core.control.version if core.control else None,
-                        "report": core.control_report},
+            "control": {
+                "active": core.control is not None,
+                "version": core.control.version if core.control else None,
+                "report": core.control_report,
+            },
             "unknown_events": dict(core.normalizer.unknown_events),
             "unknown_tools": dict(core.normalizer.unknown_tools),
             "paused": paused,
@@ -98,39 +120,47 @@ class Bridge:
             "tainted": self._tainted,
         }
 
-    def _connected(self):
+    def _connected(self) -> bool:
         try:
             settings, _ = claude_settings.read_settings(self._settings_path)
         except claude_settings.SettingsError:
             return False
         return bool(claude_settings.find_entries(settings))
 
-    def _project(self, session):
+    def _project(self, session: str) -> str | None:
         state = self._core.normalizer.sessions.get(session)
         return state.project if state else None
 
-    def _live_sessions(self):
+    def _live_sessions(self) -> list[LiveSession]:
         core = self._core
-        return [{"session": sid, "project": state.project,
-                 "status": core.session_status(sid)}
-                for sid, state in list(core.normalizer.sessions.items())]
+        return [
+            {"session": sid, "project": state.project, "status": core.session_status(sid)}
+            for sid, state in list(core.normalizer.sessions.items())
+        ]
 
-    def _indicator(self):
+    def _indicator(self) -> str:
         if not self._checks:
             return "yellow"
         if any(not r.ok for r in self._checks):
             return "red"
         core = self._core
-        if any(r.warn for r in self._checks) or core.control is not None \
-                or core.control_report or core.normalizer.unknown_events \
-                or core.normalizer.unknown_tools:
+        if (
+            any(r.warn for r in self._checks)
+            or core.control is not None
+            or core.control_report
+            or core.normalizer.unknown_events
+            or core.normalizer.unknown_tools
+        ):
             return "yellow"
         return "green"
 
-    def run_check(self):
+    def run_check(self) -> list[selfcheck.CheckResult]:
         store = self._core.store
-        results = [selfcheck.check_hooks(self._settings_path, paths.EMIT_SCRIPT,
-                                          store.get_meta("emit_hash"))]
+        results = [
+            selfcheck.check_hooks(
+                self._settings_path, paths.EMIT_SCRIPT, store.get_meta("emit_hash")
+            )
+        ]
         version_result, version = selfcheck.check_version(store.verified_version())
         results.append(version_result)
         if version and version != store.verified_version() and self._core.control is None:
@@ -141,54 +171,60 @@ class Bridge:
 
     # --- pause buttons ----------------------------------------------------------
 
-    def resume(self, session=None):
+    def resume(self, session: Any = None) -> None:
         self._core.resume(session)
 
-    def end_match(self, session):
+    def end_match(self, session: Any) -> None:
         self._core.end_match(session)
+
+    def quit(self) -> None:
+        # Closing the window ends everything: "closing" cleans up as for the close button.
+        if self._window is not None:
+            self._window.destroy()
 
     # --- connect to Claude Code ---------------------------------------------------
 
-    def install_preview(self):
+    def install_preview(self) -> Reply:
         return self._preview(lambda s: claude_settings.plan_install(s, paths.EMIT_SCRIPT))
 
-    def install_apply(self):
+    def install_apply(self) -> Reply:
         os.chmod(paths.EMIT_SCRIPT, 0o755)
         result = self._apply(lambda s: claude_settings.plan_install(s, paths.EMIT_SCRIPT))
-        if result["ok"]:
+        if result["ok"] and paths.is_claude_settings(self._settings_path):
             self._core.store.set_meta("emit_hash", selfcheck.file_hash(paths.EMIT_SCRIPT))
         return result
 
-    def uninstall_preview(self):
+    def uninstall_preview(self) -> Reply:
         return self._preview(claude_settings.plan_uninstall)
 
-    def uninstall_apply(self, delete_core=False, delete_dlc=()):
+    def uninstall_apply(self, delete_core: Any = False, delete_game: Any = False) -> Reply:
         result = self._apply(claude_settings.plan_uninstall)
         if not result["ok"]:
             return result
-        if delete_core:
+        if delete_core is True:
             self._core.store.delete_all()
-        for dlc_id in delete_dlc or ():
-            if _ID_RE.match(dlc_id or ""):
-                target = os.path.join(paths.DLC_DATA_DIR, dlc_id)
-                if os.path.isdir(target):
-                    import shutil
-                    shutil.rmtree(target)
+        if delete_game is True:
+            paths.delete_game_data(paths.GAME_DATA_DIR)
         return result
 
-    def _preview(self, planner):
+    def _preview(self, planner: claude_settings.Planner) -> Reply:
         try:
             settings, _ = claude_settings.read_settings(self._settings_path)
             _, changes = planner(settings)
         except claude_settings.SettingsError as e:
             return {"ok": False, "error": str(e)}
-        return {"ok": True, "path": self._settings_path, "script": paths.EMIT_SCRIPT,
-                "changes": [{"event": e, "what": w} for e, w in changes]}
+        return {
+            "ok": True,
+            "path": self._settings_path,
+            "script": paths.EMIT_SCRIPT,
+            "changes": [{"event": e, "what": w} for e, w in changes],
+        }
 
-    def _apply(self, planner):
+    def _apply(self, planner: claude_settings.Planner) -> Reply:
         try:
-            changes, backup = claude_settings.apply(self._settings_path, planner,
-                                                    lambda _changes: True)
+            changes, backup = claude_settings.apply(
+                self._settings_path, planner, lambda _changes: True
+            )
         except claude_settings.SettingsError as e:
             return {"ok": False, "error": str(e)}
         self.run_check()
@@ -196,152 +232,121 @@ class Bridge:
 
     # --- profile, stats, journal, settings ----------------------------------------
 
-    def profile(self):
+    def profile(self) -> Reply:
         store = self._core.store
-        # avatar None means the default one (SidequestAvatar.DEFAULT in sdk/avatar.js).
-        return {"name": store.get_meta("profile.name", t("Игрок", "Player")),
-                "avatar": store.get_meta("profile.avatar"),
-                "stats": store.stats()}
+        # avatar None means the default one (SidequestAvatar.DEFAULT in game/avatar.js).
+        return {
+            "name": store.get_meta("profile.name", t("Игрок", "Player")),
+            "avatar": store.get_meta("profile.avatar"),
+            "stats": store.stats(),
+        }
 
-    def set_profile_name(self, name):
+    def set_profile_name(self, name: object) -> str:
         name = str(name).strip()[:32] or t("Игрок", "Player")
         self._core.store.set_meta("profile.name", name)
         return name
 
-    def set_avatar(self, value):
+    def set_avatar(self, value: object) -> avatar.PixelAvatar | avatar.PictureAvatar | None:
         """Store a checked avatar (see sidequest/avatar.py); None resets to the default."""
         value = None if value is None else avatar.clean(value)
         self._core.store.set_meta("profile.avatar", value)
         return value
 
-    def journal(self, limit=100):
+    def journal(self, limit: Any = 100) -> list[Row]:
         return self._core.store.recent_events(min(int(limit), 500))
 
-    def get_settings(self):
+    def get_settings(self) -> dict[str, Any]:
         store = self._core.store
         settings = {name: store.get_setting(name) for name in DEFAULT_SETTINGS}
         settings["lang"] = i18n.language()  # "auto" resolved: what the window shows
         return settings
 
-    def set_setting(self, name, value):
+    def set_setting(self, name: Any, value: Any) -> Any:
         if name == "silence_pause_seconds":
             value = max(10, min(3600, int(value)))
         elif name == "fps_limit":
             value = 30 if int(value) <= 30 else 60
         elif name == "language":
-            value = value if value in i18n.LANGS else "auto"
+            value = value if value in (*i18n.LANGS, "auto") else "en"
             i18n.set_language(i18n.resolve(value))
         self._core.store.set_setting(name, value)
         return value
 
-    # --- DLC --------------------------------------------------------------------
+    # --- the game's own data -----------------------------------------------------
 
-    def _dlc_roots(self):
-        roots = [os.path.join(paths.PROJECT_DIR, "dlc")]
-        if self._dev:
-            roots.append(os.path.join(paths.PROJECT_DIR, "dev", "dlc"))
-        return roots
+    def balance(self) -> Any:
+        """game/balance.json: the numbers and texts that ship with the game."""
+        with open(os.path.join(paths.GAME_DIR, "balance.json"), encoding="utf-8") as f:
+            return json.load(f)
 
-    def list_dlc(self):
-        roots = self._dlc_roots()
-        found = []
-        for root in roots:
-            if not os.path.isdir(root):
-                continue
-            for name in sorted(os.listdir(root)):
-                manifest = os.path.join(root, name, "manifest.json")
-                if not _ID_RE.match(name) or not os.path.isfile(manifest):
-                    continue
-                try:
-                    with open(manifest, encoding="utf-8") as f:
-                        data = json.load(f)
-                except (OSError, ValueError):
-                    continue
-                entry = os.path.join(root, name, data.get("entry", "index.html"))
-                found.append({"id": name, "name": str(data.get("name", name)),
-                              "version": str(data.get("version", "")),
-                              "dev_only": root != roots[0],
-                              "card": self._card(name),
-                              "url": _file_url(entry)})
-        return found
-
-    def _card(self, dlc_id):
-        """A few "label: value" rows the DLC wrote for its card in the hub (Sidequest.card).
-
-        A label is a string or {"ru": .., "en": ..}."""
+    def load(self, key: Any) -> Any:
         try:
-            rows = self.dlc_load(dlc_id, "card")
-        except (OSError, ValueError):
-            return []
-        if not isinstance(rows, list):
-            return []
-        card = []
-        for row in rows[:4]:
-            if isinstance(row, list) and len(row) == 2:
-                label = row[0]
-                if isinstance(label, dict):  # {"ru": .., "en": ..}: shown in the chosen language
-                    label = label.get(i18n.language(), label.get("ru", ""))
-                card.append([str(label)[:24], str(row[1])[:16]])
-        return card
-
-    def dlc_balance(self, dlc_id):
-        """The DLC's balance.json (read-only numbers that ship with the DLC)."""
-        if not _ID_RE.match(str(dlc_id)):
-            raise ValueError("bad dlc id")
-        for root in self._dlc_roots():
-            path = os.path.join(root, dlc_id, "balance.json")
-            if os.path.isfile(path):
-                with open(path, encoding="utf-8") as f:
-                    return json.load(f)
-        return None
-
-    def dlc_load(self, dlc_id, key):
-        path = self._dlc_file(dlc_id, key)
-        try:
-            with open(path, encoding="utf-8") as f:
-                return json.load(f)
+            fd = os.open(self._save_file(key), os.O_RDONLY | os.O_NOFOLLOW)
         except FileNotFoundError:
             return None
+        with open(fd, encoding="utf-8") as f:
+            return json.load(f)
 
-    def dlc_save(self, dlc_id, key, value):
-        path = self._dlc_file(dlc_id, key)
-        os.makedirs(os.path.dirname(path), mode=0o700, exist_ok=True)
-        tmp = path + ".tmp"
-        with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(value, f, ensure_ascii=False)
-        os.replace(tmp, path)
+    def save(self, key: Any, value: Any) -> bool:
+        path = self._save_file(key)
+        os.makedirs(paths.GAME_DATA_DIR, mode=0o700, exist_ok=True)
+        # A fresh temporary file, never through a link planted in the folder; the rename
+        # replaces a link in place of the save itself rather than following it.
+        fd, tmp = tempfile.mkstemp(dir=paths.GAME_DATA_DIR, prefix=key + ".", suffix=".tmp")
+        try:
+            with open(fd, "w", encoding="utf-8") as f:
+                json.dump(value, f, ensure_ascii=False, allow_nan=False)
+            os.replace(tmp, path)
+        except BaseException:
+            os.unlink(tmp)
+            raise
         return True
 
-    def match_start(self, dlc_id):
+    def _save_file(self, key: Any) -> str:
+        if not isinstance(key, str) or not paths.KEY_RE.match(key):
+            raise ValueError("bad save key")
+        # Saves stay inside the project: a link in place of the folder is refused.
+        if os.path.islink(paths.GAME_DATA_DIR):
+            raise ValueError("the saves folder is a link")
+        return os.path.join(paths.GAME_DATA_DIR, key + ".json")
+
+    def match_start(self) -> Reply:
         self._tainted = self._core.replaying
         return {"counted": not self._tainted}
 
-    def match_end(self, dlc_id, result):
+    def match_end(self, result: Any) -> Reply:
         """Record a finished match unless the dev panel or a replay touched it."""
         counted = not self._tainted and not self._core.replaying
         if counted:
-            stats = self.dlc_load(dlc_id, "stats") or {"matches": 0, "results": []}
+            stats = self.load("stats") or {"matches": 0, "results": []}
             stats["matches"] += 1
             stats["results"] = (stats["results"] + [result])[-100:]
-            self.dlc_save(dlc_id, "stats", stats)
+            self.save("stats", stats)
         self._tainted = False
         return {"counted": counted}
 
-    # --- past sessions: a DLC replays one by itself, on its own clock (a "ghost") ------
+    # --- past sessions: the game replays one by itself, on its own clock (a "ghost") --
 
-    def dlc_sessions(self, dlc_id=None):
+    def past_sessions(self) -> list[Reply]:
         """Past sessions to replay: when, which project, how long and how busy."""
         rows = self._core.store.session_summaries(30, GHOST_MIN_ACTIONS)
-        return [{"session": r["id"], "project": r["project"], "started_at": r["started_at"],
-                 "duration": round(max(0.0, r["last_ts"] - r["started_at"]), 1),
-                 "actions": r["actions"]} for r in rows]
+        return [
+            {
+                "session": r["id"],
+                "project": r["project"],
+                "started_at": r["started_at"],
+                "duration": round(max(0.0, r["last_ts"] - r["started_at"]), 1),
+                "actions": r["actions"],
+            }
+            for r in rows
+        ]
 
-    def dlc_live_sessions(self, dlc_id=None):
+    def live_sessions(self) -> list[LiveSession]:
         """Sessions open right now with their status, so a new match can pick up an agent
         that is already at work instead of waiting for its next event."""
         return self._live_sessions()
 
-    def dlc_session_events(self, dlc_id, session):
+    def session_events(self, session: Any) -> list[Event]:
         """One past session's events, already normalized, with "t" in seconds from its start."""
         events = self._core.store.session_events(str(session))[:GHOST_MAX_EVENTS]
         if not events:
@@ -354,33 +359,31 @@ class Bridge:
             out.append(e)
         return out
 
-    def _dlc_file(self, dlc_id, key):
-        if not _ID_RE.match(str(dlc_id)) or not _ID_RE.match(str(key)):
-            raise ValueError("bad dlc id or key")
-        return os.path.join(paths.DLC_DATA_DIR, dlc_id, key + ".json")
-
     # --- dev panel (only with --dev) ----------------------------------------------
 
-    def _require_dev(self):
+    def _require_dev(self) -> None:
         if not self._dev:
             raise PermissionError("dev panel is only available with --dev")
 
-    def dev_taint(self):
-        """A DLC dev command was used: the current match is not counted."""
+    def dev_taint(self) -> None:
+        """A game command of the dev panel was used: the current match is not counted."""
         self._require_dev()
         self._tainted = True
 
-    def dev_sources(self):
+    def dev_sources(self) -> list[dict[str, str]]:
         self._require_dev()
         out = []
         for folder in ("recordings", "scenarios"):
             root = os.path.join(paths.PROJECT_DIR, "dev", folder)
             if os.path.isdir(root):
-                out += [{"folder": folder, "name": n} for n in sorted(os.listdir(root))
-                        if n.endswith(".jsonl")]
+                out += [
+                    {"folder": folder, "name": n}
+                    for n in sorted(os.listdir(root))
+                    if n.endswith(".jsonl")
+                ]
         return out
 
-    def dev_replay_start(self, folder, name, speed=1):
+    def dev_replay_start(self, folder: Any, name: Any, speed: Any = 1) -> Reply:
         self._require_dev()
         if folder not in ("recordings", "scenarios") or "/" in name or name.startswith("."):
             raise ValueError("bad source")
@@ -388,16 +391,17 @@ class Bridge:
         events = replay.load(os.path.join(paths.PROJECT_DIR, "dev", folder, name))
         self._tainted = True
         self._core.replaying = True
-        self._player = replay.Player(events, self._core.publish, int(speed),
-                                     on_finish=self._replay_finished)
+        self._player = replay.Player(
+            events, self._core.publish, int(speed), on_finish=self._replay_finished
+        )
         self._player.start()
         return {"duration": self._player.duration, "events": len(events)}
 
-    def _replay_finished(self):
+    def _replay_finished(self) -> None:
         self._core.replaying = False
         self._core.clear_replay_pauses()
 
-    def dev_replay_control(self, action, value=None):
+    def dev_replay_control(self, action: Any, value: Any = None) -> Reply | None:
         self._require_dev()
         player = self._player
         if player is None:
@@ -412,7 +416,7 @@ class Bridge:
             player.set_speed(int(value))
         return {"position": player.position, "duration": player.duration}
 
-    def dev_replay_stop(self):
+    def dev_replay_stop(self) -> None:
         self._require_dev()
         if self._player is not None:
             self._player.stop()
@@ -420,16 +424,33 @@ class Bridge:
         self._core.replaying = False
         self._core.clear_replay_pauses()
 
-    def dev_send(self, kind, fields=None):
+    def dev_send(self, kind: Any, fields: Any = None) -> None:
         """Send one hand-made event into the game (marks the match as not counted)."""
         self._require_dev()
-        allowed = {"tool", "tool_error", "blocked", "waiting", "resumed", "silent",
-                   "compact", "subagent_start", "subagent_stop", "todo", "stop", "prompt"}
+        allowed = {
+            "tool",
+            "tool_error",
+            "blocked",
+            "waiting",
+            "resumed",
+            "silent",
+            "compact",
+            "subagent_start",
+            "subagent_stop",
+            "todo",
+            "stop",
+            "prompt",
+        }
         if kind not in allowed:
             raise ValueError(kind)
         self._tainted = True
-        event = {"ts": time.time(), "session": "dev", "project": "dev", "kind": kind,
-                 "replay": True}
+        event = {
+            "ts": time.time(),
+            "session": "dev",
+            "project": "dev",
+            "kind": kind,
+            "replay": True,
+        }
         for key, value in (fields or {}).items():
             if isinstance(value, (str, int, float, bool)) or value is None:
                 event[str(key)[:32]] = value
@@ -437,37 +458,109 @@ class Bridge:
                 event[str(key)[:32]] = [v[:32] for v in value[:4]]  # git: ["commit"]
         self._core.publish(event)
 
-    def dev_export(self, session, name=None):
+    def dev_export(self, session: Any, name: Any = None) -> str:
         self._require_dev()
         return replay.export_session(self._core.store, session, paths.RECORDINGS_DIR, name)
 
-    def dev_sessions(self):
+    def dev_sessions(self) -> list[Row]:
         self._require_dev()
         return self._core.store.sessions(30)
 
 
-def run(dev=False, settings_path=paths.CLAUDE_SETTINGS):
+def exposed(bridge: Bridge) -> list[Callable[..., Any]]:
+    """The Bridge's public methods as plain functions for `window.expose`.
+
+    Given as js_api, pywebview would resolve any dotted name the page sends by getattr,
+    private ones too ("_core.store._db.execute"). An exposed function is found only by
+    its exact name, and the Bridge behind it is out of reach."""
+
+    def wrap(name: str) -> Callable[..., Any]:
+        method = getattr(bridge, name)
+
+        def call(*args: Any) -> Any:
+            return method(*args)
+
+        call.__name__ = name
+        return call
+
+    return [
+        wrap(name)
+        for name in dir(Bridge)
+        if not name.startswith("_") and callable(getattr(Bridge, name))
+    ]
+
+
+_guarded = False
+
+
+def _main_frame_only() -> None:
+    """Drop bridge messages that do not come from the game page itself.
+
+    WebKit gives every frame and every page the window navigates to
+    window.webkit.messageHandlers.jsBridge, and pywebview's handler does not look at the
+    sender, so ours does (pywebview is pinned in requirements.txt): the main frame, and
+    only while it shows the game."""
+    global _guarded
+    if _guarded or sys.platform != "darwin":
+        return
+    from webview.platforms import cocoa
+
+    handler = cocoa.BrowserView.JSBridge
+    forward = handler.userContentController_didReceiveScriptMessage_
+
+    # The method is replaced in place: pywebview creates BrowserView.JSBridge by that name.
+    def from_game_only(self: Any, controller: Any, message: Any) -> None:
+        frame = message.frameInfo()
+        url = frame.request().URL()
+        if frame.isMainFrame() and url.isFileURL() and url.path() == paths.GAME_PAGE:
+            forward(self, controller, message)
+
+    handler.userContentController_didReceiveScriptMessage_ = from_game_only  # type: ignore[method-assign]
+    _guarded = True
+
+
+def create_window(bridge: Bridge, title: str, **options: Any) -> "webview.Window":
+    """The game window with the bridge exposed function by function, never as an object."""
+    import webview
+
+    _main_frame_only()
+    # No page in the window may read local files with fetch or XHR: a page dropped onto the
+    # window would get no CSP of ours. Our own scripts load by <script>, which this keeps.
+    webview.settings["ALLOW_FILE_URLS"] = False
+    window = webview.create_window(title, _file_url(paths.GAME_PAGE), **options)
+    # None only when a window is created while the GUI runs and its "initialized"
+    # handler cancels it; this one is made before webview.start().
+    assert window is not None
+    window.expose(*exposed(bridge))
+    bridge._window = window
+    return window
+
+
+def run(dev: bool = False, settings_path: str = paths.CLAUDE_SETTINGS) -> None:
     import webview  # only the window needs pywebview
 
     os.umask(0o077)
     paths.ensure_data_dir()
+    paths.migrate_game_data()
     core = Core()
     core.start()
     i18n.set_language(i18n.resolve(core.store.get_setting("language")))
     bridge = Bridge(core, dev, settings_path)
-    window = webview.create_window(
-        "Sidequest", _file_url(os.path.join(paths.PROJECT_DIR, "hub", "index.html")),
-        js_api=bridge, width=1100, height=720, min_size=(800, 560),
-        background_color="#1b1b2f")
-    bridge._window = window
+    window = create_window(
+        bridge,
+        "Sidequest",
+        width=1100,
+        height=720,
+        min_size=(800, 560),
+        background_color="#1b1b2f",
+    )
     threading.Thread(target=bridge._pusher, name="sidequest-pusher", daemon=True).start()
-    window.events.loaded += lambda: threading.Thread(target=bridge.run_check,
-                                                     daemon=True).start()
+    window.events.loaded += lambda: threading.Thread(target=bridge.run_check, daemon=True).start()
 
     cleanup_lock = threading.Lock()
-    cleaned = []
+    cleaned: list[bool] = []
 
-    def cleanup():
+    def cleanup() -> None:
         # Runs once; a second caller waits until the first one has finished.
         with cleanup_lock:
             if cleaned:
@@ -482,6 +575,7 @@ def run(dev=False, settings_path=paths.CLAUDE_SETTINGS):
     # (close button, Cmd+Q, Ctrl+C, kill), unlike "closed" which runs in a thread.
     window.events.closing += cleanup
     import signal
+
     signal.signal(signal.SIGTERM, lambda *_: window.destroy())
     try:
         # http_server=False plus a file:// URL: no port is ever opened.
@@ -490,7 +584,6 @@ def run(dev=False, settings_path=paths.CLAUDE_SETTINGS):
         cleanup()
         # pywebview's bridge call threads are not daemons and can hang on a closed
         # window; everything is cleaned up, so leave without waiting for them.
-        import sys
         sys.stdout.flush()
         sys.stderr.flush()
         os._exit(0)

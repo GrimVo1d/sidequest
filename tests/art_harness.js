@@ -3,7 +3,7 @@
 // Usage: jsc art_harness.js -- <project dir>
 "use strict";
 const [project] = arguments;
-const DLC = project + "/dlc/last-commit-standing";
+const GAME = project + "/game";
 
 // A canvas that only checks its arguments: every number must be finite.
 let calls = 0, badCall = null;
@@ -24,13 +24,17 @@ globalThis.document = {createElement: fakeCanvas};
 globalThis.innerWidth = 1000; globalThis.innerHeight = 700; globalThis.devicePixelRatio = 2;
 globalThis.addEventListener = () => {};
 
-load(DLC + "/maps.js");
-load(DLC + "/sprites.js");
-load(DLC + "/font.js");
-load(DLC + "/game.js");
-load(DLC + "/render.js");
-load(DLC + "/codex.js");
-const balance = JSON.parse(readFile(DLC + "/balance.json"));
+load(GAME + "/maps.js");
+load(GAME + "/avatar.js");
+load(GAME + "/sprites.js");
+load(GAME + "/hero.js");
+load(GAME + "/font.js");
+load(GAME + "/terrain.js");
+load(GAME + "/game.js");
+load(GAME + "/themes.js");
+load(GAME + "/render.js");
+load(GAME + "/codex.js");
+const balance = JSON.parse(readFile(GAME + "/balance.json"));
 
 // --- sprites and font ---------------------------------------------------------------
 
@@ -54,6 +58,102 @@ for (const [name, def] of Object.entries(LCSSprites.SPRITES)) {
   sizes[name] = [def.frames[0][0].length, def.frames[0].length];
 }
 
+// The hero: every choice of every slot in every frame, aimed, recoiling and at rest.
+const heroErrors = [];
+function checkHero(look, what) {
+  for (const [anim, a] of Object.entries(LCSHero.ANIMS)) {
+    for (let n = 0; n < a.frames; n++) {
+      for (const gun of [{}, {recoil: true}, {rest: true}]) {
+        const f = LCSHero.frame(look, anim, n, gun);
+        if (f.rows.length !== LCSHero.H) heroErrors.push(`${what} ${anim} ${n}: ${f.rows.length} rows`);
+        f.rows.forEach((row, i) => {
+          if (row.length !== LCSHero.W) heroErrors.push(`${what} ${anim} ${n} row ${i}: width ${row.length}`);
+          for (const c of row) if (c !== "." && !/^#[0-9a-f]{6}$/.test(f.palette[c] || "")) heroErrors.push(`${what}: no color for ${c}`);
+        });
+        try { LCSSprites.decodeRows(f.rows, f.palette); } catch (e) { heroErrors.push(`${what}: ${e}`); }
+      }
+    }
+  }
+}
+for (const slot of LCSHero.SLOTS) {
+  const table = slot.parts || SidequestAvatar.COLORS[slot.colors];
+  for (const id of Object.keys(table)) checkHero({[slot.key]: id}, `${slot.key}=${id}`);
+}
+const heroLooks = {
+  junk: LCSHero.clean({hair: "../x", top: "__proto__", skin: 5, hat: "constructor"}),
+  presets: SidequestAvatar.PRESETS.map((p) => LCSHero.fromAvatar(SidequestAvatar.preset(p.id))),
+  picture: LCSHero.fromAvatar({frames: [], parts: null}),
+};
+// What changes between frames: the walk moves the legs, recoil moves the gun and the
+// muzzle, a lowered or a downed hero's gun does not shoot.
+const heroFrame = (anim, n, gun) => LCSHero.frame(LCSHero.clean(null), anim, n, gun);
+const heroFacts = {
+  walkFrames: new Set([0, 1, 2, 3].map((n) => heroFrame("walk", n).rows.join("|"))).size,
+  recoilMoves: heroFrame("idle", 0, {recoil: true}).rows.join("|") !== heroFrame("idle", 0).rows.join("|"),
+  restMoves: heroFrame("idle", 0, {rest: true}).rows.join("|") !== heroFrame("idle", 0).rows.join("|"),
+  muzzle: heroFrame("idle", 0).muzzle, muzzleRecoil: heroFrame("idle", 0, {recoil: true}).muzzle,
+  restMuzzle: heroFrame("idle", 0, {rest: true}).muzzle,
+  recoilAtRest: heroFrame("idle", 0, {recoil: true, rest: true}).muzzle,
+  downMuzzle: heroFrame("down", 0).muzzle,
+};
+
+// The hero editor's data: names in both languages, unlocks that point at real choices and
+// achievements, presets and random looks that use only what is open.
+const unlocks = balance.character.unlocks;
+const achievementIds = new Set(balance.achievements.map((a) => a.id));
+const heroEditor = {badNames: [], badUnlocks: [], lockedPresets: [], badRandom: []};
+for (const slot of LCSHero.SLOTS) {
+  const [ru, en] = LCSHero.slotName(slot.key);
+  if (!ru || !en || /[а-яё]/i.test(en)) heroEditor.badNames.push(slot.key);
+  for (const id of LCSHero.choiceIds(slot.key)) {
+    const [r, e] = LCSHero.choiceName(slot.key, id) || [];
+    if (!r || !e || /[а-яё]/i.test(e)) heroEditor.badNames.push(`${slot.key}=${id}`);
+  }
+}
+for (const u of unlocks) {
+  const slots = LCSHero.SLOTS.filter((s) => s.key === u.slot || s.colors === u.slot);
+  if (!slots.length || !slots.every((s) => LCSHero.choiceIds(s.key).includes(u.id))
+      || !achievementIds.has(u.achievement) || !["rare", "epic", "legendary"].includes(u.rarity)) {
+    heroEditor.badUnlocks.push(u);
+  }
+}
+for (const p of LCSHero.PRESETS) {
+  const look = LCSHero.clean(p.look);
+  if (JSON.stringify(look) !== JSON.stringify(Object.assign({}, LCSHero.DEFAULT_LOOK, p.look))
+      || LCSHero.SLOTS.some((s) => !LCSHero.isOpen(unlocks, {}, s.key, look[s.key]))) {
+    heroEditor.lockedPresets.push(p.id);
+  }
+}
+let seed = 7;
+const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+const allGot = Object.fromEntries([...achievementIds].map((id) => [id, 1]));
+const usedRare = new Set();
+for (let i = 0; i < 300; i++) {
+  const fresh = LCSHero.random(unlocks, {}, rnd), rich = LCSHero.random(unlocks, allGot, rnd);
+  if (JSON.stringify(LCSHero.clean(fresh)) !== JSON.stringify(fresh)) heroEditor.badRandom.push(fresh);
+  for (const s of LCSHero.SLOTS) {
+    if (!LCSHero.isOpen(unlocks, {}, s.key, fresh[s.key])) heroEditor.badRandom.push(fresh);
+    if (LCSHero.rarity(unlocks, s.key, rich[s.key]) !== "common") usedRare.add(rich[s.key]);
+  }
+}
+heroEditor.randomRare = [...usedRare].sort();
+heroEditor.crown = [LCSHero.lockedBy(unlocks, "hat", "crown"), LCSHero.rarity(unlocks, "hat", "crown"),
+                    LCSHero.isOpen(unlocks, {}, "hat", "crown"), LCSHero.isOpen(unlocks, {classic_win: 1}, "hat", "crown")];
+const owned = LCSHero.fromAvatar({parts: {acc: "crown", body: "armor"}});
+heroEditor.owned = [LCSHero.isOpen(unlocks, {}, "hat", "crown", owned), LCSHero.isOpen(unlocks, {}, "top", "armor", owned),
+                    LCSHero.isOpen(unlocks, {}, "hat", "halo", owned)];
+// No hair above the lower edge of a cloth hat (one drawn in the hat letters C and c).
+heroEditor.hairThroughHats = [];
+for (const hat of LCSHero.choiceIds("hat")) {
+  const bald = LCSHero.frame({hair: "none", hat}, "idle", 0).rows;
+  const edge = bald.reduce((last, row, i) => (/[Cc]/.test(row) ? i : last), -1);
+  for (const hair of LCSHero.choiceIds("hair")) {
+    const rows = LCSHero.frame({hair, hat}, "idle", 0).rows;
+    if (rows.slice(0, edge + 1).some((row) => /[Hh]/.test(row))) heroEditor.hairThroughHats.push(`${hair}+${hat}`);
+  }
+}
+heroEditor.gold = ["top_color", "bottom_color", "shoes_color"].map((k) => LCSHero.lockedBy(unlocks, k, "gold"));
+
 const fontErrors = [];
 for (const [ch, g] of Object.entries(LCSFont.GLYPHS)) {
   const rows = g.split("|");
@@ -66,13 +166,13 @@ const missing = [...ALPHABET].filter((ch) => !LCSFont.has(ch));
 // Every text the game shows on the arena: string literals in text(...) calls and the
 // boss name.
 const texts = [];
-for (const call of readFile(DLC + "/game.js").match(/\btext\([^;]*\);/g) || []) {
+for (const call of readFile(GAME + "/game.js").match(/\btext\([^;]*\);/g) || []) {
   for (const m of call.match(/"[^"]*"|`[^`]*`/g) || []) {
     const value = m.slice(1, -1).replace(/\$\{[^}]*\}/g, "");
     if (!value.startsWith("#")) texts.push(value);
   }
 }
-const RENDER = readFile(DLC + "/render.js");
+const RENDER = readFile(GAME + "/render.js");
 for (const name of ["BOSS_NAME", "FINAL_NAME"]) {
   const pair = new RegExp(name + " = \\[([^\\]]+)\\]").exec(RENDER)[1];
   for (const m of pair.match(/"[^"]*"/g)) texts.push(m.slice(1, -1));
@@ -89,7 +189,7 @@ function drawMatch(map, seed, mode) {
   const g = LCS.createGame(balance, {seed, map, mode});
   const s = g.state;
   const r = LCSRender.createRenderer(fakeCanvas(), balance);
-  const avatar = {width: 16};
+  const look = LCSHero.clean(null);
   const pic = fakeCanvas();
   pic.width = 136;
   pic.height = 102;
@@ -147,7 +247,7 @@ function drawMatch(map, seed, mode) {
       for (const fx of s.effects) {
         if (fx.type === "pickup" && !counted.has(fx)) { counted.add(fx); picked++; }
       }
-      r.draw(s, avatar);
+      r.draw(s, look);
       frames++;
     }
   } catch (e) {
@@ -183,6 +283,23 @@ const hints = ["medkit", "coffee", "duck", "shield", "chest", "gem", "rage", "co
                "spirit_scout", "spirit_plan", "elite", "deploy", "incident"]
   .concat(Object.keys(balance.enemies), ["final"])
   .filter((id) => !LCSCodex.entry(balance, id));
+// Several live bosses: one bar each, stacked, so the bars end lower than with one boss.
+function bossBarsEnd(bosses) {
+  const g = LCS.createGame(balance, {seed: 5});
+  const canvas = fakeCanvas();
+  canvas.getBoundingClientRect = () => ({left: 0, top: 0, width: 1000, height: 700});
+  const r = LCSRender.createRenderer(canvas, balance);
+  g.dev.immortal();
+  g.agentEvent({kind: "prompt", session: "a", project: "sidequest"});
+  for (const type of bosses) g.dev.boss(type);
+  g.step(1 / 60, {x: 0, y: 0});
+  r.draw(g.state, LCSHero.clean(null));
+  return Math.round(r.bossBarsBottom());
+}
+const bossBars = {none: bossBarsEnd([]), one: bossBarsEnd([balance.bosses.order[0]]),
+                  two: bossBarsEnd(balance.bosses.order.slice(0, 2)), all: bossBarsEnd(balance.bosses.order)};
+// The achievements screen draws each achievement's icon.
+const achievementIcons = balance.achievements.filter((a) => !LCSSprites.SPRITES[a.icon]).map((a) => a.id);
 
-print(JSON.stringify({spriteErrors, sizes, fontErrors, missing, missingInTexts, texts, maps, calls, badCall,
-                      codexErrors, codexIds, hints, drawn: [...drawn]}));
+print(JSON.stringify({spriteErrors, heroErrors, heroLooks, heroFacts, heroEditor, sizes, fontErrors, missing, missingInTexts, texts, maps, calls, badCall,
+                      codexErrors, codexIds, hints, achievementIcons, bossBars, drawn: [...drawn]}));

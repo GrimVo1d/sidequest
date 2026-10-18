@@ -1,8 +1,0 @@
-{
-  "id": "sdk-test",
-  "name": "Тест SDK",
-  "version": "0.1",
-  "entry": "index.html",
-  "events": ["*"],
-  "sdk": 1
-}

@@ -1,22 +1,24 @@
 """Two languages for everything the user reads: ru and en.
 
-The setting "language" is "auto", "ru" or "en"; "auto" follows the system. Python code
-writes both texts in place: t("Хуки", "Hooks"). The hub and the DLC get the chosen
-language from the core (settings "lang"), so the window and the terminal always agree.
+The setting "language" is "en" (the default), "ru" or "auto", which follows the system. Python code
+writes both texts in place: t("Хуки", "Hooks"). The game page gets the chosen language
+from the core (settings "lang"), so the window and the terminal always agree.
 """
+
 import os
 
 LANGS = ("ru", "en")
-_lang = "ru"
+_lang = "en"
 
 
-def system_language():
+def system_language() -> str:
     for name in ("LC_ALL", "LC_MESSAGES", "LANG"):
         value = os.environ.get(name, "")
         if value and value not in ("C", "POSIX") and not value.startswith("C."):
             return "ru" if value.lower().startswith("ru") else "en"
     try:
         from Foundation import NSLocale  # macOS, comes with pywebview
+
         preferred = NSLocale.preferredLanguages()
         if preferred and str(preferred[0]).lower().startswith("ru"):
             return "ru"
@@ -25,18 +27,18 @@ def system_language():
     return "en"
 
 
-def resolve(setting):
+def resolve(setting: str) -> str:
     return setting if setting in LANGS else system_language()
 
 
-def set_language(lang):
+def set_language(lang: str) -> None:
     global _lang
-    _lang = lang if lang in LANGS else "ru"
+    _lang = lang if lang in LANGS else "en"
 
 
-def language():
+def language() -> str:
     return _lang
 
 
-def t(ru, en):
+def t(ru: str, en: str) -> str:
     return en if _lang == "en" else ru

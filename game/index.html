@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<!-- 'unsafe-eval' is required by the pywebview bridge; nothing may load from outside. -->
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self' 'unsafe-eval'; style-src 'self'; img-src 'self' data:; connect-src 'none'; base-uri 'none'; form-action 'none'">
+<title>Sidequest</title>
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="shell.css">
+</head>
+<body>
+<canvas id="arena"></canvas>
+
+<div id="hud" hidden>
+  <div id="xp"><div id="xp-fill"></div><span id="xp-text"></span></div>
+  <div id="top" class="hud-row">
+    <span id="time"></span>
+    <span id="score"></span>
+    <span id="multiplier"></span>
+  </div>
+  <ul id="allies"></ul>
+  <!-- Under the eye line: the weapons, the passives and the buffs with their time. -->
+  <div id="panel">
+    <div id="build"></div>
+    <div id="buffs"></div>
+  </div>
+  <div id="notice" hidden></div>
+  <div id="tip" hidden>
+    <canvas id="tip-icon"></canvas>
+    <div><div id="tip-title"></div><div id="tip-text"></div></div>
+  </div>
+</div>
+
+<section id="menu" class="screen">
+  <header class="bar">
+    <div class="logo">SIDEQUEST</div>
+    <span id="version" class="tag"></span>
+    <div class="spacer"></div>
+    <!-- The state of the link to Claude Code; it opens the screen with the details. -->
+    <button id="btn-agent" class="indicator"><span class="dot"></span><span id="indicator-text" data-en="Checking…">Проверка…</span></button>
+    <button id="btn-settings" data-en="Settings">Настройки</button>
+    <button id="btn-exit" data-en="Quit">Выйти</button>
+  </header>
+  <!-- The body scrolls on a short window; the action row under it always stays in view. -->
+  <div class="menu-body">
+    <div class="menu-cols">
+      <div class="menu-side">
+        <canvas id="avatar" class="avatar" title="Сменить аватарку" data-en-title="Change the avatar"></canvas>
+        <button id="btn-avatar" class="small" data-en="Change the avatar">Сменить аватарку</button>
+        <input id="profile-name" maxlength="32" spellcheck="false" title="Имя" data-en-title="Name">
+        <h3 id="records-title"></h3>
+        <dl id="records"></dl>
+        <h3 data-en="Overall">Всего</h3>
+        <dl id="totals"></dl>
+        <h3><span data-en="Achievements">Ачивки</span> <span id="achievements-count"></span></h3>
+        <ul id="achievements" class="achievements"></ul>
+        <p id="achievements-none" class="hint" hidden
+         data-en="None yet: the first one comes with the first match.">Пока ни одной: первая — за первый матч.</p>
+        <button id="btn-awards" class="small" data-en="All achievements">Все ачивки</button>
+      </div>
+      <div class="menu-main">
+        <div id="modes"></div>
+        <p id="mode-text" class="hint"></p>
+        <div id="ghosts" hidden></div>
+        <p id="daily-text" hidden></p>
+        <div id="maps"></div>
+        <p id="map-text" class="hint"></p>
+        <h3><span data-en="Modifiers">Модификаторы</span> <span id="mods-mul"></span></h3>
+        <div id="mods"></div>
+        <p id="mods-text" class="hint"></p>
+      </div>
+    </div>
+  </div>
+  <footer class="menu-actions">
+    <div class="menu-buttons">
+      <button id="btn-play" class="primary" data-en="Play">Играть</button>
+      <button id="btn-character" data-en="Hero">Герой</button>
+      <button id="btn-codex" data-en="Handbook">Справочник</button>
+    </div>
+    <p class="hint" data-en="WASD or arrows to move, you shoot by yourself. Esc for the menu. In menus, the arrows and Enter.">WASD или стрелки — ходить, стреляешь сам. Esc — меню. В меню — стрелки и Enter.</p>
+  </footer>
+</section>
+
+<section id="levelup" class="screen" hidden>
+  <h2 id="choices-title"></h2>
+  <div id="choices"></div>
+  <div id="choice-actions">
+    <button id="btn-reroll"></button>
+    <button id="btn-banish"></button>
+  </div>
+  <p class="hint" data-en="1, 2, 3, the arrows and Enter, or a click">1, 2, 3, стрелки и Enter или клик</p>
+</section>
+
+<section id="esc" class="screen" hidden>
+  <h2 data-en="Pause">Пауза</h2>
+  <button id="btn-resume" class="primary" data-en="Resume">Продолжить</button>
+  <button id="btn-esc-codex" data-en="Handbook">Справочник</button>
+  <button id="btn-esc-awards" data-en="Achievements">Ачивки</button>
+  <button id="btn-quit" data-en="End the match">Завершить матч</button>
+</section>
+
+<section id="codex" class="screen" hidden>
+  <h2 data-en="Handbook">Справочник</h2>
+  <div id="codex-tabs"></div>
+  <ul id="codex-list"></ul>
+  <button id="btn-codex-back" class="primary" data-en="Back">Назад</button>
+</section>
+
+<!-- Every achievement: earned ones first, with the day; then how far the locked ones are. -->
+<section id="awards" class="screen" hidden>
+  <h2><span data-en="Achievements">Ачивки</span> <span id="awards-count"></span></h2>
+  <ul id="awards-list"></ul>
+  <button id="btn-awards-back" class="primary" data-en="Back">Назад</button>
+</section>
+
+<!-- The hero's look (character.js): a live preview, the parts by tabs, ready looks. -->
+<section id="character" class="screen" hidden>
+  <h2 data-en="Hero">Герой</h2>
+  <div class="char-cols">
+    <!-- The preview, what the focused choice is, then the buttons that act on the whole look. -->
+    <div class="char-side">
+      <canvas id="char-preview"></canvas>
+      <p id="char-status"></p>
+      <button id="btn-char-random" data-en="Random">Случайно</button>
+      <button id="btn-char-save" class="primary" data-en="Save">Сохранить</button>
+      <button id="btn-char-back" data-en="Cancel">Отмена</button>
+      <p class="hint" data-en="Arrows and Enter, Esc to go back">Стрелки и Enter, Esc — назад</p>
+    </div>
+    <div class="char-main">
+      <div id="char-tabs"></div>
+      <div id="char-rows"></div>
+    </div>
+  </div>
+</section>
+
+<section id="results" class="screen" hidden>
+  <!-- The score first and biggest, then the rest of the match in two columns. -->
+  <div class="results-box">
+    <h2 id="results-title"></h2>
+    <p id="results-sub" class="hint"></p>
+    <div class="results-score"><span data-en="Score">Счёт</span> <span id="results-score"></span></div>
+    <p id="results-time"></p>
+    <dl id="results-list"></dl>
+    <p id="results-note" class="note" hidden
+     data-en="The match is not counted: a replay or the developer panel.">Матч не засчитан: повтор или панель разработчика.</p>
+    <div id="results-new" hidden>
+      <h3 data-en="New achievements">Новые ачивки</h3>
+      <ul id="results-achievements" class="achievements"></ul>
+    </div>
+  </div>
+  <button id="btn-again" class="primary" data-en="To the menu">В меню</button>
+</section>
+
+<!-- The link to Claude Code: connection, self-check, sessions, the journal. -->
+<section id="agent" class="screen" hidden>
+  <h2>Claude Code</h2>
+  <div class="agent-cols">
+    <div class="agent-col">
+      <div class="panel">
+        <h3 data-en="Connection">Подключение</h3>
+        <div class="row"><button id="btn-connect">Подключить к Claude Code</button>
+          <button id="btn-check" data-en="Check">Проверить</button></div>
+        <ul id="checks" class="list"></ul>
+      </div>
+      <div class="panel">
+        <h3 data-en="Sessions">Сессии</h3>
+        <ul id="sessions" class="list"></ul>
+        <p id="first-event" class="hint" data-en="Waiting for the first event from Claude Code">Ждём первое событие от Claude Code</p>
+      </div>
+      <div class="panel">
+        <h3 data-en="The agent's work">Работа агента</h3>
+        <dl id="stats"></dl>
+      </div>
+    </div>
+    <div class="agent-col">
+      <div class="panel journal">
+        <h3 data-en="Journal">Журнал</h3>
+        <ul id="journal" class="list mono"></ul>
+      </div>
+    </div>
+  </div>
+  <button id="btn-agent-back" class="primary" data-en="Back">Назад</button>
+</section>
+
+<!-- An agent waits for its user or went silent: the match stops under this banner. -->
+<div id="agent-pause" class="overlay" hidden>
+  <div class="banner">
+    <div id="agent-pause-title"></div>
+    <ul id="agent-pause-list"></ul>
+    <div class="actions"><button id="btn-agent-resume" class="primary" data-en="Resume">Продолжить</button></div>
+  </div>
+</div>
+
+<div id="modal" class="overlay" hidden>
+  <div class="dialog">
+    <h2 id="modal-title"></h2>
+    <div id="modal-body"></div>
+    <div class="actions" id="modal-actions"></div>
+  </div>
+</div>
+
+<aside id="dev" hidden>
+  <!-- The panel and the replay exist only with --dev, so the mark lives here, off the game. -->
+  <button id="dev-toggle">DEV <span id="game-flag" class="flag" data-en="not counted" hidden>не засчитывается</span></button>
+  <div id="dev-body" hidden>
+    <div class="row">
+      <select id="dev-source"></select>
+      <select id="dev-speed"><option>1</option><option>2</option><option>5</option><option>10</option></select>
+      <button id="dev-play">▶ Проиграть</button>
+      <button id="dev-pause">❚❚</button>
+      <button id="dev-step">Шаг</button>
+      <button id="dev-stop">■</button>
+      <input id="dev-seek" type="range" min="0" max="0" step="0.1" value="0">
+      <span id="dev-pos" class="mono"></span>
+    </div>
+    <div class="row" id="dev-send"></div>
+    <div class="row" id="dev-game"></div>
+    <div class="row">
+      <select id="dev-session"></select>
+      <button id="dev-export">Сохранить запись</button>
+      <span id="dev-msg" class="hint"></span>
+    </div>
+  </div>
+</aside>
+
+<script src="i18n.js"></script>
+<script src="sidequest.js"></script>
+<script src="avatar.js"></script>
+<script src="keynav.js"></script>
+<script src="avatar-import.js"></script>
+<script src="maps.js"></script>
+<script src="sprites.js"></script>
+<script src="hero.js"></script>
+<script src="font.js"></script>
+<script src="terrain.js"></script>
+<script src="game.js"></script>
+<script src="progress.js"></script>
+<script src="codex.js"></script>
+<script src="character.js"></script>
+<script src="themes.js"></script>
+<script src="render.js"></script>
+<script src="main.js"></script>
+<script src="shell.js"></script>
+<script src="avatar-ui.js"></script>
+</body>
+</html>

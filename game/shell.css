@@ -1,0 +1,93 @@
+/* The shell around the arena: the status bar on the menu, the Claude Code screen, the
+   dialogs, the agents' pause, the avatar editor and the dev panel. The colors and the
+   buttons come from style.css. */
+
+input, select { font: inherit; color: var(--text); background: var(--btn); border: 2px solid var(--edge);
+  padding: 4px 8px; }
+input[type=range] { border: none; background: transparent; padding: 0; }
+button.small { padding: 1px 8px; font-size: 11px; box-shadow: none; }
+.tag { font-size: 11px; color: var(--dim); }
+.ok { color: var(--green); } .warn { color: var(--yellow); } .bad { color: var(--red); }
+.fix { color: var(--dim); padding-left: 16px; }
+.mono { font-variant-numeric: tabular-nums; }
+
+/* The bar along the top of the menu. */
+.bar { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: var(--bar);
+  border-bottom: 2px solid var(--edge); }
+.logo { font-weight: bold; letter-spacing: 3px; color: var(--title); }
+.spacer { flex: 1; }
+.indicator { display: flex; align-items: center; gap: 6px; box-shadow: none; }
+.indicator .dot { width: 10px; height: 10px; background: var(--dim); box-shadow: 2px 2px 0 var(--edge); }
+.indicator.green .dot { background: var(--green); }
+.indicator.yellow .dot { background: var(--yellow); }
+.indicator.red .dot { background: var(--red); }
+#profile-name { text-align: center; width: 100%; }
+.avatar { cursor: pointer; }
+
+/* The Claude Code screen. */
+#agent { justify-content: flex-start; padding: 16px 0; box-sizing: border-box; background: var(--bg); }
+.agent-cols { display: grid; grid-template-columns: minmax(0, 360px) minmax(0, 420px); gap: 12px;
+  width: min(800px, 94vw); flex: 0 1 auto; min-height: 0; }
+.agent-col { display: flex; flex-direction: column; gap: 10px; min-height: 0; overflow-y: auto; }
+.panel { background: var(--panel); border: 2px solid var(--edge); box-shadow: 3px 3px 0 var(--edge);
+  padding: 10px; }
+.panel h3 { margin: 0 0 6px; }
+.panel .row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 6px; }
+.panel dl { width: 100%; grid-template-columns: 1fr auto; font-size: 12px; }
+.journal { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.journal .list { overflow-y: auto; flex: 1; }
+.list { list-style: none; margin: 0; padding: 0; font-size: 12px; }
+.list li { padding: 3px 0; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+.panel .hint { text-align: left; margin: 6px 0 0; }
+
+/* Dialogs and the agents' pause: over everything, the screens too. */
+.overlay { position: fixed; inset: 0; z-index: 10; display: flex; align-items: center;
+  justify-content: center; background: var(--screen); }
+.banner, .dialog { background: var(--panel); border: 4px solid var(--edge); box-shadow: 8px 8px 0 var(--edge);
+  padding: 18px 24px; min-width: min(420px, 92vw); max-width: min(640px, 94vw); max-height: 92vh;
+  overflow-y: auto; box-sizing: border-box; }
+.dialog h2 { margin: 0 0 8px; font-size: 15px; color: var(--title); }
+#agent-pause-title { color: var(--title); font-size: 16px; margin-bottom: 8px; }
+.banner ul { list-style: none; padding: 0; margin: 0 0 12px; }
+.banner li { display: flex; gap: 8px; align-items: center; margin: 4px 0; }
+.banner li span { flex: 1; }
+.actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }
+.dialog label { display: block; margin: 6px 0; }
+.dialog p { margin: 6px 0; }
+.dialog pre { max-height: 240px; overflow: auto; background: var(--bg); padding: 8px; font-size: 12px; }
+
+/* The avatar editor. The checkerboard shows transparent pixels. */
+.dialog.wide { width: 780px; }
+.av-editor { display: flex; gap: 16px; align-items: flex-start; }
+.av-side { width: 140px; flex: none; }
+.av-preview, .av-presets canvas, .av-swatch.none {
+  background: repeating-conic-gradient(var(--btn-hover) 0 25%, var(--btn) 0 50%) 0 0 / 8px 8px;
+}
+.av-preview { width: 136px; height: 136px; border: 2px solid var(--edge); }
+.av-main { flex: 1; min-width: 0; }
+.av-tabs { display: flex; gap: 6px; margin-bottom: 10px; }
+.av-content { height: 400px; max-height: 60vh; overflow-y: auto; }
+.av-tabs button.on, .av-content button.on { border-color: var(--accent); color: var(--accent); }
+.av-presets { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 6px; }
+.av-presets button { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 4px;
+  font-size: 11px; box-shadow: none; }
+.av-presets canvas { width: 64px; height: 64px; }
+.av-row { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin: 4px 0; font-size: 12px; }
+.av-row .label { width: 104px; color: var(--dim); }
+.av-row button { padding: 1px 6px; font-size: 11px; box-shadow: none; }
+.av-row button.av-swatch { width: 18px; height: 18px; padding: 0; }
+.av-row button.av-swatch.on { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* The dev panel (only with --dev): folded into a corner button, opened over the game. */
+#dev { position: fixed; right: 6px; bottom: 6px; z-index: 20; max-width: calc(100vw - 12px);
+  display: flex; flex-direction: column; align-items: flex-end; gap: 4px; font-size: 12px; }
+#dev-toggle { padding: 2px 8px; font-size: 11px; box-shadow: none; opacity: 0.7; }
+#dev-body { background: var(--bar); border: 2px solid var(--edge); padding: 6px 10px; max-height: 60vh;
+  overflow-y: auto; }
+#dev .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 4px 0; }
+#dev button, #dev select { padding: 2px 6px; box-shadow: none; }
+#dev-seek { flex: 1; min-width: 120px; }
+.flag { color: var(--yellow); }
+/* The dev panel keeps the plain look: its buttons are clicked, not walked with the keys. */
+#dev button:focus { background: var(--btn) !important; color: var(--text) !important;
+  border-color: var(--edge); outline: none; }

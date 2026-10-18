@@ -1,36 +1,49 @@
-"""Replay mode (PLAN.md 3.6): feed recorded or hand-written events with original pauses.
+"""Replay mode: feed recorded or hand-written events with original pauses.
 
 A recording / scenario is JSONL: one game event per line plus "t", seconds from the
 start of the session. The player re-stamps "ts" with the current time when it emits.
 """
+
 import json
 import os
 import re
 import threading
 import time
+from collections.abc import Callable
+
+from .db import Store
+from .normalizer import Event
+from .receiver import reject_constant
 
 SPEEDS = (1, 2, 5, 10)
 
 
-def load(path):
-    events = []
+def load(path: str) -> list[Event]:
+    events: list[Event] = []
     with open(path, encoding="utf-8") as f:
         for number, line in enumerate(f, 1):
             line = line.strip()
             if not line or line.startswith("//"):
                 continue
             try:
-                event = json.loads(line)
+                event = json.loads(line, parse_constant=reject_constant)
             except ValueError as e:
                 raise ValueError(f"{path}:{number}: {e}") from None
             if not isinstance(event, dict) or "kind" not in event or "t" not in event:
                 raise ValueError(f"{path}:{number}: нужны поля kind и t")
+            # The fields the core keys its state by: a list here would stop the player
+            # thread and leave the window in replay mode until "Stop".
+            t, kind, session = event["t"], event["kind"], event.get("session")
+            if isinstance(t, bool) or not isinstance(t, int | float) or t < 0:
+                raise ValueError(f"{path}:{number}: t — число секунд от начала")
+            if not isinstance(kind, str) or not isinstance(session, str | None):
+                raise ValueError(f"{path}:{number}: kind и session — строки")
             events.append(event)
     events.sort(key=lambda e: e["t"])
     return events
 
 
-def export_session(store, session, directory, name=None):
+def export_session(store: Store, session: str, directory: str, name: str | None = None) -> str:
     """Save one session from the database as a recording; returns the file path."""
     events = store.session_events(session)
     if not events:
@@ -51,7 +64,13 @@ def export_session(store, session, directory, name=None):
 class Player:
     """Plays events through `emit(event)`. Controls are safe to call from any thread."""
 
-    def __init__(self, events, emit, speed=1, on_finish=None):
+    def __init__(
+        self,
+        events: list[Event],
+        emit: Callable[[Event], None],
+        speed: int = 1,
+        on_finish: Callable[[], None] | None = None,
+    ) -> None:
         if speed not in SPEEDS:
             raise ValueError(f"скорость должна быть одной из {SPEEDS}")
         self.events = events
@@ -59,37 +78,36 @@ class Player:
         self.on_finish = on_finish
         self._speed = speed
         self._index = 0
-        self._clock = 0.0           # replay time in seconds since the first event
+        self._clock = 0.0  # replay time in seconds since the first event
         self._paused = False
         self._stopped = False
         self._cond = threading.Condition()
-        self._thread = None
+        self._thread: threading.Thread | None = None
 
     # --- controls ---------------------------------------------------------------
 
-    def start(self):
-        self._thread = threading.Thread(target=self._run, name="sidequest-replay",
-                                        daemon=True)
+    def start(self) -> None:
+        self._thread = threading.Thread(target=self._run, name="sidequest-replay", daemon=True)
         self._thread.start()
 
-    def stop(self):
+    def stop(self) -> None:
         with self._cond:
             self._stopped = True
             self._cond.notify_all()
 
-    def pause(self, paused=True):
+    def pause(self, paused: bool = True) -> None:
         with self._cond:
             self._paused = paused
             self._cond.notify_all()
 
-    def set_speed(self, speed):
+    def set_speed(self, speed: int) -> None:
         if speed not in SPEEDS:
             raise ValueError(speed)
         with self._cond:
             self._speed = speed
             self._cond.notify_all()
 
-    def step(self):
+    def step(self) -> None:
         """While paused: emit the next event immediately."""
         with self._cond:
             if self._index >= len(self.events):
@@ -99,25 +117,26 @@ class Player:
             self._clock = event["t"]
         self._emit(event)
 
-    def seek(self, t):
+    def seek(self, t: float) -> None:
         """Jump to replay time t; skipped events are not emitted."""
         with self._cond:
             self._clock = max(0.0, t)
-            self._index = next((i for i, e in enumerate(self.events) if e["t"] >= self._clock),
-                               len(self.events))
+            self._index = next(
+                (i for i, e in enumerate(self.events) if e["t"] >= self._clock), len(self.events)
+            )
             self._cond.notify_all()
 
     @property
-    def position(self):
+    def position(self) -> float:
         return self._clock
 
     @property
-    def duration(self):
+    def duration(self) -> float:
         return self.events[-1]["t"] if self.events else 0.0
 
     # --- playback ---------------------------------------------------------------
 
-    def _run(self):
+    def _run(self) -> None:
         last = time.monotonic()
         while True:
             with self._cond:
@@ -131,8 +150,11 @@ class Player:
                 last = now
                 event = self.events[self._index]
                 if self._paused or event["t"] > self._clock:
-                    wait = 0.05 if self._paused else \
-                        min(0.05, (event["t"] - self._clock) / self._speed)
+                    wait = (
+                        0.05
+                        if self._paused
+                        else min(0.05, (event["t"] - self._clock) / self._speed)
+                    )
                     self._cond.wait(wait)
                     continue
                 self._index += 1
@@ -140,7 +162,7 @@ class Player:
         if self.on_finish:
             self.on_finish()
 
-    def _emit(self, event):
+    def _emit(self, event: Event) -> None:
         out = dict(event, ts=time.time(), replay=True)
         del out["t"]
         self.emit(out)

@@ -1,0 +1,284 @@
+/* The palette "Arcade" (0.7): charcoal, a pink accent and cyan titles, in the arena sprites' own
+   colors. Roles: --title for headings and names; --accent only for what is chosen or has the
+   keys; the focused button is filled with it. Text contrast is at least 4.5:1 on --bg, --panel
+   and --btn; the rarity frames at least 3:1 on --btn and apart from the accent. */
+:root {
+  --bg: #0f0f14; --panel: #1c1c26; --btn: #2a2a38; --btn-hover: #3a3a4c; --btn-primary: #4a2342;
+  --line: #2e2e3e; --edge: #000; --bar: #16161e;
+  --shade: rgba(15, 15, 20, 0.72); --screen: rgba(15, 15, 20, 0.88); --hud-panel: rgba(28, 28, 38, 0.85);
+  --locked: rgba(15, 15, 20, 0.75);
+  --text: #f4f2fa; --dim: #a09eb6; --title: #7fe0e0; --accent: #f07ab4; --focus-text: #0f0f14;
+  --red: #e8665e; --green: #4fbf6f; --blue: #4f9cf0; --yellow: #e8c14a;
+  --violet: #d07ad0; --orange: #e89a4a; --sky: #8fb3e0;
+  --rare: var(--blue); --epic: #b070ff; --legendary: var(--yellow);
+}
+html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--text);
+  font: 13px/1.4 Menlo, monospace; user-select: none; }
+body { display: flex; align-items: center; justify-content: center; }
+canvas { image-rendering: pixelated; }
+[hidden] { display: none !important; }
+
+button { font: inherit; background: var(--btn); color: var(--text); border: 2px solid var(--edge);
+  box-shadow: 3px 3px 0 var(--edge); padding: 6px 14px; cursor: pointer; }
+button:hover { background: var(--btn-hover); }
+button.primary { background: var(--btn-primary); }
+.hint { color: var(--dim); font-size: 12px; text-align: center; }
+.note { color: var(--title); }
+
+#hud { position: fixed; inset: 0; pointer-events: none; padding: 8px 10px; }
+.hud-row { display: flex; gap: 14px; align-items: center; margin-bottom: 4px;
+  text-shadow: 1px 1px 0 var(--edge); }
+/* The experience across the whole top edge, the level in its middle. */
+#xp { position: fixed; left: 0; right: 0; top: 0; height: 12px; background: var(--panel);
+  border-bottom: 2px solid var(--edge); }
+#xp-fill { height: 100%; width: 0; background: var(--blue); }
+#xp-text { position: absolute; inset: 0; font-size: 10px; line-height: 12px; text-align: center;
+  text-shadow: 1px 1px 0 var(--edge); }
+/* The world passes under the top line and the agent list: a dark backing and a full outline
+   keep them readable over any sprite. */
+#top { justify-content: center; width: fit-content; margin-left: auto; margin-right: auto; margin-top: 10px;
+  padding: 2px 10px; background: var(--shade); text-shadow: 1px 0 0 var(--edge), -1px 0 0 var(--edge), 0 1px 0 var(--edge), 0 -1px 0 var(--edge), 1px 1px 0 var(--edge); }
+#score { color: var(--title); }
+#multiplier { color: var(--green); }
+/* The panel at the bottom middle: the build, then the buffs. */
+#panel { position: fixed; left: 50%; bottom: 10px; transform: translateX(-50%); display: flex;
+  flex-direction: column; align-items: center; gap: 8px; padding: 8px 12px;
+  background: var(--hud-panel); border: 2px solid var(--edge); font-size: 15px; }
+#panel:has(#build:empty):has(#buffs:empty) { display: none; }
+#buffs { display: flex; gap: 12px; align-items: center;
+  text-shadow: 1px 1px 0 var(--edge); }
+#buffs:empty { display: none; }
+#buffs .buff { display: flex; gap: 4px; align-items: center; color: var(--yellow); }
+#buffs .red { color: var(--red); }
+#buffs .violet { color: var(--violet); }
+#buffs .orange { color: var(--orange); }
+#buffs .blue { color: var(--sky); }
+#buffs .ending { animation: ending 0.25s steps(1) infinite; }
+@keyframes ending { 50% { opacity: 0.3; } }
+/* The build: weapons, then passives, each with its level. */
+#build { display: flex; gap: 16px; }
+#build:empty { display: none; }
+#build .slots { display: flex; gap: 5px; }
+/* An empty group would still take the gap and push the panel off centre. */
+#build .slots:empty { display: none; }
+#build .slot { position: relative; width: 44px; height: 44px; display: flex; align-items: center;
+  justify-content: center; background: var(--hud-panel); border: 2px solid var(--edge); }
+#build .slot.gold { border-color: var(--legendary); }
+#build .lv { position: absolute; right: 2px; bottom: -2px; font-size: 13px; color: var(--yellow);
+  text-shadow: 1px 1px 0 var(--edge); }
+#allies { list-style: none; margin: 6px 0 0; padding: 0; font-size: 12px;
+  text-shadow: 1px 1px 0 var(--edge); position: fixed; left: 6px; top: 20px; }
+#allies li { display: flex; gap: 6px; align-items: center; }
+#allies li { width: fit-content; padding: 0 4px; background: var(--shade); text-shadow: 1px 0 0 var(--edge), -1px 0 0 var(--edge), 0 1px 0 var(--edge), 0 -1px 0 var(--edge), 1px 1px 0 var(--edge); }
+#allies .swatch { width: 8px; height: 8px; border: 1px solid var(--edge); }
+#allies .project { max-width: 24ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#allies .state { color: var(--dim); }
+#notice { position: fixed; left: 0; right: 0; bottom: 128px; width: fit-content; max-width: 90%;
+  margin: 0 auto; padding: 2px 10px; text-align: center; color: var(--title); background: var(--shade);
+  text-shadow: 1px 0 0 var(--edge), -1px 0 0 var(--edge), 0 1px 0 var(--edge), 0 -1px 0 var(--edge), 1px 1px 0 var(--edge); }
+/* The first time something shows up: what it is and what it does. */
+#tip { position: fixed; left: 50%; bottom: 154px; transform: translateX(-50%); width: 420px;
+  display: flex; gap: 10px; align-items: center; padding: 8px 10px; background: var(--panel);
+  border: 2px solid var(--title); box-shadow: 3px 3px 0 var(--edge); }
+/* On a short field the hero in the middle would sit under the tip: it goes up, under the
+   boss bars and the allies (main.js says how far down). */
+@media (max-height: 560px) {
+  #tip { top: max(64px, calc(var(--clear-top, 0px) + 8px)); bottom: auto; }
+}
+/* The pause, the handbook and the results cover the match: the tip and the notice wait
+   under them unseen. */
+body:has(.screen:not([hidden])) :is(#tip, #notice) { display: none; }
+#tip-icon { flex: none; }
+#tip-title { color: var(--title); }
+#tip-text { font-size: 12px; }
+
+.screen { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 10px; background: var(--screen); }
+/* Screens of their own are solid; only the pause and the level-up let the match show through. */
+#menu, #character, #codex, #awards { background: var(--bg); }
+.screen h1 { color: var(--title); font-size: 22px; margin: 0; }
+.screen h2 { color: var(--title); font-size: 18px; margin: 0; }
+.screen h3 { color: var(--title); font-size: 13px; margin: 6px 0 0; }
+/* The pause: one column of equal buttons, the one that ends the match set apart. */
+#esc button { width: 260px; }
+#btn-quit { margin-top: 14px; }
+/* Centered while it fits, scrolls from the top when the window is small. */
+#results { justify-content: flex-start; overflow-y: auto; padding: 16px 0; box-sizing: border-box; }
+#results > :first-child { margin-top: auto; }
+#results > :last-child { margin-bottom: auto; }
+
+/* The menu: the status bar, a body that scrolls, the action row always in view. */
+#menu { justify-content: flex-start; gap: 0; }
+#menu > .bar { align-self: stretch; flex: none; }
+.menu-body { flex: 1 1 auto; min-height: 0; align-self: stretch; overflow-y: auto; display: flex;
+  flex-direction: column; padding: 12px 16px; box-sizing: border-box; }
+.menu-cols { display: flex; gap: 24px; align-items: flex-start; justify-content: center; margin: auto; }
+.menu-side { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 200px; flex: none; }
+.menu-side dl { font-size: 12px; }
+.menu-side h3 { margin-top: 8px; }
+.menu-main { display: flex; flex-direction: column; align-items: center; gap: 8px;
+  width: min(620px, calc(100vw - 272px)); }
+.menu-main .hint { margin: 0; max-width: 100%; }
+.menu-actions { flex: none; align-self: stretch; display: flex; flex-direction: column; align-items: center;
+  gap: 4px; padding: 8px 12px 6px; background: var(--bar); border-top: 2px solid var(--edge); }
+.menu-actions .hint { margin: 0; font-size: 11px; }
+
+#modes, .menu-buttons { display: flex; gap: 8px; }
+#modes { flex-wrap: wrap; justify-content: center; }
+#ghosts { display: flex; flex-direction: column; gap: 4px; width: min(420px, 100%); max-height: 210px;
+  overflow-y: auto; }
+.ghost { display: flex; flex-direction: column; gap: 2px; text-align: left; box-shadow: none; }
+.ghost.on { border-color: var(--accent); }
+.ghost .name { color: var(--title); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ghost .text { font-size: 11px; color: var(--dim); }
+#daily-text { margin: 0; color: var(--title); text-align: center; }
+#mods { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; }
+.mod { font-size: 12px; padding: 4px 6px; box-shadow: none; }
+.mod.on { border-color: var(--accent); color: var(--accent); }
+.mod.on:disabled { opacity: 1; }
+#mods-mul { color: var(--text); }
+.mode { box-shadow: none; }
+.mode.on { border-color: var(--accent); box-shadow: 3px 3px 0 var(--edge); color: var(--accent); }
+
+.achievements { list-style: none; margin: 0; padding: 0; width: 100%; font-size: 12px; }
+#achievements { max-height: 420px; overflow-y: auto; }
+.achievements li { display: flex; flex-direction: column; padding: 3px 6px;
+  border-left: 3px solid var(--line); margin-bottom: 3px; color: var(--dim); }
+.achievements li .text { font-size: 11px; }
+.achievements li.got, #results-achievements li { border-left-color: var(--title); }
+.achievements li.got .name, #results-achievements li .name { color: var(--title); }
+.avatar { width: 96px; height: 96px; border: 2px solid var(--edge); background: var(--panel); }
+dl { display: grid; grid-template-columns: auto auto; gap: 2px 16px; margin: 4px 0; }
+dt { color: var(--dim); }
+dd { margin: 0; text-align: right; }
+
+/* The results: a panel over the stopped match, the score first and biggest. */
+.results-box { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 14px 24px;
+  background: var(--panel); border: 2px solid var(--edge); box-shadow: 3px 3px 0 var(--edge);
+  max-width: min(640px, 94vw); box-sizing: border-box; }
+#results-sub, #results-time { margin: 0; text-align: center; }
+.results-score { color: var(--dim); font-size: 13px; }
+#results-score { color: var(--title); font-size: 28px; font-weight: bold; }
+#results-time { font-size: 15px; }
+#results-list { grid-template-columns: auto auto auto auto; gap: 2px 14px; margin: 6px 0 0;
+  padding-top: 8px; border-top: 2px solid var(--line); }
+#results-list dd:nth-of-type(odd) { padding-right: 12px; }
+#results-new { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+#results-note { margin: 0; }
+
+/* Nine maps and more: small cards, the description of the chosen one under the grid. The
+   previews are drawn at their own size and only ever scaled whole, by the screen. */
+#maps { display: grid; grid-template-columns: repeat(auto-fill, 100px); justify-content: center;
+  gap: 6px; width: 100%; }
+.map { width: 100px; box-sizing: border-box; display: flex; flex-direction: column; align-items: center;
+  gap: 2px; padding: 4px; box-shadow: none; font-size: 11px; line-height: 1.2; }
+.map.on { border-color: var(--accent); box-shadow: 3px 3px 0 var(--edge); }
+.map .preview { image-rendering: pixelated; border: 1px solid var(--edge); background: var(--bg); }
+.map .name { color: var(--title); text-align: center; overflow-wrap: anywhere; }
+.map.on .name { color: var(--accent); }
+
+#choices { display: flex; gap: 12px; }
+.choice { width: 170px; min-height: 96px; display: flex; flex-direction: column; gap: 6px;
+  text-align: left; }
+.choice .head { display: flex; justify-content: space-between; font-size: 11px; }
+.choice .key { color: var(--dim); }
+.choice .tag { color: var(--dim); }
+.choice .name { color: var(--title); }
+.choice .text { font-size: 12px; }
+.choice .icon { align-self: center; image-rendering: pixelated; margin: 2px 0; }
+.choice.evolution { border-color: var(--legendary); background: var(--btn-primary); }
+.choice.evolution .tag { color: var(--legendary); }
+.choice.banishing { border-color: var(--red); }
+.choice.banishing.evolution, .choice.banishing.filler { opacity: 0.4; }
+#choice-actions { display: flex; gap: 8px; }
+button:disabled { opacity: 0.4; cursor: default; }
+
+#awards { justify-content: flex-start; padding: 16px 0; box-sizing: border-box; }
+#awards-list { list-style: none; margin: 0; padding: 0 4px; width: min(760px, 94vw);
+  flex: 0 1 auto; min-height: 0; overflow-y: auto;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 8px; }
+#awards-list li { display: flex; gap: 10px; align-items: center; padding: 8px;
+  background: var(--panel); border: 2px solid var(--edge); }
+#awards-list li.got { border-color: var(--title); }
+#awards-list .icon { flex: none; width: 48px; display: flex; justify-content: center; }
+#awards-list li:not(.got) .icon canvas { filter: grayscale(1) brightness(0.55); }
+#awards-list .body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+#awards-list .name { color: var(--title); }
+#awards-list li:not(.got) .name { color: var(--text); }
+#awards-list .text { font-size: 12px; }
+#awards-list .when { font-size: 11px; color: var(--dim); }
+#awards-list .meter { height: 4px; background: var(--bg); border: 1px solid var(--edge); }
+#awards-list .meter > div { height: 100%; background: var(--title); }
+#codex { justify-content: flex-start; padding: 16px 0; box-sizing: border-box; }
+/* One row for nine sections: smaller on a narrow window, and it scrolls rather than wraps. */
+#codex-tabs { display: flex; gap: 6px; flex-wrap: nowrap; max-width: 96vw; overflow-x: auto;
+  padding: 0 4px 4px; box-sizing: border-box; }
+#codex-tabs button { box-shadow: none; flex: none; }
+@media (max-width: 1060px) {
+  #codex-tabs { gap: 4px; }
+  #codex-tabs button { font-size: 11px; padding: 3px 7px; }
+}
+#codex-tabs button.on { border-color: var(--accent); box-shadow: 3px 3px 0 var(--edge);
+  color: var(--accent); }
+#codex-list { list-style: none; margin: 0; padding: 0 4px; width: min(760px, 94vw);
+  flex: 0 1 auto; min-height: 0; overflow-y: auto;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 8px; }
+#codex-list li { display: flex; gap: 10px; align-items: center; padding: 8px;
+  background: var(--panel); border: 2px solid var(--edge); }
+#codex-list .icon { flex: none; width: 48px; display: flex; justify-content: center; }
+#codex-list .name { color: var(--title); }
+#codex-list .text { font-size: 12px; }
+/* The button the arrow keys are on: filled with the accent and ringed in white, so it is the
+   one thing on screen that looks like that. The primary button is only a darker fill. */
+button:focus { outline: 2px solid var(--text); outline-offset: 2px; border-color: var(--accent); }
+/* The fill and the dark text win over every chosen, primary or evolution color (those rules
+   are more specific); a color swatch keeps its own color and gets the ring only. */
+button:focus:not(.char-swatch, .av-swatch) { background: var(--accent) !important;
+  color: var(--focus-text) !important; }
+button:focus * { color: inherit !important; }
+input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* The hero's screen: the preview on the left, the tabs and the rows of choices on the right. */
+#character { justify-content: flex-start; padding: 16px 0; box-sizing: border-box; }
+#character > :first-child { margin-top: auto; }
+#character > :last-child { margin-bottom: auto; }
+.char-cols { display: flex; gap: 20px; align-items: flex-start; min-height: 0; }
+.char-side { display: flex; flex-direction: column; align-items: stretch; gap: 8px; width: 180px; }
+.char-side .hint { margin: 0; }
+#char-preview { image-rendering: pixelated; background: var(--panel); border: 2px solid var(--edge);
+  padding: 8px; align-self: center; }
+/* What the focused choice is, or what opens it: two lines kept, so nothing jumps. */
+#char-status { margin: 0; min-height: 36px; font-size: 12px; text-align: center; color: var(--text); }
+#btn-char-save { margin-top: 8px; }
+.char-main { display: flex; flex-direction: column; gap: 8px; width: min(540px, 62vw); min-height: 0; }
+#char-tabs { display: flex; gap: 8px; }
+#char-tabs button { box-shadow: none; }
+#char-tabs button.on { border-color: var(--accent); box-shadow: 3px 3px 0 var(--edge); color: var(--accent); }
+/* A fixed height, so the screen does not jump between the tabs. */
+#char-rows { display: flex; flex-direction: column; gap: 6px; height: min(400px, 60vh); overflow-y: auto;
+  padding: 5px 6px 4px 2px; }
+.char-row { display: flex; gap: 8px; align-items: flex-start; }
+.char-row .label { flex: none; width: 104px; color: var(--dim); font-size: 12px; line-height: 26px; }
+.char-row .choices { display: flex; flex-wrap: wrap; gap: 6px; }
+.char-row button { padding: 2px 8px; font-size: 12px; box-shadow: 2px 2px 0 var(--edge); }
+.char-row button { position: relative; }
+.char-row button.on { border-color: var(--text); color: var(--accent); }
+.char-row .char-swatch { width: 22px; height: 22px; padding: 0; }
+.char-row .char-swatch.on { outline: 2px solid var(--text); outline-offset: 1px; }
+/* A swatch keeps its own color under the focus: the ring is the accent's. */
+.char-row .char-swatch:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+/* Rarity is the frame's color and, for those who do not tell the colors apart, 1, 2 or 3
+   dots on its corner; a locked choice is gray until its achievement. */
+.char-row .rarity-rare { border-color: var(--rare); --dot: var(--rare); --dots: 3px; }
+.char-row .rarity-epic { border-color: var(--epic); --dot: var(--epic); --dots: 7px; }
+.char-row .rarity-legendary { border-color: var(--legendary); --dot: var(--legendary); --dots: 11px; }
+.char-row [class*="rarity-"]::after { content: ""; position: absolute; top: -5px; right: -5px;
+  width: var(--dots); height: 3px; border: 1px solid var(--edge);
+  background: repeating-linear-gradient(90deg, var(--dot) 0 3px, var(--edge) 3px 4px); }
+/* Locked: dim and striped, but its color and the rarity frame still show what it will be. */
+.char-row button.locked { color: var(--dim); background-image: repeating-linear-gradient(135deg,
+  var(--locked) 0 2px, transparent 2px 6px); }
+.char-presets { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; }
+.char-presets button { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px; }
+.char-presets button.on { border-color: var(--accent); color: var(--accent); }
+.char-presets canvas { image-rendering: pixelated; }

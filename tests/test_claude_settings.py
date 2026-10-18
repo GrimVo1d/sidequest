@@ -31,8 +31,7 @@ class PlanTest(unittest.TestCase):
         self.assertEqual(sorted(e for e, _ in changes), sorted(HOOK_EVENTS))
         self.assertEqual(new["hooks"]["PostToolUse"][0], FOREIGN["hooks"]["PostToolUse"][0])
         self.assertEqual(new["hooks"]["Notification"], FOREIGN["hooks"]["Notification"])
-        self.assertEqual(cs.find_entries(new),
-                         {event: [EMIT] for event in HOOK_EVENTS})
+        self.assertEqual(cs.find_entries(new), {event: [EMIT] for event in HOOK_EVENTS})
         entry = new["hooks"]["Stop"][0]["hooks"][0]
         self.assertEqual(entry["command"], "/bin/sh")
         self.assertEqual(entry["args"], [EMIT])
@@ -69,8 +68,18 @@ class PlanTest(unittest.TestCase):
         self.assertEqual(removed, {"model": "x"})
 
     def test_uninstall_finds_legacy_command_form(self):
-        legacy = {"hooks": {"Stop": [{"matcher": "*", "hooks": [
-            {"type": "command", "command": "/somewhere/hooks/sidequest-emit.sh"}]}]}}
+        legacy = {
+            "hooks": {
+                "Stop": [
+                    {
+                        "matcher": "*",
+                        "hooks": [
+                            {"type": "command", "command": "/somewhere/hooks/sidequest-emit.sh"}
+                        ],
+                    }
+                ]
+            }
+        }
         removed, changes = cs.plan_uninstall(legacy)
         self.assertEqual(removed, {})
         self.assertEqual(changes, [("Stop", "remove")])
@@ -80,6 +89,33 @@ class PlanTest(unittest.TestCase):
             cs.plan_install({"hooks": []}, EMIT)
         with self.assertRaises(cs.SettingsError):
             cs.plan_install({"hooks": {"Stop": {}}}, EMIT)
+
+    def test_odd_shapes_are_found_or_refused_never_crash(self):
+        odd = [
+            {"hooks": 5},
+            {"hooks": {"Stop": [{"hooks": 5}]}},
+            {"hooks": {"Stop": [{"hooks": "sidequest-emit.sh"}, 7, None]}},
+            {"hooks": {"Stop": [{"hooks": [{"command": 5, "args": {"a": 1}}]}]}},
+        ]
+        for settings in odd:
+            with self.subTest(settings=settings):
+                self.assertEqual(cs.find_entries(settings), {})
+                try:
+                    new, _ = cs.plan_install(settings, EMIT)
+                except cs.SettingsError:
+                    continue
+                self.assertEqual(cs.find_entries(new)["Stop"], [EMIT])
+                cs.plan_uninstall(new)
+
+    def test_own_hook_that_names_the_script_is_not_ours(self):
+        own = {"type": "command", "command": "echo see ~/notes/sidequest-emit.sh"}
+        self.assertFalse(cs.is_sidequest_hook(own))
+        self.assertFalse(
+            cs.is_sidequest_hook({"command": "/bin/sh", "args": ["x-sidequest-emit.sh"]})
+        )
+        self.assertTrue(cs.is_sidequest_hook({"command": "sh /a/hooks/sidequest-emit.sh"}))
+        settings = {"hooks": {"Stop": [{"hooks": [own]}]}}
+        self.assertEqual(cs.plan_uninstall(settings), (settings, []))
 
 
 class FileTest(unittest.TestCase):
@@ -97,8 +133,19 @@ class FileTest(unittest.TestCase):
             return json.load(f)
 
     def install(self, confirm=yes):
-        return cs.apply(self.path, lambda s: cs.plan_install(s, EMIT), confirm,
-                        backup_dir=self.backups)
+        return cs.apply(
+            self.path, lambda s: cs.plan_install(s, EMIT), confirm, backup_dir=self.backups
+        )
+
+    def test_symlinked_settings_stay_a_link(self):
+        real = os.path.join(self.dir, "dotfiles-settings.json")
+        with open(real, "w") as f:
+            json.dump({"model": "x"}, f)
+        os.symlink(real, self.path)
+        self.install()
+        self.assertTrue(os.path.islink(self.path))
+        with open(real) as f:
+            self.assertEqual(cs.find_entries(json.load(f))["Stop"], [EMIT])
 
     def test_missing_file_is_created_without_backup(self):
         changes, backup = self.install()
@@ -110,7 +157,7 @@ class FileTest(unittest.TestCase):
     def test_backup_and_round_trip(self):
         self.write(FOREIGN)
         os.chmod(self.path, 0o644)
-        changes, backup = self.install()
+        _changes, backup = self.install()
         self.assertEqual(os.path.dirname(backup), self.backups)
         with open(backup) as f:
             self.assertEqual(json.load(f), FOREIGN)

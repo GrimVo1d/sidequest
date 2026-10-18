@@ -1,4 +1,5 @@
 """Two languages: the setting, the system language and the texts in place."""
+
 import os
 import unittest
 from unittest import mock
@@ -15,8 +16,8 @@ class I18nTest(unittest.TestCase):
         self.assertEqual(i18n.t("Хуки", "Hooks"), "Hooks")
         i18n.set_language("ru")
         self.assertEqual(i18n.t("Хуки", "Hooks"), "Хуки")
-        i18n.set_language("de")  # unknown: Russian, like before there was a choice
-        self.assertEqual(i18n.language(), "ru")
+        i18n.set_language("de")  # unknown: English, the default
+        self.assertEqual(i18n.language(), "en")
 
     def test_auto_follows_the_system(self):
         with mock.patch.dict(os.environ, {"LC_ALL": "", "LC_MESSAGES": "", "LANG": "ru_RU.UTF-8"}):

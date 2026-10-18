@@ -3,11 +3,12 @@
 // Usage: jsc arena_harness.js -- <project dir>
 "use strict";
 const [project] = arguments;
-const DLC = project + "/dlc/last-commit-standing";
-load(DLC + "/maps.js");
-load(DLC + "/game.js");
-load(DLC + "/progress.js");
-const balance = JSON.parse(readFile(DLC + "/balance.json"));
+const GAME = project + "/game";
+load(GAME + "/maps.js");
+load(GAME + "/terrain.js");
+load(GAME + "/game.js");
+load(GAME + "/progress.js");
+const balance = JSON.parse(readFile(GAME + "/balance.json"));
 const DT = 1 / 60;
 
 function readScenario(name) {
@@ -305,6 +306,74 @@ result.enemies = {};
     if (Math.hypot(e.x - s.player.x, e.y - s.player.y) < e.r + s.player.r + 2) reached = s.time;
   }
   result.enemies.deprecated = {crossed, reached, straight: 300 / e.speed};
+}
+
+// Guns do not aim at an enemy behind a wall: their bullets would stop in it.
+{
+  const shoot = (withOpen) => {
+    const game = arena("hotfix", 31), s = game.state;
+    s.enemies.length = 0;
+    s.weapons = [{id: "pistol", level: 1, evolved: false, timer: 0}];
+    Object.assign(s.player, {x: 270, y: 180});
+    const hidden = crowd(game, 1, 0, 1e6)[0];
+    Object.assign(hidden, {x: 360, y: 180});
+    const open = withOpen ? Object.assign(crowd(game, 1, 0, 1e6)[0], {x: 270, y: 300}) : null;
+    stepFor(game, 2, () => ({x: 0, y: 0}));
+    return {hidden: 1e6 - hidden.hp, open: open ? 1e6 - open.hp : null, ammo: s.player.ammo};
+  };
+  result.sight = {alone: shoot(false), both: shoot(true)};
+  // No weapon at all hurts an enemy fully behind a wall: beams stop at it, lightning does
+  // not strike or jump through it.
+  result.sight.weapons = {};
+  for (const w of balance.weapons) {
+    const game = arena("hotfix", 41), s = game.state;
+    s.enemies.length = 0;
+    s.spawnAt = Infinity;
+    s.weapons = [{id: w.id, level: 1, evolved: false, timer: 0}];
+    Object.assign(s.player, {x: 270, y: 180});
+    const hidden = Object.assign(crowd(game, 1, 0, 1e6)[0], {x: 360, y: 180, speed: 0});
+    stepFor(game, 3, () => ({x: 0, y: 0}));
+    result.sight.weapons[w.id] = Math.round(1e6 - hidden.hp);
+  }
+  // The null pointer does not blink through a wall to the player on the other side.
+  {
+    const game = arena("hotfix", 29), s = game.state;
+    s.enemies.length = 0;
+    Object.assign(s.player, {x: 380, y: 180});
+    game.dev.enemy("nullptr");
+    const e = Object.assign(s.enemies[s.enemies.length - 1], {x: 250, y: 180, hp: 1e9, damage: 0});
+    // It may walk round the wall; a blink is a jump, and none goes from one side to the other.
+    let crossed = false;
+    for (let i = 0; i < 600; i++) {
+      e.blinkAt = Math.min(e.blinkAt, s.time);
+      s.enemies = [e];
+      const x0 = e.x;
+      game.step(DT, {x: 0, y: 0});
+      if (x0 < 300 && e.x > 324) crossed = true;
+    }
+    result.sight.blink_crossed = crossed;
+  }
+}
+
+// Floating texts from a burst of events do not land on each other.
+{
+  const game = arena("open", 33), s = game.state;
+  game.agentEvent({kind: "prompt", session: "a", project: "demo"});
+  stepFor(game, 1, () => ({x: 0, y: 0}));
+  for (const kind of ["tool_error", "blocked", "tool_error"]) {
+    game.agentEvent({kind, session: "a", project: "demo", tool: "Bash", category: "test", ok: false});
+  }
+  game.agentEvent({kind: "tool", session: "a", project: "demo", tool: "Bash", action: "cast", category: "git",
+                   git: ["commit"], ok: true});
+  game.step(DT, {x: 0, y: 0});
+  const at = s.texts.map((t) => ({x: t.x, y: t.y - t.t * 14, text: t.text}));
+  let piled = 0;
+  for (let i = 0; i < at.length; i++) {
+    for (let j = i + 1; j < at.length; j++) {
+      if (Math.abs(at[i].x - at[j].x) < 48 && Math.abs(at[i].y - at[j].y) < 8) piled++;
+    }
+  }
+  result.texts = {count: at.length, piled, all: at.map((t) => t.text)};
 }
 
 // --- the arsenal: weapons, passives, evolutions --------------------------------------------
@@ -922,8 +991,13 @@ result.bestiary = {};
   const work = Object.assign({}, busy, {commits: 5, reviews: 1});
   const worked = P.earned(balance.achievements, work, P.addMatch(null, work), ids);
   result.progress = {migrated, junk, records: r, after_win: afterWin, tourist, busy: ach, worked,
-                     card: P.card(r, 3, balance.achievements.length),
                      ids: balance.achievements.map((a) => a.id)};
+  // The achievements screen: the best single match and how far each locked one is.
+  const bests = P.addBests({kills: 40, junk: 3}, balance.achievements, Object.assign({}, won, {time: 900}));
+  result.progress.bests = bests;
+  result.progress.of = Object.fromEntries(balance.achievements.map((a) => [a.id, P.progressOf(a, r, bests, ids)]));
+  result.progress.half_maps = P.progressOf(balance.achievements.find((a) => a.id === "tourist"),
+                                           P.addMatch(null, won), bests, ids);
 }
 
 print(JSON.stringify(result));

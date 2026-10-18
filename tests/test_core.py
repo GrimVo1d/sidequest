@@ -3,7 +3,7 @@ import threading
 import time
 import unittest
 
-from sidequest import replay, selfcheck
+from sidequest import i18n, replay, selfcheck
 from sidequest.core import Core
 from sidequest.db import Store
 
@@ -22,8 +22,11 @@ class CoreTest(unittest.TestCase):
     def setUp(self):
         self.dir = temp_dir(self)
         self.clock = FakeClock()
-        self.core = Core(db_path=os.path.join(self.dir, "t.db"),
-                         socket_path=os.path.join(self.dir, "s.sock"), clock=self.clock)
+        self.core = Core(
+            db_path=os.path.join(self.dir, "t.db"),
+            socket_path=os.path.join(self.dir, "s.sock"),
+            clock=self.clock,
+        )
         self.addCleanup(self.core.store.close)
         self.seen = []
         self.core.subscribe(self.seen.append)
@@ -125,20 +128,35 @@ class CoreTest(unittest.TestCase):
         self.working_session()
         self.assertEqual(self.seen, [])
         self.assertEqual(len(self.core.store.session_events(SID)), 2)
-        self.core.publish({"ts": 1, "session": "r", "project": "p", "kind": "tool",
-                           "replay": True})
+        self.core.publish({"ts": 1, "session": "r", "project": "p", "kind": "tool", "replay": True})
         self.assertEqual(self.kinds(), ["tool"])
         self.assertEqual(self.core.store.session_events("r"), [])  # replays never count
 
     def test_replayed_pause_shows_banner_but_is_never_stored(self):
-        self.core.publish({"ts": 1, "session": "r", "project": "p", "kind": "waiting",
-                           "tool": "Write", "replay": True})
+        self.core.publish(
+            {
+                "ts": 1,
+                "session": "r",
+                "project": "p",
+                "kind": "waiting",
+                "tool": "Write",
+                "replay": True,
+            }
+        )
         self.assertEqual(self.core.paused_sessions(), {"r": "waiting"})
         self.core.resume()
         self.assertTrue(self.seen[-1]["replay"])
         self.assertEqual(self.core.paused_sessions(), {})
-        self.core.publish({"ts": 2, "session": "r", "project": "p", "kind": "silent",
-                           "seconds": 90, "replay": True})
+        self.core.publish(
+            {
+                "ts": 2,
+                "session": "r",
+                "project": "p",
+                "kind": "silent",
+                "seconds": 90,
+                "replay": True,
+            }
+        )
         self.core.clear_replay_pauses()
         self.assertEqual(self.core.paused_sessions(), {})
         self.assertEqual(self.core.store.session_events("r"), [])
@@ -156,6 +174,9 @@ class CoreTest(unittest.TestCase):
         self.assertEqual(self.core.store.verified_version(), "9.9.9")
 
     def test_control_session_reports_missing_fields(self):
+        # The report is in the user's language; this checks the Russian texts.
+        self.addCleanup(i18n.set_language, i18n.language())
+        i18n.set_language("ru")
         self.core.start_control_session("9.9.9")
         self.working_session()
         p = pre("Bash", "t1", {"command": "ls"})
@@ -180,17 +201,38 @@ class ReplayTest(unittest.TestCase):
     def test_load_validates(self):
         with self.assertRaises(ValueError):
             replay.load(self.scenario(['{"kind": "tool"}']))
-        events = replay.load(self.scenario(['// comment', '',
-                                            '{"t": 2, "kind": "stop"}',
-                                            '{"t": 0, "kind": "prompt"}']))
+        events = replay.load(
+            self.scenario(
+                ["// comment", "", '{"t": 2, "kind": "stop"}', '{"t": 0, "kind": "prompt"}']
+            )
+        )
         self.assertEqual([e["kind"] for e in events], ["prompt", "stop"])
+
+    def test_load_refuses_nan_and_odd_types(self):
+        for line in (
+            '{"t": NaN, "kind": "stop"}',
+            '{"t": "1", "kind": "stop"}',
+            '{"t": true, "kind": "stop"}',
+            '{"t": 1, "kind": ["stop"]}',
+            '{"t": 1, "kind": "stop", "session": ["s"]}',
+        ):
+            with self.subTest(line=line), self.assertRaises(ValueError):
+                replay.load(self.scenario([line]))
+
+    def test_store_refuses_nan(self):
+        store = Store(os.path.join(self.dir, "t.db"))
+        self.addCleanup(store.close)
+        with self.assertRaises(ValueError):
+            store.add_event({"ts": 1.0, "session": "s", "kind": "tool", "x": float("nan")})
+        with self.assertRaises(ValueError):
+            store.set_meta("k", float("inf"))
+        self.assertEqual(store.session_events("s"), [])
 
     def test_export_round_trip(self):
         store = Store(os.path.join(self.dir, "t.db"))
         self.addCleanup(store.close)
         for ts, kind in ((100.0, "session_start"), (101.5, "prompt"), (110.25, "stop")):
-            store.add_event({"ts": ts, "session": "abcdef123", "project": "my proj",
-                             "kind": kind})
+            store.add_event({"ts": ts, "session": "abcdef123", "project": "my proj", "kind": kind})
         path = replay.export_session(store, "abcdef123", os.path.join(self.dir, "rec"))
         self.assertTrue(path.endswith("my-proj-abcdef12.jsonl"))
         events = replay.load(path)
