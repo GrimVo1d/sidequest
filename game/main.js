@@ -146,7 +146,7 @@
     await loadLook();
     const prefs = (await Sidequest.storage.get("prefs")) || {};
     if (LCS_MAPS.some((m) => m.id === prefs.map)) mapId = prefs.map;
-    if (MODES[prefs.mode]) mode = prefs.mode;
+    if (Object.hasOwn(MODES, prefs.mode)) mode = prefs.mode;
     if (Array.isArray(prefs.mods)) mods = prefs.mods.filter((id) => modifier(id));
     if (typeof prefs.ghost === "string") ghostId = prefs.ghost;
     const {records, got} = await progress();

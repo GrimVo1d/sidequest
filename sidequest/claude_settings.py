@@ -7,6 +7,7 @@ are found even if the project folder was moved. Nothing else in the file is chan
 import copy
 import datetime
 import json
+import math
 import os
 import shutil
 import tempfile
@@ -38,26 +39,58 @@ class SettingsError(Exception):
     pass
 
 
+def _no_constant(name: str) -> float:
+    raise ValueError(f"{name} is not JSON")
+
+
+def _finite(text: str) -> float:
+    value = float(text)
+    if not math.isfinite(value):
+        raise ValueError(f"{text} does not fit a number")
+    return value
+
+
+def strict_json(text: str) -> Any:
+    """json.loads as the standard has it. Python's json takes NaN and Infinity and turns 1e400
+    into an infinity, then writes them back as text no other reader accepts."""
+    return json.loads(text, parse_constant=_no_constant, parse_float=_finite)
+
+
 def hook_entry(emit_path: str) -> HookEntry:
-    # Exec form: Claude Code starts /bin/sh directly, the path never goes through a shell.
-    return {"type": "command", "command": "/bin/sh", "args": [emit_path], "timeout": HOOK_TIMEOUT}
+    # Exec form: Claude Code starts the script itself (it is executable, with a #!/bin/sh
+    # line), the path never goes through a shell. The command is the script, not /bin/sh with
+    # the script in `args`: a Claude Code that ignored `args` would then run a bare /bin/sh,
+    # which reads the hook's input (tool output, web pages) as commands. This way it can only
+    # ever run the script.
+    return {"type": "command", "command": emit_path, "args": [], "timeout": HOOK_TIMEOUT}
+
+
+def _is_script(word: str) -> bool:
+    return word == EMIT_NAME or word.endswith("/" + EMIT_NAME)
 
 
 def _script_parts(hook: dict[str, Any]) -> list[str]:
-    """The strings of an entry that may be the script path: each of `args`, and a
-    `command` that is only a path, maybe after `sh` (an entry written by hand).
+    """The script path of an entry that is Sidequest's: a `command` that is the script (with
+    empty `args`), or
+    `sh` with the script first, either in `args` (the old exec form) or in the command itself
+    (an entry written by hand).
 
-    A command like `echo see sidequest-emit.sh` is the user's own and is not ours."""
-    args = hook.get("args")
-    parts = [a.strip() for a in args if isinstance(a, str)] if isinstance(args, list) else []
+    A command like `echo see sidequest-emit.sh`, or another program that is handed the
+    script among its arguments, is the user's own and is not ours."""
     command = hook.get("command")
-    if isinstance(command, str):
-        words = command.split()
-        if words[:1] in (["sh"], ["/bin/sh"]):
-            words = words[1:]
-        if len(words) == 1:
-            parts.append(words[0])
-    return [p for p in parts if p == EMIT_NAME or p.endswith("/" + EMIT_NAME)]
+    if not isinstance(command, str):
+        return []
+    args = hook.get("args")
+    # The exec form is never split: the path may have spaces ("My Projects/…").
+    if args == [] and _is_script(command.strip()):
+        return [command.strip()]
+    words = command.split()
+    if words[:1] in (["sh"], ["/bin/sh"]) and len(words) == 1 and isinstance(args, list) and args:
+        first = args[0].strip() if isinstance(args[0], str) else ""
+        return [first] if _is_script(first) else []
+    if words[:1] in (["sh"], ["/bin/sh"]):
+        words = words[1:]
+    return words if len(words) == 1 and _is_script(words[0]) else []
 
 
 def is_sidequest_hook(hook: object) -> bool:
@@ -84,7 +117,7 @@ def read_settings(path: str) -> tuple[Settings, bytes | None]:
     except FileNotFoundError:
         return {}, None
     try:
-        data = json.loads(raw.decode("utf-8")) if raw.strip() else {}
+        data = strict_json(raw.decode("utf-8")) if raw.strip() else {}
     except (ValueError, UnicodeDecodeError) as e:
         raise SettingsError(
             t(
@@ -219,7 +252,7 @@ def write_atomic(path: str, settings: Settings, expected_raw: bytes | None) -> b
     fd, tmp = tempfile.mkstemp(prefix=".settings.json.", dir=directory)
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
-            json.dump(settings, f, indent=2, ensure_ascii=False)
+            json.dump(settings, f, indent=2, ensure_ascii=False, allow_nan=False)
             f.write("\n")
         os.chmod(tmp, mode)
         os.replace(tmp, path)

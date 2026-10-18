@@ -234,8 +234,8 @@ class AvatarJsTest(unittest.TestCase):
         for value in self.result["builder"]:
             with self.subTest(value.get("preset") or value.get("parts")):
                 self.assertEqual(avatar.clean(value)["size"], 16)
-        unknown = self.result["builder"][-1]["parts"]
-        self.assertEqual((unknown["hair"], unknown["skin"]), ("none", "light"))
+        for unknown in (self.result["builder"][-2]["parts"], self.result["builder"][-1]["parts"]):
+            self.assertEqual((unknown["hair"], unknown["skin"]), ("none", "light"))
 
     def test_gif_frames_follow_disposal_and_transparency(self):
         frames = self.result["gif"]

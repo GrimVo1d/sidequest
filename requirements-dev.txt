@@ -1,3 +1,8 @@
-# Development tools, not needed to play (docs/style.md, section 2).
+# Development tools, not needed to play (docs/style.md, section 2), with their whole tree
+# pinned like the game's.
 ruff==0.17.0
 mypy==2.4.0
+ast_serialize==0.13.0
+librt==0.16.0
+mypy_extensions==1.1.0
+pathspec==1.1.1

@@ -2,7 +2,7 @@ import json
 import time
 import unittest
 
-from sidequest.normalizer import MAX_FILE, Normalizer, bash_category, git_ops
+from sidequest.normalizer import MAX_FILE, MAX_KINDS, MAX_TEXT, Normalizer, bash_category, git_ops
 
 from .helpers import CWD, SID, batch, post, pre, raw
 
@@ -335,6 +335,14 @@ class HostileShapeTest(unittest.TestCase):
         self.n = Normalizer()
         self.n.process(raw("SessionStart", source="startup"), 1)
         self.n.process(raw("UserPromptSubmit", prompt_id="p1"), 2)
+
+    def test_counting_tables_stay_small(self):
+        for i in range(MAX_KINDS + 50):
+            self.n.process({"hook_event_name": f"Odd{i}", "session_id": "s", "k" * 10_000: i}, 3)
+            self.n.process(post(f"Tool{i}", f"t{i}", {}, {}), 3)
+        for table in (self.n.shapes, self.n.unknown_events, self.n.unknown_tools):
+            self.assertLessEqual(len(table), MAX_KINDS)
+        self.assertTrue(all(len(k) <= MAX_TEXT for _, keys in self.n.shapes for k in keys))
 
     def test_odd_types_never_raise(self):
         file = {"file_path": CWD + "/a"}

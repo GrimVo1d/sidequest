@@ -292,7 +292,7 @@ class Bridge:
         except FileNotFoundError:
             return None
         with open(fd, encoding="utf-8") as f:
-            return json.load(f)
+            return claude_settings.strict_json(f.read())
 
     def save(self, key: Any, value: Any) -> bool:
         path = self._save_file(key)

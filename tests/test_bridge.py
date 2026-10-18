@@ -170,6 +170,13 @@ class BridgeTest(unittest.TestCase):
         _, bridge = self.make()
         with self.assertRaises(ValueError):
             bridge.save("save", {"x": float("nan")})
+        # A save edited by hand with NaN or 1e400 is refused on the way back too: the page
+        # could not read it.
+        for text in ('{"x": NaN}', '{"x": 1e400}'):
+            with open(os.path.join(paths.GAME_DATA_DIR, "edited.json"), "w") as f:
+                f.write(text)
+            with self.assertRaises(ValueError):
+                bridge.load("edited")
 
     def test_balance_is_the_games(self):
         _, bridge = self.make()

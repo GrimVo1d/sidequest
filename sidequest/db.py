@@ -68,6 +68,10 @@ class Store:
         self._lock = threading.Lock()
         new = not os.path.exists(path)
         self._db = sqlite3.connect(path, check_same_thread=False)
+        # Deleted rows are overwritten in the file, not only unlinked from it.
+        self._db.execute("PRAGMA secure_delete = ON")
+        # VACUUM and big sorts build their scratch copies in memory, not in the system temp dir.
+        self._db.execute("PRAGMA temp_store = MEMORY")
         if new and path != ":memory:":
             os.chmod(path, 0o600)
         self._db.executescript(SCHEMA)
@@ -170,6 +174,9 @@ class Store:
             self._db.execute("DELETE FROM events")
             self._db.execute("DELETE FROM sessions")
             self._db.execute("DELETE FROM meta")
+        # Free pages left by deletions before secure_delete was on go too.
+        with self._lock:
+            self._db.execute("VACUUM")
 
     # --- meta and settings --------------------------------------------------------
 
