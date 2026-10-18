@@ -74,8 +74,9 @@
     return t(`Откроется за ачивку «${name}»`, `Opens with the achievement "${name}"`);
   }
 
+  // The line under the preview: what the focused choice is, or what opens it. The keys'
+  // hint has its own line under the buttons.
   function status(text) { $("char-status").textContent = text; }
-  const defaultStatus = () => t("Стрелки и Enter, Esc — назад", "Arrows and Enter, Esc to go back");
 
   // A choice button: a part by name or a color swatch; a locked one only tells what opens it.
   function choiceButton(key, id) {
@@ -171,7 +172,7 @@
     shown = "";
     draft = HERO.clean(options.look);
     tab = "looks";
-    status(defaultStatus());
+    status("");
     render();
     cancelAnimationFrame(raf);
     raf = requestAnimationFrame(animate);

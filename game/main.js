@@ -144,7 +144,7 @@
     menuRecords = records;
     renderModes();
     renderAchievements(got);
-    $("menu").scrollTop = 0;
+    document.querySelector("#menu .menu-body").scrollTop = 0;
     $("btn-play").focus({preventScroll: true});
   }
 
@@ -252,12 +252,12 @@
     $("mods-text").textContent = on.map((id) => `${tf(modifier(id), "name")}: ${tf(modifier(id), "text")}`).join("; ");
   }
 
-  // The menu shows the count and the latest three; all of them are on the achievements screen.
+  // The menu shows the count and the latest one; all of them are on the achievements screen.
   function renderAchievements(got) {
     const list = $("achievements");
     clear(list);
     const earned = earnedList(got);
-    for (const a of earned.slice(0, 3)) {
+    for (const a of earned.slice(0, 1)) {
       const li = el("li", null, "got");
       li.appendChild(el("span", tf(a, "name"), "name"));
       li.appendChild(el("span", tf(a, "text"), "text"));
@@ -329,6 +329,7 @@
     $("awards-count").textContent = `${earned.length}/${balance.achievements.length}`;
   }
 
+  // Small cards with a name; what the chosen map is like is said once, under the grid.
   function renderMaps() {
     const box = $("maps");
     clear(box);
@@ -336,13 +337,13 @@
     for (const m of LCS_MAPS) {
       const b = el("button", null, "map" + ((daily || mapId) === m.id ? " on" : ""));
       b.disabled = daily !== null && daily !== m.id;
+      b.title = tf(m, "text");
       const pic = el("canvas", null, "preview");
-      pic.width = 136;
-      pic.height = Math.round(136 * m.height / m.width);
+      pic.width = 80;
+      pic.height = Math.round(80 * m.height / m.width);
       renderer.preview(m, pic);
       b.appendChild(pic);
       b.appendChild(el("span", tf(m, "name"), "name"));
-      b.appendChild(el("span", tf(m, "text"), "text"));
       b.addEventListener("click", () => {
         mapId = m.id;
         renderMaps();
@@ -350,6 +351,8 @@
       });
       box.appendChild(b);
     }
+    const chosen = LCS_MAPS.find((m) => m.id === (daily || mapId)) || LCS_MAPS[0];
+    $("map-text").textContent = `${tf(chosen, "name")} · ${tf(chosen, "text")}`;
   }
 
   // Records and achievements: only for counted matches. Returns the new achievements.
@@ -434,22 +437,24 @@
     $("hud").hidden = true;
     codexFrom = null;
     $("results-title").textContent = t(...(TITLES[res.reason] || TITLES.quit));
+    // The mode, the map and the modifiers in one line; the score big; then the rest.
+    const sub = [tf(MODES[res.mode], "name")
+      + (res.mode === "classic" && res.with_agent ? t(" с агентом", " with an agent") : ""),
+                 tf(game.state.map, "name")];
+    if (res.modifiers) {
+      sub.push(res.modifier_ids.map((id) => tf(modifier(id), "name")).join(", ") + ` ×${res.score_mul}`);
+    }
+    $("results-sub").textContent = sub.join(" · ");
+    $("results-score").textContent = res.score;
+    $("results-time").textContent = `${clock(res.time)} · ${t("ур. ", "lv. ")}${res.level}`;
     const rows = [
-      [t("Режим", "Mode"), tf(MODES[res.mode], "name")
-        + (res.mode === "classic" && res.with_agent ? t(" с агентом", " with an agent") : "")],
-      [t("Карта", "Map"), tf(game.state.map, "name")],
-      [t("Счёт", "Score"), res.score], [t("Время", "Time"), clock(res.time)],
-      [t("Уровень", "Level"), res.level], [t("Убито", "Kills"), res.kills],
+      [t("Убито", "Kills"), res.kills],
       [t("Боссов", "Bosses"), res.bosses], [t("Лучшая серия", "Best streak"), res.best_streak],
       [t("Получено урона", "Damage taken"), res.damage_taken], [t("Снаряжение", "Gear"), res.gear],
       [t("Оружие", "Weapons"), res.weapons], [t("Эволюций", "Evolutions"), res.evolutions],
     ];
     if (res.mode === "agent") {
       rows.push([t("Смертей", "Deaths"), res.deaths], [t("Агентов", "Agents"), res.allies]);
-    }
-    if (res.modifiers) {
-      rows.push([t("Модификаторы", "Modifiers"),
-                 res.modifier_ids.map((id) => tf(modifier(id), "name")).join(", ") + ` (×${res.score_mul})`]);
     }
     // The agent's real work, when there was any.
     for (const [ru, en, key] of [["Коммитов", "Commits", "commits"], ["Пушей", "Pushes", "pushes"],
@@ -535,7 +540,13 @@
     if (!game || game.state.over) return;
     if (e.code === "Escape") {
       if (banishing) { banishing = false; choicesKey = ""; }
-      else if (!game.state.choices) escOpen = !escOpen;
+      else if (!game.state.choices) {
+        escOpen = !escOpen;
+        // The pause opens with the keys on "Resume"; closed, no hidden button keeps them.
+        show(escOpen ? "esc" : null);
+        if (escOpen) $("btn-resume").focus({preventScroll: true});
+        else document.activeElement.blur();
+      }
       e.preventDefault();
       return;
     }

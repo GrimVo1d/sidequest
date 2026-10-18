@@ -41,40 +41,44 @@
     <button id="btn-settings" data-en="Settings">Настройки</button>
     <button id="btn-exit" data-en="Quit">Выйти</button>
   </header>
-  <div class="menu-cols">
-    <div class="menu-col">
-      <canvas id="avatar" class="avatar" title="Сменить аватарку" data-en-title="Change the avatar"></canvas>
-      <button id="btn-avatar" class="small" data-en="Change the avatar">Сменить аватарку</button>
-      <input id="profile-name" maxlength="32" spellcheck="false" title="Имя" data-en-title="Name">
-      <h3 id="records-title"></h3>
-      <dl id="records"></dl>
-      <h3 data-en="Overall">Всего</h3>
-      <dl id="totals"></dl>
-    </div>
-    <div class="menu-col">
-      <div id="modes"></div>
-      <p id="mode-text" class="hint"></p>
-      <div id="ghosts" hidden></div>
-      <p id="daily-text" hidden></p>
-      <div id="maps"></div>
-      <h3><span data-en="Modifiers">Модификаторы</span> <span id="mods-mul"></span></h3>
-      <div id="mods"></div>
-      <p id="mods-text" class="hint"></p>
-      <div class="menu-buttons">
-        <button id="btn-play" class="primary" data-en="Play">Играть</button>
-        <button id="btn-character" data-en="Hero">Герой</button>
-        <button id="btn-codex" data-en="Handbook">Справочник</button>
+  <!-- The body scrolls on a short window; the action row under it always stays in view. -->
+  <div class="menu-body">
+    <div class="menu-cols">
+      <div class="menu-side">
+        <canvas id="avatar" class="avatar" title="Сменить аватарку" data-en-title="Change the avatar"></canvas>
+        <button id="btn-avatar" class="small" data-en="Change the avatar">Сменить аватарку</button>
+        <input id="profile-name" maxlength="32" spellcheck="false" title="Имя" data-en-title="Name">
+        <h3 id="records-title"></h3>
+        <dl id="records"></dl>
+        <h3 data-en="Overall">Всего</h3>
+        <dl id="totals"></dl>
+        <h3><span data-en="Achievements">Ачивки</span> <span id="achievements-count"></span></h3>
+        <ul id="achievements" class="achievements"></ul>
+        <p id="achievements-none" class="hint" hidden
+         data-en="None yet: the first one comes with the first match.">Пока ни одной: первая — за первый матч.</p>
+        <button id="btn-awards" class="small" data-en="All achievements">Все ачивки</button>
       </div>
-      <p class="hint" data-en="WASD or arrows to move, you shoot by yourself. Esc for the menu. In menus, the arrows and Enter.">WASD или стрелки — ходить, стреляешь сам. Esc — меню. В меню — стрелки и Enter.</p>
-    </div>
-    <div class="menu-col">
-      <h3><span data-en="Achievements">Ачивки</span> <span id="achievements-count"></span></h3>
-      <ul id="achievements" class="achievements"></ul>
-      <p id="achievements-none" class="hint" hidden
-       data-en="None yet: the first one comes with the first match.">Пока ни одной: первая — за первый матч.</p>
-      <button id="btn-awards" data-en="All achievements">Все ачивки</button>
+      <div class="menu-main">
+        <div id="modes"></div>
+        <p id="mode-text" class="hint"></p>
+        <div id="ghosts" hidden></div>
+        <p id="daily-text" hidden></p>
+        <div id="maps"></div>
+        <p id="map-text" class="hint"></p>
+        <h3><span data-en="Modifiers">Модификаторы</span> <span id="mods-mul"></span></h3>
+        <div id="mods"></div>
+        <p id="mods-text" class="hint"></p>
+      </div>
     </div>
   </div>
+  <footer class="menu-actions">
+    <div class="menu-buttons">
+      <button id="btn-play" class="primary" data-en="Play">Играть</button>
+      <button id="btn-character" data-en="Hero">Герой</button>
+      <button id="btn-codex" data-en="Handbook">Справочник</button>
+    </div>
+    <p class="hint" data-en="WASD or arrows to move, you shoot by yourself. Esc for the menu. In menus, the arrows and Enter.">WASD или стрелки — ходить, стреляешь сам. Esc — меню. В меню — стрелки и Enter.</p>
+  </footer>
 </section>
 
 <section id="levelup" class="screen" hidden>
@@ -113,30 +117,36 @@
 <section id="character" class="screen" hidden>
   <h2 data-en="Hero">Герой</h2>
   <div class="char-cols">
+    <!-- The preview, what the focused choice is, then the buttons that act on the whole look. -->
     <div class="char-side">
       <canvas id="char-preview"></canvas>
-      <p id="char-status" class="hint"></p>
+      <p id="char-status"></p>
       <button id="btn-char-random" data-en="Random">Случайно</button>
+      <button id="btn-char-save" class="primary" data-en="Save">Сохранить</button>
+      <button id="btn-char-back" data-en="Cancel">Отмена</button>
+      <p class="hint" data-en="Arrows and Enter, Esc to go back">Стрелки и Enter, Esc — назад</p>
     </div>
     <div class="char-main">
       <div id="char-tabs"></div>
       <div id="char-rows"></div>
     </div>
   </div>
-  <div class="menu-buttons">
-    <button id="btn-char-save" class="primary" data-en="Save">Сохранить</button>
-    <button id="btn-char-back" data-en="Cancel">Отмена</button>
-  </div>
 </section>
 
 <section id="results" class="screen" hidden>
-  <h2 id="results-title"></h2>
-  <dl id="results-list"></dl>
-  <p id="results-note" class="note" hidden
-   data-en="The match is not counted: a replay or the developer panel.">Матч не засчитан: повтор или панель разработчика.</p>
-  <div id="results-new" hidden>
-    <h3 data-en="New achievements">Новые ачивки</h3>
-    <ul id="results-achievements" class="achievements"></ul>
+  <!-- The score first and biggest, then the rest of the match in two columns. -->
+  <div class="results-box">
+    <h2 id="results-title"></h2>
+    <p id="results-sub" class="hint"></p>
+    <div class="results-score"><span data-en="Score">Счёт</span> <span id="results-score"></span></div>
+    <p id="results-time"></p>
+    <dl id="results-list"></dl>
+    <p id="results-note" class="note" hidden
+     data-en="The match is not counted: a replay or the developer panel.">Матч не засчитан: повтор или панель разработчика.</p>
+    <div id="results-new" hidden>
+      <h3 data-en="New achievements">Новые ачивки</h3>
+      <ul id="results-achievements" class="achievements"></ul>
+    </div>
   </div>
   <button id="btn-again" class="primary" data-en="To the menu">В меню</button>
 </section>

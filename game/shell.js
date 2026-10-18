@@ -131,6 +131,9 @@ async function refreshStatus() {
   $("indicator-text").textContent = text;
   $("btn-connect").textContent = status.connected ? t("Отключить от Claude Code", "Disconnect from Claude Code")
                                                   : t("Подключить к Claude Code", "Connect to Claude Code");
+  // Not connected: connecting is the thing to do here, so it is the primary button.
+  $("btn-connect").classList.toggle("primary", !status.connected);
+  $("btn-agent-back").classList.toggle("primary", status.connected);
   $("first-event").hidden = !status.waiting_first_event;
 
   const sessions = $("sessions");
@@ -217,6 +220,8 @@ async function runCheck() {
 
 // --- modal dialogs -----------------------------------------------------------------
 
+let modalFrom = null;  // what had the keys before the dialog: it gets them back after
+
 function modal(title, body, actions, options) {
   $("modal").querySelector(".dialog").classList.toggle("wide", !!(options && options.wide));
   $("modal-title").textContent = title;
@@ -226,9 +231,20 @@ function modal(title, body, actions, options) {
   const a = $("modal-actions");
   clear(a);
   for (const [label, fn, cls] of actions) a.appendChild(button(label, fn, cls));
+  const was = $("modal").hidden;
   $("modal").hidden = false;
+  // The keys go into the dialog, to its main button (the arrows reach the rest), so no
+  // button under the dark layer stays marked. A dialog that follows another keeps the first's.
+  if (was) modalFrom = document.activeElement;
+  (a.querySelector(".primary") || a.lastElementChild || b).focus({preventScroll: true});
 }
-function closeModal() { $("modal").hidden = true; }
+function closeModal() {
+  $("modal").hidden = true;
+  const back = modalFrom;
+  modalFrom = null;
+  if (back && document.contains(back) && back.getBoundingClientRect().width) back.focus({preventScroll: true});
+  else if (document.activeElement) document.activeElement.blur();
+}
 
 async function connectFlow() {
   if (status && status.connected) return disconnectFlow();
@@ -328,7 +344,7 @@ function openAgent() {
   $("agent").hidden = false;
   loadProfile();
   runCheck();
-  $("btn-agent-back").focus({preventScroll: true});
+  $(status && !status.connected ? "btn-connect" : "btn-agent-back").focus({preventScroll: true});
 }
 
 function closeAgent() {
