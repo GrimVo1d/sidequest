@@ -417,7 +417,16 @@
      "when": {"min": {"incidents": 1}}},
     {"id": "deploy", "icon": "deploy",     "name": "Деплой пережит",   "text": "пережить пятничный деплой",
      "name_en": "Deploy survived", "text_en": "survive a Friday deploy",
-     "when": {"min": {"deploys": 1}}}
+     "when": {"min": {"deploys": 1}}},
+    {"id": "campaign_half", "icon": "monitor", "name": "Середина спринта", "text": "дойти до третьего этапа кампании",
+     "name_en": "Mid-sprint", "text_en": "reach the third stage of the campaign",
+     "when": {"is": {"mode": "campaign"}, "min": {"stage": 3}}},
+    {"id": "campaign_win", "icon": "boss", "name": "Релиз", "text": "пройти кампанию до конца",
+     "name_en": "Release", "text_en": "finish the campaign",
+     "when": {"is": {"mode": "campaign", "reason": "win"}}},
+    {"id": "crits", "icon": "tests_ok", "name": "Покрытие 100%", "text": "100 критических ударов за матч",
+     "name_en": "100% coverage", "text_en": "100 critical hits in a match",
+     "when": {"min": {"crits": 100}}}
   ],
 
   "ghost": {"max_gap": 15, "after_task": 2, "lead": 2, "end_after": 4},
