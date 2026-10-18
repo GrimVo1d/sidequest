@@ -148,8 +148,8 @@
   },
 
   "xp": {
-    "per_action": {"attack": 6, "scout": 2, "cast": 5, "scout_far": 4, "summon": 8,
-                   "todo": 3, "generic": 2},
+    "per_action": {"attack": 9, "scout": 3, "cast": 8, "scout_far": 6, "summon": 12,
+                   "todo": 5, "generic": 3},
     "error": 2,
     "first_level": 20,
     "growth": 1.22
@@ -239,11 +239,12 @@
   },
 
   "spawn": {
-    "base_per_second": 0.6, "per_minute": 0.02, "per_level": 0.1, "max_per_second": 3,
+    "base_per_second": 0.6, "per_minute": 0.02, "per_level": 0.07, "max_per_second": 3,
     "max_alive": 250,
-    "hp_growth_per_minute": 0.02, "hp_growth_per_level": 0.06,
+    "hp_growth_per_minute": 0.02, "hp_growth_per_level": 0.045,
     "speed_growth_per_minute": 0.03, "max_speed_growth": 0.35,
     "damage_growth_per_minute": 0.03,
+    "growth_minutes": 12,
     "boss_every_minutes": 5,
     "weights": {"grunt": 6, "runner": 3, "tank": 1, "flaky": 1.2, "spaghetti": 0.8, "offbyone": 1,
                 "debt": 0.8, "logspam": 0.7, "regression": 1, "scope": 0.6, "monolith": 0.25},
@@ -527,8 +528,8 @@
     "stages": [
       {"map": "open", "boss": "boss_oom"},
       {"map": "legacy", "boss": "boss_loop"},
-      {"map": "cicd", "boss": "boss_fire"},
       {"map": "night", "boss": "boss_race"},
+      {"map": "cicd", "boss": "boss_fire"},
       {"map": "prod", "boss": "boss"}
     ],
     "ending": {"title": "Релиз выпущен", "title_en": "Shipped",

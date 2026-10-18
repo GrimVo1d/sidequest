@@ -191,8 +191,7 @@
     // Spawns an enemy just off screen, or at `at` (moved out of the walls); `extra` is merged
     // into it. Returns the enemy, or nothing when there was no room.
     function spawn(type, at, extra) {
-      const cfg = B.enemies[type];
-      const minute = s.time / 60;
+      const cfg = B.enemies[type], minute = clockMinute();
       let x, y;
       if (at) {
         ({x, y} = at);
@@ -293,6 +292,9 @@
       if (boss) text(s.player.x, s.player.y - 30, tr(cfg.name, cfg.name_en).toUpperCase(), "#e8c14a", 2.5);
       return boss;
     }
+
+    // The clock's part of the difficulty stops at `growth_minutes`, so a long agent session levels off.
+    const clockMinute = () => Math.min(s.time / 60, B.spawn.growth_minutes);
 
     // The usual bugs, and the map's own enemy (maps.js, `special`).
     function pickType() {
@@ -1314,8 +1316,7 @@
 
     function updateSpawns(dt) {
       if (s.finaleAt !== null || s.endAt !== null) return;
-      const active = classic || s.allies.some((a) => a.state === "active");
-      const minute = s.time / 60;
+      const active = classic || s.allies.some((a) => a.state === "active"), minute = clockMinute();
       const rate = Math.min(B.spawn.max_per_second, B.spawn.base_per_second
                             + B.spawn.per_minute * minute + B.spawn.per_level * (s.level - 1))
         * (active ? 1 : B.spawn.no_ally_factor) * (s.redCi > 0 ? AG.red_ci.spawn : 1)
@@ -1451,9 +1452,8 @@
         e.fireAt = s.time + cfg.fire_every;
         const angle = Math.atan2(p.y - e.y, p.x - e.x);
         s.enemyShots.push({x: e.x, y: e.y, vx: Math.cos(angle) * cfg.shot_speed,
-                           vy: Math.sin(angle) * cfg.shot_speed, r: 3,
-                           damage: cfg.shot_damage * (1 + B.spawn.damage_growth_per_minute * s.time / 60),
-                           life: cfg.range * 1.5 / cfg.shot_speed});
+                           vy: Math.sin(angle) * cfg.shot_speed, r: 3, life: cfg.range * 1.5 / cfg.shot_speed,
+                           damage: cfg.shot_damage * (1 + B.spawn.damage_growth_per_minute * clockMinute())});
       }
       if (d > cfg.keep) return false;
       if (d < cfg.keep * 0.7) {
