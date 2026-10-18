@@ -23,7 +23,7 @@
     // --- level-ups ---------------------------------------------------------------------
 
     function addXp(n) {
-      s.xp += n;
+      s.xp += n * s.stats.xp;
       while (s.xp >= s.xpNext) {
         s.xp -= s.xpNext;
         s.level++;

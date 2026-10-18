@@ -10,7 +10,7 @@
 "use strict";
 
 (function (root) {
-  const MODES = ["agent", "classic", "daily", "ghost"];
+  const MODES = ["agent", "classic", "daily", "ghost", "campaign"];
   const KEEP_DAYS = 400, KEEP_GHOSTS = 100;
 
   function emptyMode() {
@@ -20,8 +20,8 @@
   // Records as saved, from any version: the first version kept one flat set of numbers
   // for matches with an agent.
   function migrate(saved) {
-    const r = {agent: emptyMode(), classic: emptyMode(), daily: emptyMode(), ghost: emptyMode(),
-               totals: {matches: 0, kills: 0, bosses: 0, wins: 0, done: 0, maps: {}}};
+    const r = Object.fromEntries(MODES.map((m) => [m, emptyMode()]));
+    r.totals = {matches: 0, kills: 0, bosses: 0, wins: 0, done: 0, maps: {}};
     if (!saved || typeof saved !== "object") return r;
     if (!saved.totals) {
       for (const k of Object.keys(r.agent)) if (Number.isFinite(saved[k])) r.agent[k] = saved[k];

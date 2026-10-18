@@ -66,6 +66,9 @@
         <p id="daily-text" hidden></p>
         <div id="maps"></div>
         <p id="map-text" class="hint"></p>
+        <h3 data-en="Class">Класс</h3>
+        <div id="classes"></div>
+        <p id="class-text" class="hint"></p>
         <h3><span data-en="Modifiers">Модификаторы</span> <span id="mods-mul"></span></h3>
         <div id="mods"></div>
         <p id="mods-text" class="hint"></p>
@@ -76,9 +79,10 @@
     <div class="menu-buttons">
       <button id="btn-play" class="primary" data-en="Play">Играть</button>
       <button id="btn-character" data-en="Hero">Герой</button>
+      <button id="btn-stars" data-en="Stars">Звёзды</button>
       <button id="btn-codex" data-en="Handbook">Справочник</button>
     </div>
-    <p class="hint" data-en="WASD or arrows to move, you shoot by yourself. Esc for the menu. In menus, the arrows and Enter.">WASD или стрелки — ходить, стреляешь сам. Esc — меню. В меню — стрелки и Enter.</p>
+    <p class="hint" data-en="WASD or arrows to move, you shoot by yourself. Space for the class's ability, Esc for the menu. In menus, the arrows and Enter.">WASD или стрелки — ходить, стреляешь сам. Пробел — способность класса, Esc — меню. В меню — стрелки и Enter.</p>
   </footer>
 </section>
 
@@ -114,6 +118,16 @@
   <button id="btn-awards-back" class="primary" data-en="Back">Назад</button>
 </section>
 
+<!-- Stars (meta.js): bonuses for every next match, and the collection of weapons found. -->
+<section id="stars" class="screen" hidden>
+  <h2><span data-en="Stars">Звёзды</span> <span id="stars-count"></span></h2>
+  <p class="hint" data-en="Counted matches bring stars: for the match, each boss, a win, each campaign stage and every 5 minutes. The bonuses work in every mode but the daily task.">Звёзды дают засчитанные матчи: за матч, каждого босса, победу, этап кампании и каждые 5 минут. Бонусы работают во всех режимах, кроме «Задачи дня».</p>
+  <ul id="perks"></ul>
+  <h3 data-en="Collection">Коллекция</h3>
+  <p id="collection" class="hint"></p>
+  <button id="btn-stars-back" class="primary" data-en="Back">Назад</button>
+</section>
+
 <!-- The hero's look (character.js): a live preview, the parts by tabs, ready looks. -->
 <section id="character" class="screen" hidden>
   <h2 data-en="Hero">Герой</h2>
@@ -141,6 +155,7 @@
     <p id="results-sub" class="hint"></p>
     <div class="results-score"><span data-en="Score">Счёт</span> <span id="results-score"></span></div>
     <p id="results-time"></p>
+    <p id="results-ending" class="ending" hidden></p>
     <dl id="results-list"></dl>
     <p id="results-note" class="note" hidden
      data-en="The match is not counted: a replay or the developer panel.">Матч не засчитан: повтор или панель разработчика.</p>
@@ -234,14 +249,18 @@
 <script src="hero.js"></script>
 <script src="font.js"></script>
 <script src="terrain.js"></script>
+<script src="modes.js"></script>
 <script src="build.js"></script>
+<script src="classes.js"></script>
 <script src="game.js"></script>
 <script src="progress.js"></script>
+<script src="meta.js"></script>
 <script src="codex.js"></script>
 <script src="character.js"></script>
 <script src="themes.js"></script>
 <script src="terrain-art.js"></script>
 <script src="render.js"></script>
+<script src="screens.js"></script>
 <script src="main.js"></script>
 <script src="shell.js"></script>
 <script src="avatar-ui.js"></script>
