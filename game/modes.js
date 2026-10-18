@@ -63,7 +63,7 @@
                  "rerolls", "banishes", "banished", "score", "kills", "bosses", "bossKinds",
                  "evolutions", "damageTaken", "deaths", "bestStreak", "maxMultiplier", "elites",
                  "incidents", "deploys", "picked", "synced", "commits", "pushes", "turretsBuilt",
-                 "reviews", "crits", "everAlly", "withAgent", "met"];
+                 "reviews", "crits", "abilityUses", "everAlly", "withAgent", "met"];
 
   function stage(B, options) {
     const K = B.campaign, i = options && options.mode === "campaign" ? options.stage | 0 : -1;

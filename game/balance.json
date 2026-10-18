@@ -426,7 +426,19 @@
      "when": {"is": {"mode": "campaign", "reason": "win"}}},
     {"id": "crits", "icon": "tests_ok", "name": "Покрытие 100%", "text": "100 критических ударов за матч",
      "name_en": "100% coverage", "text_en": "100 critical hits in a match",
-     "when": {"min": {"crits": 100}}}
+     "when": {"min": {"crits": 100}}},
+    {"id": "abilities", "icon": "keyboard", "name": "Горячие клавиши", "text": "25 раз применить способность класса за матч",
+     "name_en": "Hotkeys", "text_en": "Use the class ability 25 times in a match",
+     "when": {"min": {"abilities": 25}}},
+    {"id": "fullstack", "icon": "monitor", "name": "Фулстек", "text": "Сыграть матч каждым из шести классов",
+     "name_en": "Full stack", "text_en": "Play a match with each of the six classes",
+     "when": {"kinds_min": {"classes": 6}}},
+    {"id": "evolutions", "icon": "linters", "name": "Рефакторинг", "text": "4 эволюции оружия за матч",
+     "name_en": "Refactoring", "text_en": "4 weapon evolutions in a match",
+     "when": {"min": {"evolutions": 4}}},
+    {"id": "senior", "icon": "gem", "name": "Из джунов в лиды", "text": "Джуном дойти до 25-го уровня",
+     "name_en": "Junior to lead", "text_en": "Reach level 25 as the Junior",
+     "when": {"is": {"class": "junior"}, "min": {"level": 25}}}
   ],
 
   "ghost": {"max_gap": 15, "after_task": 2, "lead": 2, "end_after": 4},

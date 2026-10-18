@@ -140,6 +140,18 @@ class ClassesTest(unittest.TestCase):
         self.assertEqual(m["found"]["evolutions"], {"laser": 1})
         self.assertEqual(m["found"]["stars"], self.balance["stars"]["match"])
 
+    def test_class_achievements(self):
+        a = self.result["awards"]
+        n = len(self.classes)
+        full = next(x for x in self.balance["achievements"] if x["id"] == "fullstack")
+        self.assertEqual(full["when"], {"kinds_min": {"classes": n}})
+        # The developer was already played in the old save: the 1st new match makes 1 of 6.
+        self.assertEqual([s[0] for s in a["steps"]], [0] * (n - 1) + [1])
+        self.assertEqual([s[1] for s in a["steps"]], list(range(1, n + 1)))
+        self.assertEqual(a["classes"], sorted(self.classes))
+        self.assertTrue(a["safe"])
+        self.assertEqual(a["abilities"], 3)
+
 
 if __name__ == "__main__":
     unittest.main()

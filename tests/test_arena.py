@@ -549,7 +549,9 @@ class ArenaTest(unittest.TestCase):
         for a in self.balance["achievements"]:
             with self.subTest(a["id"]):
                 self.assertTrue(a["name"] and a["text"] and a["when"])
-                self.assertLessEqual(set(a["when"]), {"min", "max", "is", "total_min", "maps_all"})
+                self.assertLessEqual(
+                    set(a["when"]), {"min", "max", "is", "total_min", "maps_all", "kinds_min"}
+                )
         for a in ("first", "classic_win", "solo", "friday", "boss"):
             self.assertIn(a, p["after_win"])
         self.assertNotIn("tourist", p["after_win"])

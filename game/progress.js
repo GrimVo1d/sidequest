@@ -21,7 +21,7 @@
   // for matches with an agent.
   function migrate(saved) {
     const r = Object.fromEntries(MODES.map((m) => [m, emptyMode()]));
-    r.totals = {matches: 0, kills: 0, bosses: 0, wins: 0, done: 0, maps: {}};
+    r.totals = {matches: 0, kills: 0, bosses: 0, wins: 0, done: 0, maps: {}, classes: {}};
     if (!saved || typeof saved !== "object") return r;
     if (!saved.totals) {
       for (const k of Object.keys(r.agent)) if (Number.isFinite(saved[k])) r.agent[k] = saved[k];
@@ -36,11 +36,15 @@
       }
     }
     for (const k of Object.keys(r.totals)) {
-      if (k !== "maps" && Number.isFinite(saved.totals[k])) r.totals[k] = saved.totals[k];
+      if (Number.isFinite(saved.totals[k])) r.totals[k] = saved.totals[k];
     }
-    const maps = saved.totals.maps;
-    if (maps && typeof maps === "object") {
-      for (const [id, n] of Object.entries(maps)) if (Number.isFinite(n)) r.totals.maps[id] = n;
+    // Matches per map and per class; a save's "__proto__" key stays a plain key.
+    for (const field of ["maps", "classes"]) {
+      const counts = saved.totals[field];
+      if (!counts || typeof counts !== "object") continue;
+      for (const [id, n] of Object.entries(counts)) {
+        if (id !== "__proto__" && Number.isFinite(n)) r.totals[field][id] = n;
+      }
     }
     return r;
   }
@@ -61,6 +65,7 @@
     if (won) t.wins++;
     if (res.reason === "done") t.done++;
     t.maps[res.map] = (t.maps[res.map] || 0) + 1;
+    if (typeof res.class === "string") t.classes[res.class] = (t.classes[res.class] || 0) + 1;
     return r;
   }
 
@@ -108,7 +113,9 @@
 
   // A condition holds when every part of it holds:
   //   min / max: {field: n} on the match results, is: {field: value},
-  //   total_min: {field: n} on the totals after the match, maps_all: every map played.
+  //   total_min: {field: n} on the totals after the match, maps_all: every map played,
+  //   kinds_min: {field: n} — that many different maps or classes played.
+  const kinds = (records, field) => Object.values(records.totals[field] || {}).filter((n) => n > 0).length;
   function holds(when, res, records, mapIds) {
     const w = when || {};
     for (const [k, n] of Object.entries(w.min || {})) if (!((res[k] || 0) >= n)) return false;
@@ -118,6 +125,7 @@
       if (!((records.totals[k] || 0) >= n)) return false;
     }
     if (w.maps_all && !mapIds.every((id) => records.totals.maps[id] > 0)) return false;
+    for (const [k, n] of Object.entries(w.kinds_min || {})) if (kinds(records, k) < n) return false;
     return true;
   }
 
@@ -146,7 +154,8 @@
     if (w.is || w.max) return null;
     const parts = [
       ...Object.entries(w.min || {}).map(([k, n]) => ({field: k, have: bests[k] || 0, need: n, of: "match"})),
-      ...Object.entries(w.total_min || {}).map(([k, n]) => ({field: k, have: records.totals[k] || 0, need: n, of: "total"}))];
+      ...Object.entries(w.total_min || {}).map(([k, n]) => ({field: k, have: records.totals[k] || 0, need: n, of: "total"})),
+      ...Object.entries(w.kinds_min || {}).map(([k, n]) => ({field: k, have: kinds(records, k), need: n, of: "total"}))];
     if (w.maps_all) {
       parts.push({field: "maps", have: mapIds.filter((id) => records.totals.maps[id] > 0).length,
                   need: mapIds.length, of: "total"});

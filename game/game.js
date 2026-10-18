@@ -1722,8 +1722,7 @@
     function finish(reason) {
       if (s.over) return s.results;
       s.over = true;
-      s.choices = null;
-      s.choiceKind = null;
+      s.choices = s.choiceKind = null;
       s.results = {reason, mode: s.mode, with_agent: classic ? s.withAgent : true, map: map.id,
                    time: Math.round(s.time), score: Math.floor(s.score * s.scoreMul), kills: s.kills,
                    damage_taken: Math.round(s.damageTaken), deaths: s.deaths, level: s.level,
@@ -1735,7 +1734,8 @@
                    boss_kinds: Object.keys(s.bossKinds).length,
                    modifiers: s.modifiers.length, modifier_ids: s.modifiers.slice(),
                    score_mul: Math.round(s.scoreMul * 100) / 100, class: s.cls.id, crits: s.crits || 0,
-                   stage: s.stage ? s.stage.index + 1 : 0, weapon_ids: s.weapons.map((w) => w.id),
+                   abilities: s.abilityUses || 0, stage: s.stage ? s.stage.index + 1 : 0,
+                   weapon_ids: s.weapons.map((w) => w.id),
                    evolved_ids: s.weapons.filter((w) => w.evolved).map((w) => w.id)};
       if (ghost) s.results.ghost = ghost.session;
       if (s.mode === "daily") s.results.day = s.day;

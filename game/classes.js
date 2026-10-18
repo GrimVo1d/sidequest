@@ -85,6 +85,7 @@
       if (!A || s.over || s.choices || p.dead || s.time < s.cls.ready) return false;
       s.cls.ready = s.time + A.cooldown;
       s.cls.until = s.time + (A.seconds || 0);
+      s.abilityUses = (s.abilityUses || 0) + 1;
       ACTIONS[A.id](p);
       return true;
     }

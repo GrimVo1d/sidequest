@@ -157,4 +157,25 @@ result.start.unknown = make({cls: "nope"}).state.cls.id;
   result.meta.found = found;
 }
 
+// --- achievements of the classes ----------------------------------------------------------
+{
+  // Full stack: a match with each class, counted in the records' totals.
+  const full = balance.achievements.find((a) => a.id === "fullstack");
+  let records = LCSProgress.migrate({totals: {matches: 1, classes: {__proto__: 3, developer: 2, nope: "x"}}});
+  const steps = [];
+  for (const c of balance.classes) {
+    records = LCSProgress.addMatch(records, {mode: "classic", reason: "dead", time: 60, score: 0, level: 1,
+                                             kills: 0, map: "open", class: c.id});
+    steps.push([LCSProgress.earned([full], {}, records, []).length, LCSProgress.progressOf(full, records, {}, []).have]);
+  }
+  // Hotkeys: the ability's uses go into the match's results.
+  const game = make({cls: "junior"}), s = game.state;
+  for (let i = 0; i < 3; i++) {
+    s.cls.ready = 0;
+    game.ability();
+  }
+  result.awards = {steps, classes: Object.keys(records.totals.classes).sort(), safe: ({}).developer === undefined,
+                   abilities: game.finish("quit").abilities};
+}
+
 print(JSON.stringify(result));
