@@ -94,12 +94,12 @@
     const map = (options && options.map)
       || {id: "open", name: "Open space", width: B.arena.width, height: B.arena.height, walls: []};
     const W = map.width, H = map.height;
-    const WALLS = map.walls.map(([x, y, w, h]) => ({x, y, w, h}));
+    const T = root.LCSTerrain.create(map), WALLS = T.walls;
     const A = B.abilities, C = B.classic, AG = B.agent;
     const WEAPONS = new Map(B.weapons.map((w) => [w.id, w]));
     const PASSIVES = new Map(B.upgrades.map((u) => [u.id, u]));
     const PISTOL = WEAPONS.get("pistol").base;
-    const CELL = 32;
+    const CELL = 32;   // px per cell of the enemies' grid for nearby()
     const TEXT_PILE = 5;   // floating texts over one spot at once
     const modeName = ["classic", "daily", "ghost"].includes(options && options.mode) ? options.mode : "agent";
     // Classic and the daily task are played alone: crystals, a final boss, death ends it.
@@ -224,130 +224,11 @@
     const I = B.items;
     const speed = () => s.stats.speed * (s.buffs.coffee > 0 ? I.coffee.speed : 1) * s.player.sticky;
 
-    // --- walls -------------------------------------------------------------------
+    // --- walls: terrain.js ----------------------------------------------------------
 
-    const inWall = (x, y, r) => WALLS.some((w) => x > w.x - r && x < w.x + w.w + r
-                                                && y > w.y - r && y < w.y + w.h + r);
-
-    // Moves a circle out of every wall it overlaps, so it slides along them.
-    function pushOut(o, r) {
-      for (const w of WALLS) {
-        const nx = clamp(o.x, w.x, w.x + w.w), ny = clamp(o.y, w.y, w.y + w.h);
-        const dx = o.x - nx, dy = o.y - ny, d2 = dx * dx + dy * dy;
-        if (d2 >= r * r) continue;
-        if (d2 > 1e-6) {
-          const d = Math.sqrt(d2);
-          o.x = nx + dx / d * r;
-          o.y = ny + dy / d * r;
-        } else {
-          // The centre is inside the wall: leave by the nearest side.
-          const sides = [[o.x - w.x, w.x - r, o.y], [w.x + w.w - o.x, w.x + w.w + r, o.y],
-                         [o.y - w.y, o.x, w.y - r], [w.y + w.h - o.y, o.x, w.y + w.h + r]];
-          const best = sides.reduce((a, b) => (b[0] < a[0] ? b : a));
-          o.x = best[1];
-          o.y = best[2];
-        }
-      }
-    }
-
-    // Where the segment from (x0, y0) by (dx, dy) first enters a wall grown by r (the same
-    // box as inWall), as a share of its length from 0 to 1, or Infinity when it enters none.
-    // Exact: the segment is clipped against each box on both axes (the slab method), so a
-    // line never cuts the corner of a wall the way a check every few pixels did.
-    function wallEntry(x0, y0, dx, dy, r) {
-      let first = Infinity;
-      for (const w of WALLS) {
-        let t0 = 0, t1 = 1;
-        for (const [p, d, lo, hi] of [[x0, dx, w.x - r, w.x + w.w + r], [y0, dy, w.y - r, w.y + w.h + r]]) {
-          if (d === 0) {
-            if (p <= lo || p >= hi) t1 = -1;
-            continue;
-          }
-          const a = (lo - p) / d, b = (hi - p) / d;
-          t0 = Math.max(t0, Math.min(a, b));
-          t1 = Math.min(t1, Math.max(a, b));
-        }
-        if (t0 < t1) first = Math.min(first, t0);
-      }
-      return first;
-    }
-
-    // No wall between a point and (x, y) for a circle of radius r.
-    const clearPath = (o, x, y, r) => wallEntry(o.x, o.y, x - o.x, y - o.y, r) === Infinity;
-
-    // How far a line from (x, y) along (dx, dy) goes before a wall, up to `length`.
-    function toWall(x, y, dx, dy, length) {
-      return Math.min(length, wallEntry(x, y, dx * length, dy * length, 0) * length);
-    }
-
-    const inSight = (from, e) => !WALLS.length || clearPath(from, e.x, e.y, 0);
-
-    // The first `n` of the sorted enemies with no wall in between: the path is checked
-    // only until enough are found.
-    function firstInSight(sorted, from, n) {
-      const out = [];
-      for (const e of sorted) {
-        if (out.length >= n) break;
-        if (inSight(from, e)) out.push(e);
-      }
-      return out;
-    }
-
-    // Enemies find their way around walls along a distance field: a breadth-first search
-    // over 16 px cells from the player's cell, redone when the player changes cell.
-    const FCELL = 16, FW = Math.ceil(W / FCELL), FH = Math.ceil(H / FCELL);
-    const blocked = new Uint8Array(FW * FH);
-    for (let c = 0; c < FW * FH; c++) {
-      blocked[c] = inWall((c % FW + 0.5) * FCELL, (Math.floor(c / FW) + 0.5) * FCELL, 6) ? 1 : 0;
-    }
-    const flow = new Int32Array(FW * FH).fill(-1);
-    const queue = new Int32Array(FW * FH);
-    let flowFrom = -1;
-    const cellOf = (o) => clamp(Math.floor(o.x / FCELL), 0, FW - 1)
-      + clamp(Math.floor(o.y / FCELL), 0, FH - 1) * FW;
-    const STEPS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
-
-    // A diagonal step is allowed only if both straight steps next to it are open.
-    function open(cx, cy, dx, dy) {
-      const x = cx + dx, y = cy + dy;
-      if (x < 0 || y < 0 || x >= FW || y >= FH || blocked[x + y * FW]) return false;
-      return !dx || !dy || (!blocked[cx + dx + cy * FW] && !blocked[cx + (cy + dy) * FW]);
-    }
-
-    function updateFlow() {
-      const start = cellOf(s.player);
-      if (start === flowFrom) return;
-      flowFrom = start;
-      flow.fill(-1);
-      flow[start] = 0;
-      let head = 0, tail = 0;
-      queue[tail++] = start;
-      while (head < tail) {
-        const c = queue[head++], cx = c % FW, cy = (c - cx) / FW;
-        for (const [dx, dy] of STEPS) {
-          if (!open(cx, cy, dx, dy)) continue;
-          const n = cx + dx + (cy + dy) * FW;
-          if (flow[n] < 0) { flow[n] = flow[c] + 1; queue[tail++] = n; }
-        }
-      }
-    }
-
-    // Where an enemy should head: the player, or the next cell towards the player.
-    function waypoint(e) {
-      const p = s.player;
-      if (!WALLS.length) return p;
-      const c = cellOf(e);
-      if (flow[c] >= 0 && flow[c] <= 2) return p;
-      const cx = c % FW, cy = (c - cx) / FW;
-      let best = -1, bestFlow = flow[c] >= 0 ? flow[c] : Infinity;
-      for (const [dx, dy] of STEPS) {
-        if (!open(cx, cy, dx, dy)) continue;
-        const n = cx + dx + (cy + dy) * FW;
-        if (flow[n] >= 0 && flow[n] < bestFlow) { bestFlow = flow[n]; best = n; }
-      }
-      if (best < 0) return p;
-      return {x: (best % FW + 0.5) * FCELL, y: (Math.floor(best / FW) + 0.5) * FCELL};
-    }
+    const {inWall, pushOut, clearPath, toWall, inSight, firstInSight} = T;
+    const updateFlow = () => T.updateFlow(s.player);
+    const waypoint = (e) => T.waypoint(e, s.player);
 
     // --- enemies -----------------------------------------------------------------
 
