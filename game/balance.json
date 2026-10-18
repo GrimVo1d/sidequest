@@ -585,5 +585,33 @@
     {"id": "missiles",   "name": "Мультиправка",  "text": "+1 снаряд союзника за правку",
      "name_en": "Multi-edit", "text_en": "+1 ally missile per edit",
      "stat": "ally_missiles", "add": 1, "max_level": 4, "ally": true}
-  ]
+  ],
+  "tutorial": {
+    "steps": [
+      {"id": "move", "icon": "keyboard", "need": {"moved": 160},
+       "name": "Ходи", "name_en": "Move",
+       "text": "WASD или стрелки. Стрелять не нужно: оружие само бьёт по ближайшему врагу.",
+       "text_en": "WASD or the arrows. No need to shoot: the weapon fires at the closest enemy by itself."},
+      {"id": "kills", "icon": "grunt", "need": {"kills": 5},
+       "name": "Убей 5 багов", "name_en": "Squash 5 bugs",
+       "text": "Держись на расстоянии и не стой в толпе: враг ранит при касании.",
+       "text_en": "Keep your distance and stay out of the crowd: enemies hurt on touch."},
+      {"id": "level", "icon": "gem", "need": {"level": 2},
+       "name": "Собирай кристаллы", "name_en": "Pick up crystals",
+       "text": "Враги роняют кристаллы опыта. Набери уровень и выбери одно из трёх улучшений.",
+       "text_en": "Enemies drop experience crystals. Gain a level and pick one of three upgrades."},
+      {"id": "ability", "icon": "keyboard", "need": {"ability": 1}, "only": "ability",
+       "name": "Способность класса", "name_en": "Class ability",
+       "text": "Нажми Пробел. Пока она перезаряжается, секунды видны в нижней панели.",
+       "text_en": "Press Space. While it recharges, the seconds show in the bottom panel."},
+      {"id": "agent", "icon": "ally", "need": {"seconds": 8}, "only": "agent",
+       "name": "Союзники", "name_en": "Allies",
+       "text": "Это твои агенты Claude Code: их правки, тесты и коммиты становятся атаками и бонусами.",
+       "text_en": "These are your Claude Code agents: their edits, tests and commits turn into attacks and bonuses."},
+      {"id": "pause", "icon": "monitor", "need": {"seconds": 8},
+       "name": "Пауза и справочник", "name_en": "Pause and handbook",
+       "text": "Esc — пауза. Всё, что встретишь на арене, описано в справочнике. Удачи!",
+       "text_en": "Esc pauses. Everything you meet on the arena is in the handbook. Good luck!"}
+    ]
+  }
 }

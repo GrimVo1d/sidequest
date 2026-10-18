@@ -18,6 +18,8 @@
   let codexTab = "items";
   let seen = {};             // codex ids the player has met in any match: no second hint
   let tips = [], tip = null;
+  let lesson = null;         // the first match's tutorial, while it goes on
+  let taught = true;         // the tutorial has been passed (or the player has matches already)
   let shownEvents = {};      // the deploy and the incident whose hint has been shown
   let lastDraw = 0, acc = 0, hudAt = 0;
   let choicesKey = "";
@@ -150,6 +152,7 @@
     cls = LCSClasses.isOpen(balance, prefs.cls, got) ? prefs.cls : "developer";
     meta = LCSMeta.clean(await Sidequest.storage.get("meta"), balance);
     seen = (await Sidequest.storage.get("seen")) || {};
+    taught = records.totals.matches > 0 || Boolean(await Sidequest.storage.get("tutorial"));
     ghostRecords = LCSProgress.addGhost(await Sidequest.storage.get("ghosts"), {});
     days = LCSProgress.addDay(await Sidequest.storage.get("days"), {});
     try { ghostList = await Sidequest.history.sessions(); } catch (e) { ghostList = []; }
@@ -371,6 +374,11 @@
     codexFrom = null;
     tips = [];
     tip = null;
+    // The next campaign stage goes on with the lesson where it was.
+    if (!carry) {
+      lesson = taught ? null : LCSTutorial.create(balance.tutorial,
+                                                  {ability: Boolean(game.state.cls.ability), agent: mode === "agent"});
+    }
     shownEvents = {};
     $("tip").hidden = true;
     choicesKey = "";
@@ -799,6 +807,17 @@
     }
   }
 
+  function showTip(iconName, title, text) {
+    const icon = $("tip-icon"), src = iconCanvas(iconName, 40);
+    icon.width = src.width;
+    icon.height = src.height;
+    icon.getContext("2d").drawImage(src, 0, 0);
+    icon.style.width = src.style.width;
+    icon.style.height = src.style.height;
+    $("tip-title").textContent = title;
+    $("tip-text").textContent = t(...text);
+  }
+
   // The first time ever the player meets an item or an enemy: a hint for a few seconds of
   // game time, one after another. What was shown is remembered in the game's saves.
   // An arena event gets its hint every time it starts, right away: it is easy to forget
@@ -821,20 +840,25 @@
       }
       shownEvents[id] = s[id];
     }
-    if (tip && s.time >= tip.until) tip = null;
-    if (!tip && tips.length) {
+    // The tutorial's step holds the hint box until its goal is met; the hints about items and
+    // enemies wait for it, an arena event's hint goes first.
+    const step = lesson && lesson.update(s);
+    if (lesson && lesson.done) {
+      lesson = null;
+      taught = true;
+      Sidequest.storage.set("tutorial", Date.now());
+    }
+    const urgent = tips.length > 0 && tips[0].kind === "event";
+    if (tip && (tip.step ? !step || urgent : s.time >= tip.until)) tip = null;
+    if (!tip && tips.length && (urgent || !step)) {
       const e = tips.shift();
       tip = {until: s.time + TIP_SECONDS};
-      const icon = $("tip-icon"), src = iconCanvas(e.icon, 40);
-      icon.width = src.width;
-      icon.height = src.height;
-      icon.getContext("2d").drawImage(src, 0, 0);
-      icon.style.width = src.style.width;
-      icon.style.height = src.style.height;
-      $("tip-title").textContent = (e.kind === "enemy" ? t("Новый враг: ", "New enemy: ")
-                                    : e.kind === "event" ? t("Событие: ", "Event: ")
-                                    : t("Новое: ", "New: ")) + t(...e.name);
-      $("tip-text").textContent = t(...e.text);
+      showTip(e.icon, (e.kind === "enemy" ? t("Новый враг: ", "New enemy: ")
+                       : e.kind === "event" ? t("Событие: ", "Event: ")
+                       : t("Новое: ", "New: ")) + t(...e.name), e.text);
+    } else if (step && (!tip || (tip.step && tip.step !== step.id))) {
+      tip = {step: step.id};
+      showTip(step.icon, `${t("Обучение", "Tutorial")} ${step.index + 1}/${step.count}: ${t(...step.name)}`, step.text);
     }
     $("tip").hidden = !tip;
   }
