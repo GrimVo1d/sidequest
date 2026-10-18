@@ -26,9 +26,10 @@ class TutorialTest(unittest.TestCase):
             cls.steps = json.load(f)["tutorial"]["steps"]
 
     def test_steps_come_in_order_and_skip_what_does_not_apply(self):
-        ids = [st["id"] for st in self.steps]
+        # The Junior plays with an agent: no crystals there, the agent's work brings experience.
+        ids = [st["id"] for st in self.steps if st.get("only") != "gems"]
         self.assertEqual(self.result["junior"]["order"], ids)
-        plain = [st["id"] for st in self.steps if not st.get("only")]
+        plain = [st["id"] for st in self.steps if st.get("only") in (None, "gems")]
         self.assertEqual(self.result["developer"]["order"], plain)
         at = self.result["developer"]["at"]
         self.assertEqual([at[i]["index"] for i in plain], list(range(len(plain))))
@@ -46,8 +47,27 @@ class TutorialTest(unittest.TestCase):
             junior["pause"]["time"] - junior["agent"]["time"], need["agent"]["seconds"] - 0.05
         )
 
+    def test_the_allies_step_needs_an_agent_on_the_field(self):
+        self.assertGreater(self.result["allies"], 0)
+        alone = self.result["alone"]
+        self.assertNotIn("agent", alone["order"])
+        self.assertTrue(alone["done"])
+        # Counted without the skipped step: 1/N .. N/N with no gap.
+        n = len(alone["order"])
+        self.assertEqual([alone["at"][i]["index"] for i in alone["order"]], list(range(n)))
+        self.assertTrue(all(alone["at"][i]["count"] == n for i in alone["order"]))
+
+    def test_taught_entries_and_walking(self):
+        covers = {c for st in self.steps for c in st.get("covers", [])}
+        self.assertEqual(set(self.result["covers"]), covers)
+        plain = {
+            c for st in self.steps if st.get("only") in (None, "gems") for c in st.get("covers", [])
+        }
+        self.assertEqual(set(self.result["plainCovers"]), plain)
+        self.assertEqual(self.result["jump"], "move")
+
     def test_the_tutorial_ends(self):
-        for name in ("developer", "junior"):
+        for name in ("developer", "junior", "alone"):
             r = self.result[name]
             self.assertTrue(r["done"], name)
             self.assertIsNone(r["after"], name)

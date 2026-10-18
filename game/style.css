@@ -88,11 +88,9 @@ button.primary { background: var(--btn-primary); }
 #tip { position: fixed; left: 50%; bottom: 154px; transform: translateX(-50%); width: 420px;
   display: flex; gap: 10px; align-items: center; padding: 8px 10px; background: var(--panel);
   border: 2px solid var(--title); box-shadow: 3px 3px 0 var(--edge); }
-/* On a short field the hero in the middle would sit under the tip: it goes up, under the
-   boss bars and the allies (main.js says how far down). */
-@media (max-height: 560px) {
-  #tip { top: max(64px, calc(var(--clear-top, 0px) + 8px)); bottom: auto; }
-}
+/* Near the hero in the middle (a short window, a big interface) the tip goes up, under the
+   boss bars and the allies (main.js, placeTip, says when and how far down). */
+#tip.raised { top: max(64px, calc(var(--clear-top, 0px) + 8px)); bottom: auto; }
 /* The pause, the handbook and the results cover the match: the tip and the notice wait
    under them unseen. */
 body:has(.screen:not([hidden])) :is(#tip, #notice) { display: none; }
@@ -322,5 +320,6 @@ input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 1p
 .screen h1, .screen h2 { font: 24px/1.2 var(--pixel); }
 .screen h3, #tip-title { font: 16px/1.3 var(--pixel); }
 #top, #notice { font-family: var(--pixel); font-size: 16px; }
-.menu-actions button, #esc button, #results button, #modal-actions button { font: 16px/1.2 var(--pixel); }
+.menu-actions button, #esc button, #results button, #modal-actions button,
+.screen > button[id$="-back"] { font: 16px/1.2 var(--pixel); }
 #results-score { font: 32px/1.1 var(--pixel); }

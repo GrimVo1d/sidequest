@@ -1,12 +1,13 @@
 // The arena: records and achievements. No DOM and no storage here: main.js
 // reads and saves through the SDK, tests run this in jsc.
 //   records = LCSProgress.addMatch(records, results)   // only for counted matches
-//   LCSProgress.earned(balance.achievements, results, records, mapIds)  // ids, met now
+//   known = LCSProgress.known(balance, LCS_MAPS)        // the maps and classes that exist
+//   LCSProgress.earned(balance.achievements, results, records, known)   // ids, met now
 //   days = LCSProgress.addDay(days, results)            // the daily task: best score per day
 //   LCSProgress.streak(days, "2026-10-09")              // days in a row up to that day
 //   ghosts = LCSProgress.addGhost(ghosts, results)      // best score per replayed session
 //   bests = LCSProgress.addBests(bests, balance.achievements, results)   // best single match
-//   LCSProgress.progressOf(achievement, records, bests, mapIds)   // how far a locked one is
+//   LCSProgress.progressOf(achievement, records, bests, known)    // how far a locked one is
 "use strict";
 
 (function (root) {
@@ -114,9 +115,14 @@
   // A condition holds when every part of it holds:
   //   min / max: {field: n} on the match results, is: {field: value},
   //   total_min: {field: n} on the totals after the match, maps_all: every map played,
-  //   kinds_min: {field: n} — that many different maps or classes played.
-  const kinds = (records, field) => Object.values(records.totals[field] || {}).filter((n) => n > 0).length;
-  function holds(when, res, records, mapIds) {
+  //   kinds_min: {field: n} — that many different maps or classes played; only the ones that
+  //   exist count, not a name left in the saves by an older version.
+  const kinds = (records, field, known) =>
+    (known[field] || []).filter((id) => records.totals[field] && records.totals[field][id] > 0).length;
+  function known(balance, maps) {
+    return {maps: maps.map((m) => m.id), classes: (balance.classes || []).map((c) => c.id)};
+  }
+  function holds(when, res, records, ids) {
     const w = when || {};
     for (const [k, n] of Object.entries(w.min || {})) if (!((res[k] || 0) >= n)) return false;
     for (const [k, n] of Object.entries(w.max || {})) if (!((res[k] || 0) <= n)) return false;
@@ -124,13 +130,13 @@
     for (const [k, n] of Object.entries(w.total_min || {})) {
       if (!((records.totals[k] || 0) >= n)) return false;
     }
-    if (w.maps_all && !mapIds.every((id) => records.totals.maps[id] > 0)) return false;
-    for (const [k, n] of Object.entries(w.kinds_min || {})) if (kinds(records, k) < n) return false;
+    if (w.maps_all && !ids.maps.every((id) => records.totals.maps[id] > 0)) return false;
+    for (const [k, n] of Object.entries(w.kinds_min || {})) if (kinds(records, k, ids) < n) return false;
     return true;
   }
 
-  function earned(list, res, records, mapIds) {
-    return list.filter((a) => holds(a.when, res, records, mapIds)).map((a) => a.id);
+  function earned(list, res, records, ids) {
+    return list.filter((a) => holds(a.when, res, records, ids)).map((a) => a.id);
   }
 
   // The best of single matches, for the fields that achievements ask of one match: the
@@ -149,21 +155,20 @@
   // How far a locked achievement is: {field, have, need, of} with `of` "match" (the best
   // match), "total" (all matches) or maps played, or null when there is nothing to count: a
   // condition on how the match ended, several conditions at once, or a single step.
-  function progressOf(a, records, bests, mapIds) {
+  function progressOf(a, records, bests, ids) {
     const w = a.when || {};
     if (w.is || w.max) return null;
     const parts = [
       ...Object.entries(w.min || {}).map(([k, n]) => ({field: k, have: bests[k] || 0, need: n, of: "match"})),
       ...Object.entries(w.total_min || {}).map(([k, n]) => ({field: k, have: records.totals[k] || 0, need: n, of: "total"})),
-      ...Object.entries(w.kinds_min || {}).map(([k, n]) => ({field: k, have: kinds(records, k), need: n, of: "total"}))];
+      ...Object.entries(w.kinds_min || {}).map(([k, n]) => ({field: k, have: kinds(records, k, ids), need: n, of: "total"}))];
     if (w.maps_all) {
-      parts.push({field: "maps", have: mapIds.filter((id) => records.totals.maps[id] > 0).length,
-                  need: mapIds.length, of: "total"});
+      parts.push({field: "maps", have: kinds(records, "maps", ids), need: ids.maps.length, of: "total"});
     }
     if (parts.length !== 1 || !(parts[0].need > 1)) return null;
     const p = parts[0];
     return Object.assign(p, {have: Math.min(p.have, p.need)});
   }
 
-  root.LCSProgress = {migrate, addMatch, earned, addBests, progressOf, addDay, streak, addGhost, MODES};
+  root.LCSProgress = {migrate, addMatch, known, earned, addBests, progressOf, addDay, streak, addGhost, MODES};
 })(typeof window !== "undefined" ? window : globalThis);

@@ -151,6 +151,8 @@ class ClassesTest(unittest.TestCase):
         self.assertEqual(a["classes"], sorted(self.classes))
         self.assertTrue(a["safe"])
         self.assertEqual(a["abilities"], 3)
+        # Six names in the saves that are no classes do not make "Full stack".
+        self.assertEqual(self.result["strangers"], 0)
 
 
 if __name__ == "__main__":

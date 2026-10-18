@@ -494,7 +494,7 @@ window.addEventListener("keydown", (e) => {
   e.stopImmediatePropagation();
   if (e.code === "Escape" && overlay === $("agent")) { closeAgent(); e.preventDefault(); return; }
   if (e.code === "Escape" && overlay === $("modal")) { closeModal(); e.preventDefault(); return; }
-  SidequestKeys.handle(e, overlay);
+  SidequestKeys.handle(e, overlay, {rows: overlay === $("modal")});
 }, true);
 
 window.addEventListener("error", (e) => {

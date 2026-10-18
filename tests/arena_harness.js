@@ -699,7 +699,7 @@ result.arsenal.level_text = LCS.levelText(balance.weapons.find((w) => w.id === "
   let ghosts = P.addGhost(null, {ghost: "s1", score: 300, at: 5});
   ghosts = P.addGhost(ghosts, {ghost: "s1", score: 200, at: 6});
   ghosts = P.addGhost(ghosts, {ghost: "s2", score: 50, at: 7});
-  const ids = LCS_MAPS.map((x) => x.id);
+  const ids = LCSProgress.known(balance, LCS_MAPS);
   const ach = (res) => P.earned(balance.achievements, res, P.addMatch(null, res), ids);
   const base = Object.assign({}, result.busy_two.results);
   r.progress = {days, streak_today: P.streak(days, "2026-10-09"), streak_tomorrow: P.streak(days, "2026-10-10"),
@@ -981,14 +981,14 @@ result.bestiary = {};
 
 // --- records and achievements --------------------------------------------------------------
 {
-  const P = LCSProgress, ids = LCS_MAPS.map((m) => m.id);
+  const P = LCSProgress, ids = P.known(balance, LCS_MAPS);
   const old = {best_score: 900, best_time: 300, best_level: 7, matches: 3, kills: 400};
   const migrated = P.migrate(old);
   const junk = P.migrate({agent: {best_score: "x"}, totals: {maps: {open: "y", legacy: 2}}});
   const won = Object.assign({}, result.classic.final.results);
   let r = P.addMatch(old, won);
   const afterWin = P.earned(balance.achievements, won, r, ids);
-  for (const id of ids) r = P.addMatch(r, Object.assign({}, won, {map: id, reason: "dead", bosses: 0}));
+  for (const id of ids.maps) r = P.addMatch(r, Object.assign({}, won, {map: id, reason: "dead", bosses: 0}));
   const tourist = P.earned(balance.achievements, Object.assign({}, won, {reason: "dead"}), r, ids);
   const busy = result.busy_two.results;
   const ach = P.earned(balance.achievements, busy, P.addMatch(null, busy), ids);

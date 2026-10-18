@@ -4,8 +4,10 @@
 (function () {
   const $ = (id) => document.getElementById(id);
   const t = SidequestI18n.t, tf = SidequestI18n.field;
+  const secondsLeft = (n) => Math.ceil(n) + t(" с", "s");   // a countdown in the HUD
   const STEP = 1 / 60;
   const TIP_SECONDS = 6;
+  const TIP_BOTTOM = 154;   // the tip's place above the bottom panel (style.css, #tip)
   const MAX_STEPS = 5;  // per frame; after a long stall the game slows down instead of jumping
 
   let balance = null;
@@ -325,7 +327,7 @@
       await Sidequest.storage.set("ghosts", ghostRecords);
     }
     const got = before.got;
-    const fresh = LCSProgress.earned(balance.achievements, res, records, LCS_MAPS.map((m) => m.id))
+    const fresh = LCSProgress.earned(balance.achievements, res, records, LCSProgress.known(balance, LCS_MAPS))
       .filter((id) => !got[id]);
     for (const id of fresh) got[id] = Date.now();
     if (fresh.length) await Sidequest.storage.set("achievements", got);
@@ -376,8 +378,8 @@
     tip = null;
     // The next campaign stage goes on with the lesson where it was.
     if (!carry) {
-      lesson = taught ? null : LCSTutorial.create(balance.tutorial,
-                                                  {ability: Boolean(game.state.cls.ability), agent: mode === "agent"});
+      const has = {ability: Boolean(game.state.cls.ability), agent: mode === "agent", gems: mode !== "agent"};
+      lesson = taught ? null : LCSTutorial.create(balance.tutorial, has);
     }
     shownEvents = {};
     $("tip").hidden = true;
@@ -589,7 +591,7 @@
       message = `${t("Этап", "Stage")} ${s.stage.index + 1}/${s.stage.count}: ${tf(s.map, "name")}`;
     } else if (s.finaleAt !== null) {
       message = t("Все задачи готовы — финал через ", "All tasks done — the finale in ")
-        + Math.ceil(s.finaleAt - s.time);
+        + secondsLeft(s.finaleAt - s.time);
     } else if (!s.everAlly && s.mode === "ghost") {
       message = t("Призрак сессии вот-вот появится", "The session ghost is about to appear");
     } else if (!s.everAlly && s.mode === "agent") {
@@ -604,7 +606,7 @@
   function activeBuffs(s) {
     const I = balance.items, AG = balance.agent, p = s.player, list = [];
     const timed = (id, icon, name, left, total, kind) =>
-      list.push({id, icon, cls: kind, text: `${name} ${Math.ceil(left)}`, ending: left / total < 0.25});
+      list.push({id, icon, cls: kind, text: `${name} ${secondsLeft(left)}`, ending: left / total < 0.25});
     const ability = screens.abilityChip(s);
     if (ability) list.push(ability);
     if (s.buffs.coffee > 0) timed("coffee", "coffee", t("кофе", "coffee"), s.buffs.coffee, I.coffee.seconds);
@@ -613,10 +615,10 @@
     if (s.rage > 0) timed("rage", null, t("ЯРОСТЬ", "RAGE"), s.rage, balance.rage.seconds, "red");
     if (s.redCi > 0) timed("red-ci", "red_ci", t("КРАСНЫЙ CI", "RED CI"), s.redCi, AG.red_ci.seconds, "red");
     if (s.orchestra) list.push({id: "orchestra", icon: "orchestra", cls: "violet", text: t("ОРКЕСТР", "ORCHESTRA")});
-    if (s.deploy) list.push({id: "deploy", cls: "orange", text: t("ДЕПЛОЙ ", "DEPLOY ") + Math.ceil(s.deploy.left)});
+    if (s.deploy) list.push({id: "deploy", cls: "orange", text: t("ДЕПЛОЙ ", "DEPLOY ") + secondsLeft(s.deploy.left)});
     if (s.incident) {
       list.push({id: "incident", cls: "red", text: t("ИНЦИДЕНТ ", "INCIDENT ")
-        + `${Math.floor(s.incident.held)}/${balance.events.incident.hold} · ${Math.ceil(s.incident.left)}`});
+        + `${Math.floor(s.incident.held)}/${balance.events.incident.hold} · ${secondsLeft(s.incident.left)}`});
     }
     return list;
   }
@@ -828,7 +830,8 @@
   }
 
   // The first time ever the player meets an item or an enemy: a hint for a few seconds of
-  // game time, one after another. What was shown is remembered in the game's saves.
+  // game time, one after another. What was shown is remembered in the game's saves; what the
+  // tutorial teaches gets no hint of its own.
   // An arena event gets its hint every time it starts, right away: it is easy to forget
   // what a deploy or an incident wants from you.
   function updateTips() {
@@ -839,7 +842,7 @@
       seen[id] = Date.now();
       fresh = true;
       const entry = LCSCodex.entry(balance, id);
-      if (entry && entry.kind !== "event") tips.push(entry);
+      if (entry && entry.kind !== "event" && !(lesson && lesson.covers.has(id))) tips.push(entry);
     }
     if (fresh) Sidequest.storage.set("seen", seen);
     for (const id of ["deploy", "incident"]) {
@@ -872,14 +875,16 @@
     $("tip").hidden = !tip;
   }
 
-  // How far down a tip raised on a short field must stay: under the boss bars, and under the
-  // allies when it is wide enough to reach them. The width comes from CSS even while hidden.
-  function tipClearance() {
+  // The tip sits above the bottom panel unless it would come near the hero in the middle (a
+  // short window or a big interface): then it goes up, under the boss bars, and under the
+  // allies when it is wide enough to reach them. The HUD is zoomed, the arena is not.
+  function placeTip() {
+    const el = $("tip"), k = parseFloat(document.documentElement.style.getPropertyValue("--ui-scale")) || 1;
+    el.classList.toggle("raised", innerHeight - (TIP_BOTTOM + (el.offsetHeight || 80)) * k < innerHeight / 2 + 90);
     let y = renderer.bossBarsBottom();
     const list = $("allies").getBoundingClientRect();
-    const tipLeft = (innerWidth - parseFloat(getComputedStyle($("tip")).width)) / 2;
-    if (list.height && list.right > tipLeft) y = Math.max(y, list.bottom);
-    return Math.ceil(y);
+    if (list.height && list.right > (innerWidth - el.offsetWidth * k) / 2) y = Math.max(y, list.bottom);
+    el.style.setProperty("--clear-top", Math.ceil(y / k) + "px");
   }
 
   // --- the loop ---------------------------------------------------------------------
@@ -915,7 +920,7 @@
       hudAt = now;
       updateHud();
       updateTips();
-      $("tip").style.setProperty("--clear-top", tipClearance() + "px");
+      placeTip();
     }
     if (game.state.over) endMatch();
   }

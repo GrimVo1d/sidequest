@@ -71,7 +71,7 @@
       const earned = earnedList(got);
       const share = (x) => (x.p ? x.p.have / x.p.need : -1);
       const locked = balance.achievements.filter((a) => !got[a.id])
-        .map((a) => ({a, p: LCSProgress.progressOf(a, records, bests, LCS_MAPS.map((m) => m.id))}))
+        .map((a) => ({a, p: LCSProgress.progressOf(a, records, bests, LCSProgress.known(balance, LCS_MAPS))}))
         .sort((x, y) => share(y) - share(x));
       const item = (a, done, note, p) => {
         const li = el("li", null, done ? "got" : "");
@@ -170,8 +170,9 @@
       const A = LCSClasses.byId(balance, s.cls.id).ability;
       const left = s.cls.ready - s.time;
       const active = s.time < s.cls.until;
-      return {id: "ability" + (left > 0 ? "-wait" : "") + (active ? "-on" : ""), cls: left > 0 && !active ? "dim" : "pink",
-              text: `${tf(A, "name")} · ` + (left > 0 && !active ? Math.ceil(left) : t(...KEY))};
+      const waiting = left > 0 && !active;
+      return {id: "ability" + (left > 0 ? "-wait" : "") + (active ? "-on" : ""), cls: waiting ? "dim" : "pink",
+              text: `${tf(A, "name")} · ` + (waiting ? Math.ceil(left) + t(" с", "s") : t(...KEY))};
     }
 
     return {achievements, awards, classes, stars, found, abilityChip};
