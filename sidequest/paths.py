@@ -35,8 +35,8 @@ def ensure_data_dir(data_dir: str = DATA_DIR) -> None:
 
 
 def migrate_game_data(data_dir: str = DATA_DIR) -> None:
-    """Move the saves to where the game keeps them now (once): before 0.7 the game was
-    the DLC "last-commit-standing" of a hub with several games."""
+    """Move the saves to where the game keeps them now (once): before 0.7 they lived in
+    data/dlc/last-commit-standing."""
     old = os.path.join(data_dir, "dlc", "last-commit-standing")
     new = os.path.join(data_dir, "game")
     # A link is left alone: moved, it would take the saves out of the project.
@@ -46,8 +46,8 @@ def migrate_game_data(data_dir: str = DATA_DIR) -> None:
 
 
 def delete_game_data(game_dir: str) -> None:
-    """Delete the game's saves and, next to them, the saves of the DLCs the project had
-    before 0.7. A link in their place is removed itself, never what it points to."""
+    """Delete the game's saves and, next to them, the old data/dlc folder from before 0.7.
+    A link in their place is removed itself, never what it points to."""
     for target in (game_dir, os.path.join(os.path.dirname(game_dir), "dlc")):
         if os.path.islink(target):
             os.unlink(target)
