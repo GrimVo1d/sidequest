@@ -348,21 +348,39 @@ class ArenaTest(unittest.TestCase):
         self.assertEqual(final["results"]["reason"], "win")
         self.assertEqual(final["results"]["bosses"], 1)
 
-    def test_chest_offers_each_piece_of_gear_once(self):
-        gear = self.result["gear"]
-        n = len(self.balance["gear"])
-        for offer in gear["offers"][:n]:
-            self.assertEqual(offer["kind"], "chest")
-            self.assertTrue(offer["gear"])
-            self.assertGreaterEqual(offer["n"], 1)
-        self.assertEqual(gear["offers"][n]["kind"], None)  # nothing left: score instead
-        self.assertEqual(gear["unique"], n)
-        for g in self.balance["gear"]:
+    def test_chest_offers_new_gear_then_levels_and_rare_pieces(self):
+        gear, top = self.result["gear"], self.balance["chest"]["max_level"]
+        pieces = {g["id"]: g for g in self.balance["gear"]}
+        usual = [g for g in pieces.values() if not g.get("rare")]
+        self.assertGreaterEqual(len(pieces) - len(usual), 4)
+        total = len(pieces) * top
+        offers = gear["offers"]
+        for i, offer in enumerate(offers[:total]):
+            with self.subTest(chest=i):
+                self.assertEqual(offer["kind"], "chest")
+                self.assertTrue(all(c["gear"] for c in offer["cards"]))
+                self.assertEqual(len({c["id"] for c in offer["cards"]}), offer["n"])
+                self.assertLessEqual(offer["n"], 3)
+                if i < len(usual):  # the usual pieces first, nothing else
+                    self.assertTrue(all(c["level"] == 1 and not c["rare"] for c in offer["cards"]))
+                for c in offer["cards"]:
+                    self.assertLessEqual(c["level"], top)
+                    if c["level"] > 1:
+                        self.assertEqual(c["text_en"], pieces[c["id"]]["up"]["text_en"])
+        self.assertEqual(offers[: len(usual)][0]["n"], 3)
+        self.assertTrue(any(c["rare"] for o in offers[len(usual) : total] for c in o["cards"]))
+        self.assertEqual(offers[total]["kind"], None)  # nothing left: score instead
+        self.assertEqual(gear["unique"], len(pieces))
+        self.assertEqual(gear["levels"], dict.fromkeys(pieces, top))
+        for g in pieces.values():
             with self.subTest(g["id"]):
+                up, ups = g["up"], top - 1
                 before, after = gear["before"][g["stat"]], gear["after"][g["stat"]]
-                expected = before * g.get("mul", 1) + g.get("add", 0)
+                expected = before * g.get("mul", 1) * up.get("mul", 1) ** ups
+                expected += g.get("add", 0) + up.get("add", 0) * ups
                 self.assertAlmostEqual(after, expected)
-        self.assertEqual(gear["shield"], 1)
+        sticker = pieces["sticker"]
+        self.assertEqual(gear["shield"], sticker["shield"] + sticker["up"]["shield"] * (top - 1))
         self.assertEqual(gear["level_first"], "level")
         self.assertIsNone(gear["choices_left"])
         self.assertEqual(gear["pending"], 0)
@@ -371,11 +389,23 @@ class ArenaTest(unittest.TestCase):
         self.assertEqual(self.result["boss_chest"], {"dead": True, "chest": True, "medkit": True})
 
     def test_every_map_has_its_own_enemy(self):
-        special = {"open": "race", "monorepo": "leak", "legacy": "deprecated", "hotfix": "nullptr"}
+        special = {
+            "open": "race",
+            "monorepo": "leak",
+            "legacy": "deprecated",
+            "hotfix": "nullptr",
+            "prod": "regression",
+            "micro": "micro",
+            "cicd": "flaky",
+            "cloud": "scope",
+            "night": "offbyone",
+        }
+        # The first four live only on their own map; the newer maps make a usual bug common.
+        own = {k: special[k] for k in ("open", "monorepo", "legacy", "hotfix")}
         for name, match in self.result["maps"].items():
             with self.subTest(name):
                 self.assertIn(special[name], match["types"])
-                others = set(special.values()) - {special[name]}
+                others = set(own.values()) - {special[name]}
                 self.assertFalse(others & set(match["types"]))
 
     def test_new_enemies(self):
@@ -504,12 +534,13 @@ class ArenaTest(unittest.TestCase):
         r = self.result["progress"]["records"]
         won = self.result["classic"]["final"]["results"]
         self.assertEqual(r["agent"]["matches"], 3)
-        self.assertEqual(r["classic"]["matches"], 1 + 4)
+        maps = len(self.result["maps"])
+        self.assertEqual(r["classic"]["matches"], 1 + maps)
         self.assertEqual(r["classic"]["wins"], 1)
         self.assertEqual(r["classic"]["best_score"], won["score"])
-        self.assertEqual(r["totals"]["matches"], 3 + 5)
+        self.assertEqual(r["totals"]["matches"], 3 + 1 + maps)
         self.assertEqual(r["totals"]["bosses"], 1)
-        self.assertEqual(sum(r["totals"]["maps"].values()), 5)
+        self.assertEqual(sum(r["totals"]["maps"].values()), 1 + maps)
 
     def test_achievements(self):
         p = self.result["progress"]
@@ -593,6 +624,9 @@ class ArenaArtTest(unittest.TestCase):
             ids["work"], ["commit", "push", "turret", "tests", "red_ci", "reviewer", "orchestra"]
         )
         self.assertIn("spirit_plan", ids["allies"])
+        self.assertEqual(
+            ids["map"], ["door", "crack", "rack", "belt", "pit", "pad", "vent", "dark"]
+        )
         # Every enemy has a first-time hint, except the small leak (part of the big one).
         self.assertEqual(ids["events"], ["deploy", "incident"])
         for enemy in (

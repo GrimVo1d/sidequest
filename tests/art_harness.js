@@ -30,8 +30,10 @@ load(GAME + "/sprites.js");
 load(GAME + "/hero.js");
 load(GAME + "/font.js");
 load(GAME + "/terrain.js");
+load(GAME + "/build.js");
 load(GAME + "/game.js");
 load(GAME + "/themes.js");
+load(GAME + "/terrain-art.js");
 load(GAME + "/render.js");
 load(GAME + "/codex.js");
 const balance = JSON.parse(readFile(GAME + "/balance.json"));
@@ -280,7 +282,8 @@ for (const sec of LCSCodex.sections(balance)) {
 }
 const hints = ["medkit", "coffee", "duck", "shield", "chest", "gem", "rage", "commit", "push",
                "turret", "tests", "red_ci", "reviewer", "orchestra", "spirit_shooter",
-               "spirit_scout", "spirit_plan", "elite", "deploy", "incident"]
+               "spirit_scout", "spirit_plan", "elite", "deploy", "incident",
+               "door", "crack", "rack", "belt", "pit", "pad", "vent", "dark"]
   .concat(Object.keys(balance.enemies), ["final"])
   .filter((id) => !LCSCodex.entry(balance, id));
 // Several live bosses: one bar each, stacked, so the bars end lower than with one boss.

@@ -227,6 +227,17 @@
                  "fail_rage": 10}
   },
 
+  "terrain": {
+    "door":  {"open": 10, "closed": 6, "warn": 1.5},
+    "crack": {"hp": 200},
+    "rack":  {"hp": 30, "radius": 70, "damage": 60, "player_damage": 15, "back": 40},
+    "belt":  {"speed": 45},
+    "pit":   {"knockback": 24},
+    "pad":   {"radius": 12, "cooldown": 1},
+    "vent":  {"every": 8, "warn": 1.5, "burn": 2.5, "damage": 8, "enemy_dps": 30},
+    "dark":  {"light": 110, "ally_light": 60}
+  },
+
   "spawn": {
     "base_per_second": 0.6, "per_minute": 0.02, "per_level": 0.1, "max_per_second": 3,
     "max_alive": 250,
@@ -267,25 +278,50 @@
     "magnet": 40, "gem_speed": 260, "max_gems": 300, "empty_chest_score": 500
   },
 
+  "chest": {"max_level": 3},
   "gear": [
     {"id": "keyboard",   "name": "Механическая клавиатура", "text": "всё оружие стреляет на 20% чаще",
      "name_en": "Mechanical keyboard", "text_en": "every weapon fires 20% more often",
-     "stat": "cooldown", "mul": 0.8},
+     "stat": "cooldown", "mul": 0.8,
+     "up": {"mul": 0.9, "text": "стреляешь ещё на 10% чаще", "text_en": "fire 10% more often again"}},
     {"id": "monitor",    "name": "Второй монитор",   "text": "предметы и опыт подбираются издалека",
      "name_en": "Second monitor", "text_en": "items and experience are picked up from afar",
-     "stat": "pickup", "add": 40},
+     "stat": "pickup", "add": 40,
+     "up": {"add": 20, "text": "подбираешь ещё дальше", "text_en": "pick things up from even farther"}},
     {"id": "headphones", "name": "Наушники с шумодавом", "text": "ярость врагов вдвое короче",
      "name_en": "Noise-cancelling headphones", "text_en": "enemy rage lasts half as long",
-     "stat": "rage", "mul": 0.5},
+     "stat": "rage", "mul": 0.5,
+     "up": {"mul": 0.7, "text": "ярость ещё на 30% короче", "text_en": "rage is 30% shorter again"}},
     {"id": "chair",      "name": "Эргономичное кресло", "text": "+30 к здоровью и полное лечение",
      "name_en": "Ergonomic chair", "text_en": "+30 health and a full heal",
-     "stat": "max_hp", "add": 30, "heal": true},
+     "stat": "max_hp", "add": 30, "heal": true,
+     "up": {"add": 15, "heal": true, "text": "+15 к здоровью и полное лечение",
+            "text_en": "+15 health and a full heal"}},
     {"id": "sticker",    "name": "Стикер с котиком", "text": "+1 к щиту: сразу и с каждым щитом",
      "name_en": "Cat sticker", "text_en": "+1 shield: right away and with every shield",
-     "stat": "shield_bonus", "add": 1, "shield": 1},
+     "stat": "shield_bonus", "add": 1, "shield": 1,
+     "up": {"shield": 2, "text": "+2 к щиту сразу", "text_en": "+2 shield right away"}},
     {"id": "thermos",    "name": "Термокружка",      "text": "кофе действует вдвое дольше",
      "name_en": "Thermo mug", "text_en": "coffee lasts twice as long",
-     "stat": "coffee", "mul": 2}
+     "stat": "coffee", "mul": 2,
+     "up": {"mul": 1.25, "text": "кофе ещё на 25% дольше", "text_en": "coffee lasts 25% longer again"}},
+
+    {"id": "standing_desk", "rare": true, "name": "Стол для работы стоя", "text": "ходишь на 15% быстрее",
+     "name_en": "Standing desk", "text_en": "you move 15% faster",
+     "stat": "speed", "mul": 1.15,
+     "up": {"mul": 1.05, "text": "ещё на 5% быстрее", "text_en": "5% faster again"}},
+    {"id": "cactus",     "rare": true, "name": "Кактус у монитора", "text": "каждая пуля пробивает ещё одного врага",
+     "name_en": "Desk cactus", "text_en": "every bullet goes through one more enemy",
+     "stat": "pierce", "add": 1,
+     "up": {"add": 1, "text": "пробивает ещё одного", "text_en": "goes through one more"}},
+    {"id": "plaid",      "rare": true, "name": "Плед", "text": "+1 здоровья в секунду",
+     "name_en": "Cozy plaid", "text_en": "+1 health a second",
+     "stat": "regen", "add": 1,
+     "up": {"add": 1, "text": "ещё +1 здоровья в секунду", "text_en": "+1 more health a second"}},
+    {"id": "homelab",    "rare": true, "name": "Домашний сервер", "text": "агенты бьют на 30% сильнее",
+     "name_en": "Home lab", "text_en": "agents hit 30% harder",
+     "stat": "ally_damage", "mul": 1.3,
+     "up": {"mul": 1.1, "text": "агенты бьют ещё на 10% сильнее", "text_en": "agents hit 10% harder again"}}
   ],
 
   "achievements": [

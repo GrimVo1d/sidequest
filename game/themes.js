@@ -75,7 +75,76 @@
       top: (lx, ly, n, C) => (((lx + ly) >> 2) & 1 ? C.top : C.top2),
       face: (lx, fy, F, n, C) => (fy % 3 === 0 ? C.faceLine : C.face),
     },
+    // Production: a tread plate floor; machines with hazard stripes on top.
+    factory: {
+      colors: {a: "#2b2a2e", b: "#29282c", seam: "#1e1d21", stud: "#3a393f", studLo: "#201f23",
+               oil: "#3d3524", top: "#4a4650", top2: "#c9a43a", edge: "#5e5a66", face: "#36333c",
+               faceLine: "#2a2830", frame: "#36333c"},
+      floor(x, y, n, C) {
+        if ((x & 31) === 0 || (y & 31) === 0) return C.seam;
+        const sx = (x + ((y >> 3) & 1) * 4) & 7, sy = y & 7;
+        if (sx === 2 || sx === 3) {
+          if (sy === 3) return C.stud;
+          if (sy === 4) return C.studLo;
+        }
+        if (n < 0.02) return C.oil;
+        return ((x >> 5) + (y >> 5)) & 1 ? C.a : C.b;
+      },
+      top: (lx, ly, n, C) => (ly < 5 && ((lx + ly) >> 2) & 1 ? C.top2 : C.top),
+      face: (lx, fy, F, n, C) => (fy % 3 === 0 ? C.faceLine : C.face),
+    },
+    // Microservices: small teal tiles, racks of little services for walls.
+    micro: {
+      colors: {a: "#1c2a30", b: "#1f2e35", seam: "#142026", hi: "#26383f", top: "#2e4a52",
+               top2: "#355660", edge: "#4a7a84", face: "#20363c", faceLine: "#182a30", frame: "#20363c"},
+      floor(x, y, n, C, tile, hash) {
+        const lx = x & 15, ly = y & 15;
+        if (lx === 0 || ly === 0) return C.seam;
+        if (lx === 1 || ly === 1) return C.hi;
+        return hash(x >> 4, y >> 4, 11) < 0.5 ? C.a : C.b;
+      },
+      top: (lx, ly, n, C) => (ly % 3 === 0 ? C.top2 : C.top),
+      face: (lx, fy, F, n, C) => (fy % 3 === 0 ? C.faceLine : C.face),
+    },
+    // CI/CD: concrete slabs with lane paint between the belts.
+    pipeline: {
+      colors: {a: "#272c2b", b: "#2a2f2e", seam: "#1f2322", speck: "#323837", paint: "#5a5530",
+               top: "#48524e", top2: "#3e4744", edge: "#66746e", face: "#333b38", faceLine: "#29302d",
+               frame: "#333b38"},
+      floor(x, y, n, C) {
+        if ((x & 63) === 0 || (y & 63) === 0) return C.seam;
+        if ((y & 127) === 96 && (x & 15) < 8) return C.paint;
+        if (n < 0.05) return C.speck;
+        return ((x >> 6) + (y >> 6)) & 1 ? C.a : C.b;
+      },
+      top: (lx, ly, n, C) => (lx % 6 === 0 ? C.top2 : C.top),
+      face: (lx, fy, F, n, C) => (fy % 3 === 0 ? C.faceLine : C.face),
+    },
+    // Cloud: a floor of puffs at dusk; the pits are holes in it down to the night sky.
+    cloud: {
+      colors: {a: "#4a5a7c", b: "#4d5e80", puff: "#5a6c90", puffHi: "#6a7ca0", shade: "#42506e",
+               top: "#8a9ac0", top2: "#7a8ab0", edge: "#a8b8d8", face: "#5a6a90", faceLine: "#4a5a80",
+               frame: "#3a4868"},
+      floor(x, y, n, C, tile, hash) {
+        const cx = Math.floor(x / 48), cy = Math.floor(y / 48), k = hash(cx, cy, 5);
+        if (k > 0.4) {
+          const ox = cx * 48 + 24 + (k - 0.7) * 30, oy = cy * 48 + 24, r = 10 + k * 12;
+          const d2 = (x - ox) ** 2 + (y - oy) ** 2;
+          if (d2 < r * r) return y < oy - r * 0.4 ? C.puffHi : C.puff;
+          if (d2 < (r + 2) ** 2 && y > oy) return C.shade;
+        }
+        return n < 0.5 ? C.a : C.b;
+      },
+      top: (lx, ly, n, C) => (n < 0.2 ? C.top2 : C.top),
+      face: (lx, fy, F, n, C) => (fy % 3 === 0 ? C.faceLine : C.face),
+    },
   };
+  // The night office: the office with the lights off.
+  THEMES.night = Object.assign({}, THEMES.office, {
+    colors: {a: "#171a2e", b: "#16192c", seam: "#121428", speck: "#1d2140", dot: "#101225",
+             top: "#2e3256", top2: "#2a2e50", edge: "#3c4270", face: "#22264a", base: "#1c1f3e",
+             frame: "#22264a"},
+  });
 
   function hash(x, y, seed) {
     let h = Math.imul(x | 0, 374761393) + Math.imul(y | 0, 668265263) + Math.imul(seed | 0, 1442695041);
@@ -95,7 +164,7 @@
     const dot = (x, y, color) => { cx.fillStyle = color; cx.fillRect(x, y, 1, 1); };
     for (let k = 0; k < count; k++) {
       const x = Math.floor(rand() * W), y = Math.floor(rand() * H), r = rand();
-      if (map.theme === "office") {
+      if (map.theme === "office" || map.theme === "night") {
         if (!free(x, y, 8, 8)) continue;
         if (r < 0.5) {  // a sticky note
           const color = ["#e8d36a", "#e86aa8", "#7fc8a0"][Math.floor(rand() * 3)];
@@ -116,7 +185,7 @@
             dot(Math.round(x + 4 + Math.cos(t) * 3), Math.round(y + 4 + Math.sin(t) * 3), "#3a2e44");
           }
         }
-      } else if (map.theme === "servers") {
+      } else if (map.theme === "servers" || map.theme === "micro") {
         if (r > 0.35 || !free(x, y, 4, 4)) continue;
         // A cable: a few straight runs with turns.
         const color = ["#3f6fc8", "#c8443c", "#b8902a"][Math.floor(rand() * 3)];
@@ -147,7 +216,7 @@
           dot(x + 1, y + 1, DARK);
           dot(x + 2, y + 1, DARK);
         }
-      } else if (map.theme === "hazard") {
+      } else if (map.theme === "hazard" || map.theme === "factory") {
         if (r > 0.25 || !free(x, y, 10, 10)) continue;
         // An oil stain.
         for (let a = 0; a < 26; a++) {

@@ -94,10 +94,10 @@
     const map = (options && options.map)
       || {id: "open", name: "Open space", width: B.arena.width, height: B.arena.height, walls: []};
     const W = map.width, H = map.height;
-    const T = root.LCSTerrain.create(map), WALLS = T.walls;
+    const T = root.LCSTerrain.create(map, B.terrain, {
+      explode, hurtPlayer, hurtEnemy, fall, effect, text, met: (id) => { s.met[id] = true; }});
     const A = B.abilities, C = B.classic, AG = B.agent;
     const WEAPONS = new Map(B.weapons.map((w) => [w.id, w]));
-    const PASSIVES = new Map(B.upgrades.map((u) => [u.id, u]));
     const PISTOL = WEAPONS.get("pistol").base;
     const CELL = 32;   // px per cell of the enemies' grid for nearby()
     const TEXT_PILE = 5;   // floating texts over one spot at once
@@ -129,7 +129,7 @@
       day: (options && options.day) || null,
       view: {width: B.view.width, height: B.view.height},
       map: {id: map.id, name: map.name, name_en: map.name_en, theme: map.theme || "office", width: W, height: H,
-            walls: WALLS, special: map.special || null},
+            walls: T.still, special: map.special || null, terrain: T.objects},
       player: {x: W / 2, y: H / 2, r: B.player.radius, hp: B.player.hp, invulnerable: 0,
                dead: 0, sticky: 1, ammo: PISTOL.magazine, magazine: PISTOL.magazine, reload: 0,
                reloadTotal: 0, shield: 0, moving: false, aim: 0, firedAt: -1, hurtAt: -1},
@@ -142,7 +142,7 @@
       weapons: [{id: "pistol", level: 1, evolved: false, timer: 0}],
       taken: {},  // passive id -> level
       level: 1, xp: 0, xpNext: B.xp.first_level, pendingLevels: 0, choices: null,
-      choiceKind: null, pendingChests: 0, gear: [],
+      choiceKind: null, pendingChests: 0, gear: [], gearLevels: {},
       rerolls: B.build.rerolls, banishes: B.build.banishes, banished: [],
       enemies: [], shots: [], mines: [], turrets: [], effects: [], texts: [], allies: [], items: [],
       gems: [],
@@ -174,8 +174,6 @@
 
     // --- helpers -----------------------------------------------------------------
 
-    // A floating text. One that would land on another still in the air (it rises 14 px a
-    // second) goes above it, so a burst of events stays readable.
     // A floating text over (x, y), above the ones already there; a pile over one spot keeps
     // at most TEXT_PILE of them, so the oldest goes first.
     function text(x, y, value, color, life) {
@@ -232,8 +230,8 @@
 
     // --- enemies -----------------------------------------------------------------
 
-    // Spawns an enemy just off screen, or at `at`; `extra` is merged into it. Returns the
-    // enemy, or nothing when there was no room.
+    // Spawns an enemy just off screen, or at `at` (moved out of the walls); `extra` is merged
+    // into it. Returns the enemy, or nothing when there was no room.
     function spawn(type, at, extra) {
       const cfg = B.enemies[type];
       const minute = s.time / 60;
@@ -248,7 +246,7 @@
           const d = Math.hypot(s.view.width, s.view.height) / 2 + 20 + random() * 40;
           x = clamp(s.player.x + Math.cos(angle) * d, cfg.radius, W - cfg.radius);
           y = clamp(s.player.y + Math.sin(angle) * d, cfg.radius, H - cfg.radius);
-        } while (inWall(x, y, cfg.radius) && ++tries < 10);
+        } while (inWall(x, y, cfg.radius, true) && ++tries < 10);
         if (tries >= 10) return null;
       }
       // Difficulty follows both the clock and the player's level, so a busy agent
@@ -262,6 +260,7 @@
                                score: cfg.score, slow: 0, slowFactor: 1,
                                flash: 0, dead: false, incoming: 0, born: s.time, hitAt: {}},
                               extra);
+      if (at) pushOut(e, e.r);
       if (e.hpScale) { e.hp *= e.hpScale; e.maxHp = e.hp; }
       if (mod("code_review")) { e.hp *= mod("code_review").enemy_hp; e.maxHp = e.hp; }
       if (cfg.boss) e.boss = true;
@@ -283,7 +282,6 @@
       const a = spawn(type);
       if (!a) return null;
       const b = spawn(type, {x: a.x + Math.max(14, a.r * 2.5), y: a.y + a.r});
-      pushOut(b, b.r);
       a.partner = b;
       b.partner = a;
       b.twinB = true;
@@ -376,8 +374,7 @@
         effect({type: "ring", x: e.x, y: e.y, r: e.r + 10, color: "#5fbf5a", life: 0.4});
         for (let i = 0; i < cfg.split.count; i++) {
           const angle = random() * Math.PI * 2;
-          const o = spawn(cfg.split.type, {x: e.x + Math.cos(angle) * e.r, y: e.y + Math.sin(angle) * e.r});
-          pushOut(o, o.r);
+          spawn(cfg.split.type, {x: e.x + Math.cos(angle) * e.r, y: e.y + Math.sin(angle) * e.r});
         }
       }
     }
@@ -397,17 +394,14 @@
       if (cfg.return_seconds && !e.returned) {
         s.comebacks.push({at: s.time + cfg.return_seconds, type: e.type, x: e.x, y: e.y});
       }
-      if (e.segments) {
-        for (const seg of e.segments) {
-          seg.dead = true;
-          effect({type: "pop", x: seg.x, y: seg.y, r: seg.r, kind: seg.type, life: 0.3, color: "#e8e6f0"});
-        }
+      for (const seg of e.segments || []) {
+        seg.dead = true;
+        effect({type: "pop", x: seg.x, y: seg.y, r: seg.r, kind: seg.type, life: 0.3, color: "#e8e6f0"});
       }
       if (cfg.splits) {
         for (let i = 0; i < cfg.splits.count; i++) {
           const angle = random() * Math.PI * 2;
-          const o = spawn(cfg.splits.type, {x: e.x + Math.cos(angle) * 6, y: e.y + Math.sin(angle) * 6});
-          pushOut(o, o.r);
+          spawn(cfg.splits.type, {x: e.x + Math.cos(angle) * 6, y: e.y + Math.sin(angle) * 6});
         }
       }
       let pairDone = !e.partner;
@@ -441,7 +435,7 @@
       s.bosses++;
       s.bossKinds[e.type] = true;
       if (!loot) return;
-      if (s.gear.length < B.gear.length) drop("chest", e.x, e.y - 10, true);
+      if (chestLeft()) drop("chest", e.x, e.y - 10, true);
       for (let i = 0; i < I.boss_drops; i++) {
         drop(i ? pickItem() : "medkit", e.x + (random() - 0.5) * 40, e.y + (random() - 0.5) * 40,
              !i);
@@ -456,7 +450,6 @@
       const twin = spawn(e.type, {x: at.x, y: at.y}, Object.assign({partner: e},
         cfg.revive_hp ? {hpScale: cfg.revive_hp, score: 0, noLoot: true} : {}));
       twin.twinB = !e.twinB;
-      pushOut(twin, twin.r);
       e.partner = twin;
       effect({type: "ring", x: at.x, y: at.y, r: 16, color: "#7fe0e0", life: 0.4});
       text(at.x, at.y - 10, tr("ГОНКА!", "RACE!"), "#7fe0e0");
@@ -542,7 +535,7 @@
     function drop(type, x, y, force) {
       if (!force && s.items.length >= I.max_on_map) return;
       const o = {x: clamp(x, 8, W - 8), y: clamp(y, 8, H - 8)};
-      pushOut(o, 8);
+      pushOut(o, 8, true);
       s.items.push({type, x: o.x, y: o.y, t: 0, life: type === "chest" ? Infinity : I.lifetime});
     }
 
@@ -553,7 +546,7 @@
         const angle = random() * Math.PI * 2, d = 60 + random() * 140;
         const x = clamp(p.x + Math.cos(angle) * d, 12, W - 12);
         const y = clamp(p.y + Math.sin(angle) * d, 12, H - 12);
-        if (!inWall(x, y, 10)) { drop(pickItem(), x, y); return; }
+        if (!inWall(x, y, 10, true)) { drop(pickItem(), x, y); return; }
       }
     }
 
@@ -608,9 +601,18 @@
 
     function explode(x, y, radius, damage, color) {
       effect({type: "ring", x, y, r: radius, color, life: 0.35});
+      T.blast(x, y, radius, damage);
       nearby(x, y, radius + 20, (e) => {
-        if (Math.hypot(e.x - x, e.y - y) <= radius + e.r) hurtEnemy(e, damage);
+        if (Math.hypot(e.x - x, e.y - y) > radius + e.r) return;
+        hurtEnemy(e, damage);
+        T.knock(e, x, y);
       });
+    }
+
+    // Down a pit on the cloud map: as good as killed.
+    function fall(e) {
+      effect({type: "fall", x: e.x, y: e.y, r: e.r, kind: e.type, life: 0.5});
+      killEnemy(e);
     }
 
     // --- player ------------------------------------------------------------------
@@ -828,7 +830,7 @@
         const m = {x: p.x + Math.cos(angle) * d, y: p.y + Math.sin(angle) * d, r: o.radius * o.area,
                    damage: o.damage, trigger: o.trigger, armAt: s.time + o.arm,
                    until: s.time + o.life, evolved: w.evolved};
-        pushOut(m, 4);
+        pushOut(m, 4, true);
         s.mines.push(m);
       }
       return true;
@@ -933,194 +935,14 @@
       }
     }
 
-    // --- level-ups ---------------------------------------------------------------
-
-    function addXp(n) {
-      s.xp += n;
-      while (s.xp >= s.xpNext) {
-        s.xp -= s.xpNext;
-        s.level++;
-        s.pendingLevels++;
-        s.xpNext = Math.round(s.xpNext * B.xp.growth);
-        text(s.player.x, s.player.y - 16, tr(`УРОВЕНЬ ${s.level}`, `LEVEL ${s.level}`), "#e8c14a", 1.5);
-      }
-      if (s.pendingLevels && !s.choices) offerChoices();
-    }
-
-    // Everything a level-up could offer now: new levels of what the player has, new weapons
-    // and passives while there are free slots, and evolutions. Keys are "kind:id".
-    function offers() {
-      const out = [], evolutions = [];
-      const banned = (key) => s.banished.includes(key);
-      const owned = new Set(s.weapons.map((w) => w.id));
-      for (const w of s.weapons) {
-        const cfg = WEAPONS.get(w.id);
-        if (w.level <= cfg.levels.length) {
-          if (!banned("weapon:" + w.id)) out.push("weapon:" + w.id);
-        } else if (!w.evolved && s.taken[cfg.evolution.passive]) {
-          evolutions.push("evolution:" + w.id);
-        }
-      }
-      if (s.weapons.length < B.build.weapon_slots && !mod("pistol_only")) {
-        for (const cfg of B.weapons) {
-          if (!owned.has(cfg.id) && !banned("weapon:" + cfg.id)) out.push("weapon:" + cfg.id);
-        }
-      }
-      const passives = Object.keys(s.taken).length;
-      for (const u of B.upgrades) {
-        const level = s.taken[u.id] || 0;
-        if (banned("passive:" + u.id) || level >= (u.max_level || 5)) continue;
-        if (!level && (passives >= B.build.passive_slots || (u.ally && !s.everAlly))) continue;
-        out.push("passive:" + u.id);
-      }
-      return {evolutions, rest: out};
-    }
-
-    // A choice card: names and texts in both languages, the level it brings.
-    function card(key) {
-      const [kind, id] = key.split(":");
-      if (kind === "passive") {
-        const u = PASSIVES.get(id);
-        return {key, kind, id, icon: id, name: u.name, name_en: u.name_en, text: u.text,
-                text_en: u.text_en, level: (s.taken[id] || 0) + 1, fresh: !s.taken[id]};
-      }
-      const cfg = WEAPONS.get(id), w = s.weapons.find((x) => x.id === id);
-      if (kind === "evolution") {
-        const ev = cfg.evolution;
-        return {key, kind, id, icon: id, name: ev.name, name_en: ev.name_en, text: ev.text,
-                text_en: ev.text_en, level: null};
-      }
-      if (!w) {
-        return {key, kind, id, icon: id, name: cfg.name, name_en: cfg.name_en, text: cfg.text,
-                text_en: cfg.text_en, level: 1, fresh: true};
-      }
-      const [ru, en] = levelText(cfg, cfg.levels[w.level - 1]);
-      return {key, kind, id, icon: id, name: cfg.name, name_en: cfg.name_en, text: ru, text_en: en,
-              level: w.level + 1};
-    }
-
-    // Three cards; evolutions always make it. Nothing left to take: a coffee break.
-    function offerChoices() {
-      const {evolutions, rest} = offers();
-      const picked = evolutions.slice(0, 3);
-      while (picked.length < 3 && rest.length) {
-        picked.push(rest.splice(Math.floor(random() * rest.length), 1)[0]);
-      }
-      const F = B.build.filler;
-      s.choices = picked.length ? picked.map(card)
-        : [{key: "filler", kind: "filler", id: "filler", icon: "medkit", level: null,
-            name: "Кофе-брейк", name_en: "Coffee break",
-            text: `+${F.heal} к здоровью и +${F.score} очков`,
-            text_en: `+${F.heal} health and +${F.score} score`}];
-      s.choiceKind = "level";
-    }
-
-    // A chest: three pieces of gear not taken yet, kept to the end of the match.
-    function offerChest() {
-      const open = B.gear.filter((g) => !s.gear.includes(g.id));
-      if (!open.length) {
-        s.pendingChests = 0;
-        s.score += C.empty_chest_score;
-        text(s.player.x, s.player.y - 16, `+${C.empty_chest_score}`, "#e8c14a");
-        return;
-      }
-      const picked = [];
-      while (picked.length < 3 && picked.length < open.length) {
-        const g = open[Math.floor(random() * open.length)];
-        if (!picked.includes(g)) picked.push(g);
-      }
-      s.choices = picked.map((g) => ({key: "gear:" + g.id, kind: "gear", id: g.id, icon: g.id,
-                                      name: g.name, text: g.text, name_en: g.name_en,
-                                      text_en: g.text_en, level: 1, gear: true}));
-      s.choiceKind = "chest";
-    }
-
-    function nextChoice() {
-      if (s.pendingChests > 0) offerChest();
-      if (!s.choices && s.pendingLevels > 0) offerChoices();
-    }
-
-    function applyGear(g) {
-      s.gear.push(g.id);
-      if (g.mul) s.stats[g.stat] *= g.mul;
-      if (g.add) s.stats[g.stat] += g.add;
-      if (g.stat === "max_hp" && !s.player.dead) s.player.hp += g.add || 0;
-      if (g.heal && !s.player.dead) s.player.hp = s.stats.max_hp;
-      if (g.shield) s.player.shield += g.shield;
-      text(s.player.x, s.player.y - 16, tr(g.name, g.name_en), "#e8c14a", 2);
-    }
-
-    function applyUpgrade(u) {
-      s.taken[u.id] = (s.taken[u.id] || 0) + 1;
-      if (u.mul) s.stats[u.stat] *= u.mul;
-      if (u.add) s.stats[u.stat] += u.add;
-      if (u.stat === "max_hp" && !s.player.dead) s.player.hp += u.add || 0;
-      if (u.heal && !s.player.dead) s.player.hp = s.stats.max_hp;
-    }
+    // --- level-ups and chests (build.js) --------------------------------------------
 
     const magazine = () => {
       const pistol = s.weapons.find((w) => w.id === "pistol");
       return pistol ? weaponStats(pistol).magazine : 0;
     };
-
-    function applyCard(c) {
-      const p = s.player;
-      const before = magazine();
-      if (c.kind === "passive") {
-        applyUpgrade(PASSIVES.get(c.id));
-      } else if (c.kind === "weapon") {
-        const w = s.weapons.find((x) => x.id === c.id);
-        if (w) w.level++;
-        else s.weapons.push({id: c.id, level: 1, evolved: false, timer: 0});
-      } else if (c.kind === "evolution") {
-        s.weapons.find((x) => x.id === c.id).evolved = true;
-        s.evolutions++;
-        effect({type: "ring", x: p.x, y: p.y, r: 60, color: "#e8c14a", life: 0.6});
-        text(p.x, p.y - 22, tr(c.name, c.name_en), "#e8c14a", 2.5);
-      } else if (c.kind === "filler") {
-        if (!p.dead) p.hp = Math.min(s.stats.max_hp, p.hp + B.build.filler.heal);
-        s.score += B.build.filler.score;
-      }
-      // A bigger magazine is filled right away.
-      const more = magazine() - before;
-      if (more > 0 && p.reload <= 0) p.ammo += more;
-      p.magazine = magazine();
-    }
-
-    function choose(index) {
-      if (!s.choices || !s.choices[index]) return false;
-      const c = s.choices[index];
-      if (s.choiceKind === "chest") {
-        applyGear(B.gear.find((g) => g.id === c.id));
-        s.pendingChests--;
-      } else {
-        applyCard(c);
-        s.pendingLevels--;
-      }
-      s.choices = null;
-      s.choiceKind = null;
-      nextChoice();
-      return true;
-    }
-
-    // Three new cards for a level-up, a few times a match.
-    function reroll() {
-      if (s.choiceKind !== "level" || s.rerolls <= 0) return false;
-      s.rerolls--;
-      offerChoices();
-      return true;
-    }
-
-    // A card that should never come again this match; the others are dealt anew.
-    function banish(index) {
-      const c = s.choices && s.choices[index];
-      if (s.choiceKind !== "level" || s.banishes <= 0 || !c) return false;
-      if (c.kind !== "weapon" && c.kind !== "passive") return false;
-      s.banishes--;
-      s.banished.push(c.key);
-      offerChoices();
-      return true;
-    }
+    const {addXp, choose, reroll, banish, nextChoice, chestLeft, offers, take} = root.LCSBuild.create(B, s,
+      {random, text, effect, tr, mod, magazine, levelText});
 
     // --- allies: the agents ------------------------------------------------------
 
@@ -1261,7 +1083,7 @@
     function placeTurret(a, src) {
       const angle = random() * Math.PI * 2;
       const o = {x: clamp(src.x + Math.cos(angle) * 14, 8, W - 8), y: clamp(src.y + Math.sin(angle) * 14, 8, H - 8)};
-      pushOut(o, 6);
+      pushOut(o, 6, true);
       s.turrets.push({x: o.x, y: o.y, born: s.time, until: s.time + AG.turret.seconds, cooldown: 0,
                       aim: angle, color: a.color, firedAt: -1});
       while (s.turrets.length > AG.turret.max) s.turrets.shift();
@@ -1446,7 +1268,7 @@
         let tx = p.x + Math.cos(angle) * B.ally.follow_distance;
         let ty = p.y + Math.sin(angle) * B.ally.follow_distance;
         // A wall in the way: around it along the enemies' path to the player.
-        if (WALLS.length && !clearPath(a, tx, ty, a.r)) {
+        if (!T.flat && !clearPath(a, tx, ty, a.r)) {
           updateFlow();
           const w = waypoint(a);
           tx = w.x;
@@ -1458,7 +1280,7 @@
           a.x += (tx - a.x) / d * step;
           a.y += (ty - a.y) / d * step;
         }
-        pushOut(a, a.r);
+        pushOut(a, a.r, true);
         a.x = clamp(a.x, a.r, W - a.r);
         a.y = clamp(a.y, a.r, H - a.r);
         for (const [id, sp] of a.spirits) {
@@ -1519,7 +1341,7 @@
       p.moving = len > 0;
       p.x = clamp(p.x + ix * speed() * dt, p.r, W - p.r);
       p.y = clamp(p.y + iy * speed() * dt, p.r, H - p.r);
-      pushOut(p, p.r);
+      pushOut(p, p.r, true);
       p.hp = Math.min(s.stats.max_hp, p.hp + s.stats.regen * dt);
       updateWeapons(dt);
     }
@@ -1589,8 +1411,7 @@
         e.releaseAt = s.time + cfg.release.every;
         for (let i = 0; i < cfg.release.count && s.enemies.length < B.spawn.max_alive; i++) {
           const angle = random() * Math.PI * 2;
-          const o = spawn(cfg.release.type, {x: e.x + Math.cos(angle) * e.r, y: e.y + Math.sin(angle) * e.r});
-          pushOut(o, o.r);
+          spawn(cfg.release.type, {x: e.x + Math.cos(angle) * e.r, y: e.y + Math.sin(angle) * e.r});
         }
       }
       if (cfg.fire) prodDown(e, cfg.fire);
@@ -1713,7 +1534,7 @@
         sh.life -= dt;
         sh.x += sh.vx * dt;
         sh.y += sh.vy * dt;
-        if (sh.x < 0 || sh.y < 0 || sh.x > W || sh.y > H || (WALLS.length && inWall(sh.x, sh.y, 0))) sh.life = 0;
+        if (sh.x < 0 || sh.y < 0 || sh.x > W || sh.y > H || inWall(sh.x, sh.y, 0)) sh.life = 0;
         if (sh.life > 0 && !p.dead && Math.hypot(p.x - sh.x, p.y - sh.y) < p.r + sh.r) {
           hurtPlayer(sh.damage);
           sh.life = 0;
@@ -1728,7 +1549,6 @@
         c.done = true;
         if (s.finaleAt !== null || s.endAt !== null) continue;
         const e = spawn(c.type, {x: c.x, y: c.y}, {returned: true, hpScale: B.enemies[c.type].return_hp});
-        pushOut(e, e.r);
         effect({type: "ring", x: e.x, y: e.y, r: 14, color: "#d9534f", life: 0.4});
       }
       s.comebacks = s.comebacks.filter((c) => !c.done);
@@ -1752,7 +1572,7 @@
         const angle = random() * Math.PI * 2, d = Z.distance[0] + random() * (Z.distance[1] - Z.distance[0]);
         const x = clamp(p.x + Math.cos(angle) * d, Z.radius, W - Z.radius);
         const y = clamp(p.y + Math.sin(angle) * d, Z.radius, H - Z.radius);
-        if (!inWall(x, y, Z.radius / 2)) { at = {x, y}; break; }
+        if (!inWall(x, y, Z.radius / 2, true)) { at = {x, y}; break; }
       }
       s.incident = {x: at.x, y: at.y, r: Z.radius, held: 0, left: Z.seconds};
       text(p.x, p.y - 30, tr("ИНЦИДЕНТ", "INCIDENT"), "#d9534f", 3);
@@ -1800,7 +1620,7 @@
       const p = s.player;
       const rageSpeed = (s.rage > 0 ? B.rage.speed : 1) * (s.redCi > 0 ? AG.red_ci.speed : 1);
       const rageDamage = s.rage > 0 ? B.rage.damage : 1;
-      if (WALLS.length) updateFlow();
+      if (!T.flat) updateFlow();
       for (const e of s.enemies) {
         e.flash = Math.max(0, e.flash - dt);
         if (e.slow > 0) e.slow -= dt;
@@ -1843,9 +1663,7 @@
       rebuildGrid();
     }
 
-    function release(sh) {
-      if (sh.aim) { sh.aim.incoming -= sh.damage; sh.aim = null; }
-    }
+    function release(sh) { if (sh.aim) { sh.aim.incoming -= sh.damage; sh.aim = null; } }
 
     function updateShots(dt) {
       for (const sh of s.shots) {
@@ -1866,7 +1684,7 @@
         sh.y += sh.vy * dt;
         if (sh.x < 0 || sh.y < 0 || sh.x > W || sh.y > H) sh.life = 0;
         // Bullets stop at walls; the allies' homing missiles are magic and fly through.
-        if (!sh.target && WALLS.length && inWall(sh.x, sh.y, 0)) sh.life = 0;
+        if (!sh.target && T.shot(sh)) sh.life = 0;
         if (sh.life <= 0) continue;
         nearby(sh.x, sh.y, sh.r + 20, (e) => {
           if (sh.life <= 0 || sh.hit.has(e)) return;
@@ -1900,6 +1718,7 @@
       s.score += B.score.per_second * dt;
 
       updateHazards();
+      T.update(dt, s);
       updatePlayer(dt, input || {});
       if (ghost) updateGhost();
       updateAllies(dt);
@@ -1954,22 +1773,21 @@
       level() { addXp(s.xpNext - s.xp); },
       upgrade() {
         const {rest} = offers();
-        if (rest.length) applyCard(card(rest[Math.floor(random() * rest.length)]));
+        if (rest.length) take(rest[Math.floor(random() * rest.length)]);
       },
       // The next weapon not held yet while there is a free slot, or else every weapon one
       // level up.
       weapon(id) {
         const cfg = B.weapons.find((w) => (id ? w.id === id : !s.weapons.some((x) => x.id === w.id)));
         if (cfg && !s.weapons.some((x) => x.id === cfg.id) && s.weapons.length < B.build.weapon_slots) {
-          applyCard(card("weapon:" + cfg.id));
-        }
-        else for (const w of s.weapons) w.level = Math.min(w.level + 1, WEAPONS.get(w.id).levels.length + 1);
+          take("weapon:" + cfg.id);
+        } else for (const w of s.weapons) w.level = Math.min(w.level + 1, WEAPONS.get(w.id).levels.length + 1);
       },
       // Every weapon held: maxed out and evolved.
       evolve() {
         for (const w of s.weapons) {
           w.level = WEAPONS.get(w.id).levels.length + 1;
-          applyCard(card("evolution:" + w.id));
+          take("evolution:" + w.id);
         }
       },
       wave() { for (let i = 0; i < B.spawn.wave_size; i++) spawnAny(pickType()); },

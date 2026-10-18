@@ -23,8 +23,8 @@
       {id: "shield", icon: "shield", name: ["Щит", "Shield"],
        text: [`Поглощает ${I.shield.hits} удара.`, `Takes ${I.shield.hits} hits for you.`]},
       {id: "chest", icon: "chest", name: ["Сундук", "Chest"],
-       text: ["Остаётся после босса. Выбери одну вещь из трёх — она с тобой до конца матча.",
-              "Left by a boss. Pick one of three items — it stays with you to the end of the match."]},
+       text: ["Остаётся после босса. Выбери одну вещь из трёх — она с тобой до конца матча. Когда всё снаряжение собрано — улучшения и редкие вещи.",
+              "Left by a boss. Pick one of three items — it stays with you to the end of the match. Once all the gear is taken: upgrades and rare pieces."]},
       {id: "gem", icon: "gem", name: ["Кристалл", "Crystal"],
        text: [`«Классика»: опыт падает с врагов кристаллами, подбирай их. Рядом с игроком (${C.magnet} точек) они летят к нему сами.`,
               `Classic: experience drops from enemies as crystals; pick them up. Within ${C.magnet} points of you they fly to you.`]},
@@ -207,6 +207,49 @@
     ];
   }
 
+  // What some maps have on them (maps.js, terrain.js).
+  function terrain(B) {
+    const K = B.terrain, ru = (x) => String(x).replace(".", ",");
+    return [
+      {id: "door", icon: "door", name: ["Дверь", "Door"],
+       text: [`«Легаси», «Микросервисы»: открыта ${K.door.open} сек, закрыта ${K.door.closed}. За ${ru(K.door.warn)} сек до того, как закрыться, мигает.`,
+              `Legacy, Microservices: open for ${K.door.open} sec, shut for ${K.door.closed}. It blinks ${K.door.warn} sec before it shuts.`]},
+      {id: "crack", icon: "crack", name: ["Треснувшая стена", "Cracked wall"],
+       text: [`«Легаси»: ${K.crack.hp} урона пулями или взрывами — и стены нет до конца матча.`,
+              `Legacy: ${K.crack.hp} damage from bullets or blasts and the wall is gone for the match.`]},
+      {id: "rack", icon: "rack", name: ["Серверная стойка", "Server rack"],
+       text: [`«Монорепо», «Прод»: после ${K.rack.hp} урона взрывается: ${K.rack.damage} урона врагам рядом и ${K.rack.player_damage} тебе, если стоишь близко. Через ${K.rack.back} сек её ставят снова.`,
+              `Monorepo, Production: after ${K.rack.hp} damage it blows up: ${K.rack.damage} damage to the enemies near and ${K.rack.player_damage} to you if you stand close. It is back in ${K.rack.back} sec.`]},
+      {id: "belt", icon: "belt", name: ["Конвейер", "Conveyor belt"],
+       text: [`«CI/CD»: везёт всех, кто на нём стоит, — тебя, союзников, врагов и кристаллы — со скоростью ${K.belt.speed}.`,
+              `CI/CD: carries everyone on it, you, the allies, the enemies and the crystals, at speed ${K.belt.speed}.`]},
+      {id: "pit", icon: "pit", name: ["Дыра в облаке", "Hole in the cloud"],
+       text: ["«Облако»: враг, упавший в дыру, погибает. Взрывы отбрасывают врагов — толкай их туда. Ты в дыру не упадёшь, но и не пройдёшь.",
+              "Cloud: an enemy that falls in a hole dies. Blasts throw enemies back, so push them in. You can't fall in, but you can't cross either."]},
+      {id: "pad", icon: "pad", name: ["Телепорт", "Teleport"],
+       text: [`«Микросервисы»: встань на круг — и ты на круге того же цвета. Снова — через ${K.pad.cooldown} сек.`,
+              `Microservices: step on a disc to land on the disc of the same color. Again in ${K.pad.cooldown} sec.`]},
+      {id: "vent", icon: "vent", name: ["Огненная решётка", "Fire vent"],
+       text: [`«Прод»: решётки горят по очереди, каждые ${K.vent.every} сек; перед огнём мигают ${ru(K.vent.warn)} сек. Огонь ${ru(K.vent.burn)} сек жжёт и тебя, и врагов.`,
+              `Production: the vents burn in turn every ${K.vent.every} sec and blink ${K.vent.warn} sec before. The fire burns you and the enemies for ${K.vent.burn} sec.`]},
+      {id: "dark", icon: "dark", name: ["Темнота", "Darkness"],
+       text: ["«Ночной офис»: видно только вокруг тебя, союзников и взрывов.",
+              "Night office: you see only around you, the allies and the blasts."]},
+    ];
+  }
+
+  // Gear: what it does, its levels, and whether only a full set of the usual pieces opens it.
+  function gear(B) {
+    const n = B.chest.max_level;
+    return B.gear.map((g) => ({
+      id: g.id, icon: g.id, gold: Boolean(g.rare), name: [g.name, g.name_en],
+      text: [`${g.text[0].toUpperCase()}${g.text.slice(1)}. Уровни 2–${n}: ${g.up.text}.`
+             + (g.rare ? " Редкое: только из сундука, когда всё обычное снаряжение собрано." : ""),
+             `${g.text_en[0].toUpperCase()}${g.text_en.slice(1)}. Levels 2–${n}: ${g.up.text_en}.`
+             + (g.rare ? " Rare: only from a chest once every usual piece is taken." : "")],
+    }));
+  }
+
   function fromBalance(list) {
     return list.map((x) => ({id: x.id, icon: x.id, name: [x.name, x.name_en],
                              text: [x.text, x.text_en]}));
@@ -235,21 +278,23 @@
       {id: "items", name: ["Предметы", "Items"], entries: items(B)},
       {id: "weapons", name: ["Оружие", "Weapons"], entries: weapons(B)},
       {id: "passives", name: ["Пассивки", "Passives"], entries: fromBalance(B.upgrades)},
-      {id: "gear", name: ["Снаряжение", "Gear"], entries: fromBalance(B.gear)},
+      {id: "gear", name: ["Снаряжение", "Gear"], entries: gear(B)},
       {id: "enemies", name: ["Враги", "Enemies"], entries: enemies(B)},
       {id: "allies", name: ["Ты и союзники", "You and allies"], entries: allies(B)},
       {id: "work", name: ["Работа агента", "Agent's work"], entries: work(B)},
       {id: "events", name: ["События", "Events"], entries: events(B)},
+      {id: "map", name: ["Карта", "Map"], entries: terrain(B)},
     ];
   }
 
   // Things that get a hint the first time the player meets them; kind "item", "enemy",
-  // "ally" (spirits and the agent's work) or "event".
+  // "ally" (spirits and the agent's work), "event" or "map".
   function entry(B, id) {
     const found = items(B).map((e) => Object.assign({kind: "item"}, e))
       .concat(enemies(B).map((e) => Object.assign({kind: "enemy"}, e)))
       .concat(spirits(B).concat(work(B)).map((e) => Object.assign({kind: "ally"}, e)))
       .concat(events(B).map((e) => Object.assign({kind: "event"}, e)))
+      .concat(terrain(B).map((e) => Object.assign({kind: "map"}, e)))
       .find((e) => e.id === id);
     return found || null;
   }
