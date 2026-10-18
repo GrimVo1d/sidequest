@@ -6,6 +6,7 @@ const [project] = arguments;
 const GAME = project + "/game";
 load(GAME + "/maps.js");
 load(GAME + "/terrain.js");
+load(GAME + "/modes.js");
 load(GAME + "/build.js");
 load(GAME + "/game.js");
 const balance = JSON.parse(readFile(GAME + "/balance.json"));

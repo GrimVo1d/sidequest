@@ -102,7 +102,7 @@
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   }
-  const todayTask = () => LCS.daily(balance, LCS_MAPS, today());
+  const todayTask = () => LCSModes.daily(balance, LCS_MAPS, today());
   const modifier = (id) => balance.modifiers.find((m) => m.id === id);
 
   async function savePrefs() {

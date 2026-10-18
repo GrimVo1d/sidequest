@@ -30,6 +30,7 @@ load(GAME + "/sprites.js");
 load(GAME + "/hero.js");
 load(GAME + "/font.js");
 load(GAME + "/terrain.js");
+load(GAME + "/modes.js");
 load(GAME + "/build.js");
 load(GAME + "/game.js");
 load(GAME + "/themes.js");

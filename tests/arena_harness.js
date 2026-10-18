@@ -6,6 +6,7 @@ const [project] = arguments;
 const GAME = project + "/game";
 load(GAME + "/maps.js");
 load(GAME + "/terrain.js");
+load(GAME + "/modes.js");
 load(GAME + "/build.js");
 load(GAME + "/game.js");
 load(GAME + "/progress.js");
@@ -630,9 +631,9 @@ result.arsenal.level_text = LCS.levelText(balance.weapons.find((w) => w.id === "
   };
 
   // The daily task: the same for the whole day, different across days.
-  const d1 = LCS.daily(balance, LCS_MAPS, "2026-10-09"), d2 = LCS.daily(balance, LCS_MAPS, "2026-10-09");
+  const d1 = LCSModes.daily(balance, LCS_MAPS, "2026-10-09"), d2 = LCSModes.daily(balance, LCS_MAPS, "2026-10-09");
   const week = [];
-  for (let i = 1; i <= 28; i++) week.push(LCS.daily(balance, LCS_MAPS, `2026-02-${String(i).padStart(2, "0")}`));
+  for (let i = 1; i <= 28; i++) week.push(LCSModes.daily(balance, LCS_MAPS, `2026-02-${String(i).padStart(2, "0")}`));
   const opts = {seed: d1.seed, map: at(d1.map), mode: "daily", modifiers: d1.modifiers, day: d1.date};
   const a = run(opts, 60, readScenario("short-task")), b = run(opts, 60);
   r.daily = {same: JSON.stringify(d1) === JSON.stringify(d2), task: d1,
