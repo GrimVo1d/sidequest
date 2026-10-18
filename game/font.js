@@ -71,5 +71,5 @@
 
   const has = (ch) => Boolean(GLYPHS[ch] || SAME[ch]);
 
-  root.LCSFont = {GLYPHS, HEIGHT, layout, has};
+  root.LCSFont = {GLYPHS, SAME, HEIGHT, layout, has};
 })(typeof window !== "undefined" ? window : globalThis);
