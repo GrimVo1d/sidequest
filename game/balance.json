@@ -606,7 +606,7 @@
        "text": "WASD, стрелки или стик геймпада. Стрелять не нужно: оружие само бьёт по ближайшему врагу.",
        "text_en": "WASD, the arrows or a gamepad's stick. No need to shoot: the weapon fires at the closest enemy by itself."},
       {"id": "kills", "icon": "grunt", "covers": ["grunt"], "need": {"kills": 5},
-       "name": "Убей 5 багов", "name_en": "Squash 5 bugs",
+       "name": "Убей {kills} багов", "name_en": "Squash {kills} bugs",
        "text": "Держись на расстоянии и не стой в толпе: враг ранит при касании.",
        "text_en": "Keep your distance and stay out of the crowd: enemies hurt on touch."},
       {"id": "level", "icon": "gem", "covers": ["gem"], "need": {"level": 2}, "only": "gems",

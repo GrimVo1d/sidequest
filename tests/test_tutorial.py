@@ -73,6 +73,12 @@ class TutorialTest(unittest.TestCase):
             self.assertIsNone(r["after"], name)
         self.assertTrue(self.result["none"])
 
+    def test_numbers_in_names_come_from_the_goal(self):
+        kills = next(st for st in self.steps if st["id"] == "kills")
+        self.assertIn("{kills}", kills["name_en"])
+        name = self.result["developer"]["at"]["kills"]["name"]
+        self.assertEqual(name[1], kills["name_en"].replace("{kills}", str(kills["need"]["kills"])))
+
     def test_texts_in_both_languages(self):
         for st in self.steps:
             for key in ("name", "text"):

@@ -4,7 +4,8 @@
 // ability (used once), seconds (shown that long); `only`: shown when the class has an ability
 // ("ability"), in the mode with agents ("agent") or where enemies drop crystals ("gems": not
 // with agents, whose work brings the experience there); `covers`: the handbook entries the step
-// teaches, so their "New: …" hints are not shown again.
+// teaches, so their "New: …" hints are not shown again. "{kills}" in a name or a text is the
+// step's own goal.
 //   const lesson = LCSTutorial.create(B.tutorial, {ability: true, agent: false, gems: true});
 //   lesson.update(state)   // the current step ({id, icon, name, text, index, count}) or null
 //   lesson.done            // true once every step is passed
@@ -53,8 +54,9 @@
           return null;
         }
         const st = steps[index], later = steps.filter((x, i) => i > index && empty(x, s)).length;
-        return {id: st.id, icon: st.icon, name: [st.name, st.name_en], text: [st.text, st.text_en],
-                index: index - skipped, count: steps.length - skipped - later};
+        const fill = (text) => text.replace(/\{(\w+)\}/g, (all, key) => (key in st.need ? st.need[key] : all));
+        return {id: st.id, icon: st.icon, name: [fill(st.name), fill(st.name_en)],
+                text: [fill(st.text), fill(st.text_en)], index: index - skipped, count: steps.length - skipped - later};
       },
     };
     return lesson;
