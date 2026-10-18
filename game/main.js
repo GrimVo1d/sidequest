@@ -539,13 +539,15 @@
       return;
     }
     const digit = /^Digit([1-3])$/.exec(e.code) || /^Numpad([1-3])$/.exec(e.code);
-    if (digit && game.state.choices && !escOpen) { pick(Number(digit[1]) - 1); return; }
+    // A key the page leaves to WebKit makes macOS beep, so every key the match takes is kept.
+    if (digit && game.state.choices && !escOpen) { pick(Number(digit[1]) - 1); e.preventDefault(); return; }
     if (game.state.choiceKind === "level" && !escOpen) {
-      if (e.code === "KeyR") { reroll(); return; }
-      if (e.code === "KeyX") { toggleBanish(); return; }
+      if (e.code === "KeyR") { reroll(); e.preventDefault(); return; }
+      if (e.code === "KeyX") { toggleBanish(); e.preventDefault(); return; }
     }
     if (e.code === "Space" && !escOpen && !game.state.choices) { game.ability(); e.preventDefault(); return; }
     if (MOVE[e.code]) { keys.add(e.code); e.preventDefault(); }
+    else if (!escOpen && !game.state.choices && e.key.length === 1 && !e.metaKey && !e.ctrlKey) e.preventDefault();
   });
   addEventListener("keyup", (e) => keys.delete(e.code));
   addEventListener("blur", () => keys.clear());
