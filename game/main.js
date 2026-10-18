@@ -682,10 +682,11 @@
     head.appendChild(el("span", String(i + 1), "key"));
     const tag = KIND_TAGS[c.kind] ? t(...KIND_TAGS[c.kind])
       : c.fresh ? t("НОВОЕ", "NEW")
-      : c.kind === "weapon" || c.kind === "passive" ? t("ур. ", "lv. ") + c.level : "";
+      : c.kind === "weapon" || c.kind === "passive" || (c.gear && c.level > 1) ? t("ур. ", "lv. ") + c.level
+      : c.rare ? t("РЕДКОЕ", "RARE") : "";
     head.appendChild(el("span", tag, "tag"));
     b.appendChild(head);
-    b.appendChild(iconCanvas(c.icon, 48, c.kind === "evolution"));
+    b.appendChild(iconCanvas(c.icon, 48, c.kind === "evolution" || c.rare));
     b.appendChild(el("span", tf(c, "name"), "name"));
     b.appendChild(el("span", tf(c, "text"), "text"));
     b.addEventListener("click", () => pick(i));

@@ -160,6 +160,8 @@
       }
       ctx.globalAlpha = 1;
     }
+    const art = root.LCSTerrainArt.create(ctx, {px, pixelRing, hash, sprite, faceHeight, newCanvas},
+                                          balance.terrain);
 
     // --- the map: floor, walls and their shadows, painted once per map ------------------
 
@@ -211,53 +213,6 @@
       cx.putImageData(img, 0, 0);
       root.LCSThemes.decorate(cx, map, owner, seed);
       return c;
-    }
-
-    // Moving details on walls: server lights, torches, alarm lamps.
-    function wallDetails(s, camX, camY) {
-      const theme = s.map.theme, t = s.time;
-      for (const [i, w] of s.map.walls.entries()) {
-        if (w.x > camX + VW + 20 || w.y > camY + VH + 20 || w.x + w.w < camX - 20 || w.y + w.h < camY - 20) {
-          continue;
-        }
-        const F = faceHeight(w), faceY = w.y + w.h - F;
-        if (theme === "servers") {
-          for (let lx = 3; lx < w.w - 3; lx += 4) {
-            for (const fy of [2, 5]) {
-              if (fy >= F - 1) continue;
-              const k = hash(i * 64 + lx, fy, Math.floor(t * 2 + hash(i, lx, fy) * 7));
-              ctx.fillStyle = k < 0.55 ? "#4fbf6f" : k < 0.7 ? "#e8c14a" : k < 0.8 ? "#5b8bd0" : "#0d0f15";
-              ctx.fillRect(w.x + lx, faceY + fy, 2, 1);
-            }
-          }
-        } else if (theme === "dungeon") {
-          const n = Math.max(1, Math.floor(w.w / 100));
-          for (let k = 0; k < n; k++) torch(w.x + (k + 0.5) * w.w / n, faceY + 1, t, i * 7 + k);
-        } else if (theme === "hazard") {
-          const on = Math.floor(t * 2 + i) % 2 === 0;
-          for (const lx of [3, w.w - 5]) {
-            ctx.fillStyle = on ? "#ff4040" : "#5a1a1a";
-            ctx.fillRect(w.x + lx, w.y + 3, 2, 2);
-            if (on) pixelRing(w.x + lx + 1, w.y + 4, 4, "#ff4040", 0.25);
-          }
-        }
-      }
-    }
-
-    const FLAMES = ["#fffbe0", "#e8c14a", "#e89a4a", "#d9534f"];
-    function torch(x, y, t, seed) {
-      x = px(x);
-      ctx.fillStyle = "#5a4a3a";
-      ctx.fillRect(x - 1, y + 2, 2, 4);
-      const flicker = hash(seed, 0, Math.floor(t * 10));
-      const h = 3 + Math.floor(flicker * 3);
-      for (let row = 0; row < h; row++) {
-        const wdt = row < 1 ? 1 : row < h - 1 ? 3 : 2;
-        ctx.fillStyle = FLAMES[Math.min(3, Math.floor(row / h * 4))];
-        ctx.fillRect(x - Math.floor(wdt / 2) + (row === 0 && flicker > 0.5 ? 1 : 0), y + 1 - row, wdt, 1);
-      }
-      pixelRing(x, y, 10 + flicker * 2, "#e89a4a", 0.12, 2);
-      pixelRing(x, y, 6 + flicker, "#e8c14a", 0.15, 2);
     }
 
     // --- particles and floor splats ---------------------------------------------------
@@ -845,6 +800,8 @@
           ctx.fillRect(px(fx.x + (fx.x2 - fx.x) * i / n), px(fx.y + (fx.y2 - fx.y) * i / n), 1, 1);
         }
         ctx.globalAlpha = 1;
+      } else {
+        art.effect(fx, s, k);
       }
     }
 
@@ -986,10 +943,11 @@
       const fx0 = Math.max(0, camX), fy0 = Math.max(0, camY);
       const fw = Math.min(W, camX + VW) - fx0, fh = Math.min(H, camY + VH) - fy0;
       if (fw > 0 && fh > 0) ctx.drawImage(floor, fx0, fy0, fw, fh, fx0, fy0, fw, fh);
-      wallDetails(s, camX, camY);
-      drawSplats();
-
       const visible = (o, m) => o.x > camX - m && o.x < camX + VW + m && o.y > camY - m && o.y < camY + VH + m;
+      art.details(s, camX, camY, VW, VH);
+      drawSplats();
+      art.ground(s, visible);
+      art.solids(s, visible);
 
       for (const h of s.hazards) if (h.kind === "goo" && visible(h, h.r)) drawHazard(h, s);
       if (s.incident) drawIncident(s.incident, s);
@@ -1039,6 +997,7 @@
       }
 
       ctx.setTransform(1, 0, 0, 1, 0, 0);
+      art.dark(s, camX, camY, VW, VH);
       drawAllyMarkers(s, camX, camY);
       if (s.incident) drawIncidentMarker(s.incident, camX, camY, s);
       drawBossBar(s);
@@ -1072,6 +1031,7 @@
           sx.fillRect(Math.floor(w.x * k), Math.floor(w.y * k), Math.max(2, Math.round(w.w * k)),
                       Math.max(2, Math.round(w.h * k)));
         }
+        art.preview(sx, map, k);
         previews.set(key, small);
       }
       const tx = target.getContext("2d");

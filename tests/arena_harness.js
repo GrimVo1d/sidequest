@@ -6,6 +6,7 @@ const [project] = arguments;
 const GAME = project + "/game";
 load(GAME + "/maps.js");
 load(GAME + "/terrain.js");
+load(GAME + "/build.js");
 load(GAME + "/game.js");
 load(GAME + "/progress.js");
 const balance = JSON.parse(readFile(GAME + "/balance.json"));
@@ -196,7 +197,7 @@ result.classic.with_agent = play(readScenario("short-task"), 100, 23, at("open")
                           enemies_left: s.enemies.length};
 }
 
-// --- gear: a chest offers three pieces, every piece once --------------------------------
+// --- gear: a chest offers new pieces, then levels and the rare ones, then score ----------
 {
   const game = LCS.createGame(balance, {seed: 25, map: at("open")});
   const s = game.state;
@@ -204,22 +205,23 @@ result.classic.with_agent = play(readScenario("short-task"), 100, 23, at("open")
   game.dev.immortal();
   const before = JSON.parse(JSON.stringify(s.stats));
   const offers = [];
-  for (let i = 0; i < balance.gear.length + 1; i++) {
+  for (let i = 0; i < balance.gear.length * balance.chest.max_level + 1; i++) {
     game.dev.chest();
     const chest = s.items[s.items.length - 1];
     chest.x = s.player.x;
     chest.y = s.player.y;
     game.step(DT, {x: 0, y: 0});
     offers.push({kind: s.choiceKind, n: s.choices ? s.choices.length : 0,
-                 gear: Boolean(s.choices && s.choices.every((c) => c.gear))});
+                 cards: (s.choices || []).map((c) => ({id: c.id, level: c.level, gear: c.gear, rare: c.rare,
+                                                       text_en: c.text_en}))});
     if (s.choices) game.choose(0);
   }
   // A level-up and a chest at once: both are offered, one after the other.
   game.dev.level();
   const levelFirst = s.choiceKind;
   game.choose(0);
-  result.gear = {offers, taken: s.gear, unique: new Set(s.gear).size, before, after: s.stats,
-                 shield: s.player.shield, level_first: levelFirst, choices_left: s.choices,
+  result.gear = {offers, taken: s.gear, levels: s.gearLevels, unique: new Set(s.gear).size, before,
+                 after: s.stats, shield: s.player.shield, level_first: levelFirst, choices_left: s.choices,
                  pending: s.pendingChests};
 }
 // A boss leaves a chest.

@@ -679,6 +679,28 @@
               "GgGGGG", "GGGGGG", ".GGGG."]],
   };
 
+  // Rare gear: only from a chest once the usual pieces are taken.
+  const standing_desk = {
+    palette: {W: "#a8743f", w: "#86582f", G: "#8a8aa0", S: "#5b8bd0", K: "#3a3a52"},
+    frames: [["..KKKKKK..", "..KSSSSK..", "..KKKKKK..", "....GG....", "WWWWWWWWWW", "wwwwwwwwww",
+              ".G......G.", ".G......G.", ".G......G.", "GGG....GGG"]],
+  };
+  const cactus = {
+    palette: {G: "#4fbf6f", g: "#2f8a4a", W: "#e8e6f0", P: "#c8603a", p: "#9a4a2a", F: "#e87a9a"},
+    frames: [["....F.....", "...GGG....", "G..GgG....", "GW.GgG..G.", "GGGGgG.WG.", "...GgGGGG.",
+              "...GgG....", "..PPPPP...", "..PpppP...", "...PPP...."]],
+  };
+  const plaid = {
+    palette: {R: "#d9534f", r: "#a83a3a", Y: "#e8c14a", W: "#f4e0c0"},
+    frames: [["RRYRRRYRRR", "RRYRRRYRRR", "YYYYYYYYYY", "RRYRRRYRRR", "rrYrrrYrrr", "YYYYYYYYYY",
+              "RRYRRRYRRR", ".W.W.W.W.W"]],
+  };
+  const homelab = {
+    palette: {K: "#2a2a3e", k: "#45455e", G: "#4fbf6f", B: "#5b8bd0", Y: "#e8c14a"},
+    frames: [["KKKKKKKKKKKK", "KkkkkkkkkGkK", "KKKKKKKKKKKK", "KkkkkkkkkBkK", "KKKKKKKKKKKK",
+              "KkkkkkkkkYkK", "KKKKKKKKKKKK", ".K........K."]],
+  };
+
   // --- weapons: icons for the cards and the build bar, and what they leave on the floor ---
 
   const pistol = {
@@ -784,16 +806,62 @@
     frames: [["..A.....A..", ".AAA...AAA.", "AAWAA.AAWAA", ".AAA...AAA.", "..A.....A.."]],
   };
 
+  // --- the map's objects, as icons in the handbook and the hints --------------------
+
+  const door = {
+    palette: {F: "#5a4a3a", W: "#a8743f", w: "#86582f", Y: "#e8c14a"},
+    frames: [["FFFFFFFFFF", "FWWwWWwWWF", "FWWwWWwWWF", "FWWwWWwWWF", "FWWwWWwYWF", "FWWwWWwWWF",
+              "FWWwWWwWWF", "FWWwWWwWWF", "FFFFFFFFFF"]],
+  };
+  const crack = {
+    palette: {G: "#7a7486", g: "#5a5466", K: "#2a2633"},
+    frames: [["GGGGgGGGGGGg", "GGKGgGGGGGGg", "gggKgggggggg", "GGGGKGGgGGGG", "GGGgKKGgGGGG",
+              "ggggggKKgggg", "GgGGGGGgKGGG", "GgGGGGGgGKGG"]],
+  };
+  const rack = {
+    palette: {K: "#2a2a3e", k: "#45455e", G: "#4fbf6f", R: "#e85a2a", B: "#5b8bd0"},
+    frames: [["KKKKKKKK", "KkkkkkkK", "KkGkBkkK", "KkkkkkkK", "KkRkGkkK", "KkkkkkkK",
+              "KkBkkRkK", "KkkkkkkK", "KKKKKKKK", "K......K"]],
+  };
+  const belt = {
+    palette: {K: "#3a3a52", G: "#8a8aa0", Y: "#e8c14a"},
+    frames: [["GGGGGGGGGGGG", "KKKKKKKKKKKK", "KYKKKYKKKYKK", "KKYKKKYKKKYK", "KYKKKYKKKYKK",
+              "KKKKKKKKKKKK", "GGGGGGGGGGGG"]],
+  };
+  const pit = {
+    palette: {W: "#e8f0ff", w: "#b8c8e8", K: "#0e0e1e", S: "#c8c8ff"},
+    frames: [["..wwwwwwww..", ".wWWWWWWWWw.", "wWKKKKKKKKWw", "wKKKSKKKKKKw", "wKKKKKKKSKKw",
+              "wKSKKKKKKKKw", ".wKKKKSKKKw.", "..wwwwwwww.."]],
+  };
+  const pad = {
+    palette: {P: "#d07ad0", p: "#8a4a9a", W: "#fff0ff"},
+    frames: [["...PPPPP...", ".PPpppppPP.", "PpppWWWpppP", "PppWpppWppP", "PpppWWWpppP",
+              ".PPpppppPP.", "...PPPPP..."]],
+  };
+  const vent = {
+    palette: {G: "#5a5a72", K: "#1e1e2e", R: "#e85a2a", Y: "#e8c14a"},
+    frames: [["...Y..Y...", "..YR.YR.Y.", "..RR.RR.R.", "GGGGGGGGGG", "GKGKGKGKGG", "GKGKGKGKGG",
+              "GGGGGGGGGG"]],
+  };
+  // The night office: a moon over the dark.
+  const dark = {
+    palette: {Y: "#e8d36a", y: "#b8a44a", K: "#1e1e3a"},
+    frames: [["..YYYY..", ".YYYK...", "YYyK....", "YYy.....", "YYy.....", "YYyK....", ".YYYK...",
+              "..YYYY.."]],
+  };
+
   const SPRITES = {grunt, runner, tank, boss, leak, leak_small, race, nullptr, deprecated,
                    flaky, spaghetti, offbyone, debt, logspam, log_line, regression, scope, monolith,
                    micro, boss_oom, boss_loop, loop_segment, boss_race, boss_fire, fire, goo, incident,
                    deploy, elite,
                    ally, spirit, gun, bullet, missile, spark, medkit, coffee, duck, shield,
                    gem, gem_big, chest, keyboard, monitor, headphones, chair, sticker, thermos,
+                   standing_desk, cactus, plaid, homelab,
                    pistol, shotgun, laser, linters, linter, mines, mine, regex, ping, cron,
                    damage, firerate, multishot, area, pierce, reload, magazine, speed, vitality,
                    regen, ally_power, missiles, spirit_scout, spirit_plan, turret, commit, ask,
-                   orchestra, red_ci, tests_ok};
+                   orchestra, red_ci, tests_ok,
+                   door, crack, rack, belt, pit, pad, vent, dark};
 
   // --- decoding --------------------------------------------------------------------
 

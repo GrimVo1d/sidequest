@@ -18,8 +18,8 @@ MAX_LINES = 1000
 # Files written before the size budget, with the size they may not grow past. Shrink the
 # number when a file gets smaller; remove the entry once the file is under MAX_LINES.
 LEGACY_SIZE = {
-    "game/game.js": 2001,
-    "game/render.js": 1092,
+    "game/game.js": 1819,
+    "game/render.js": 1052,
 }
 
 FORBIDDEN_SINKS = re.compile(
