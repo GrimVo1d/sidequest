@@ -211,6 +211,19 @@ class PipelineTest(unittest.TestCase):
         self.assertTrue(self.arrived.wait(2))
         self.assertEqual(self.got, [payload])
 
+    def test_hook_without_stdin_still_exits_0(self):
+        # A failed redirection on `exec` ends a POSIX sh with a non-zero code, and 2 tells
+        # Claude Code to block the tool.
+        self.start_receiver()
+        for shell in ("/bin/sh", "/bin/dash"):
+            if not os.path.exists(shell):
+                continue
+            with self.subTest(shell=shell):
+                proc = subprocess.run(
+                    [shell, "-c", f'{shell} "$0" <&-', self.emit], capture_output=True
+                )
+                self.assertEqual((proc.returncode, proc.stdout, proc.stderr), (0, b"", b""))
+
     def test_second_instance_refuses(self):
         self.start_receiver()
         with self.assertRaises(AlreadyRunningError):

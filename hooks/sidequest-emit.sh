@@ -12,8 +12,9 @@ if cd "${0%/*}/../data" && [ -S sidequest.sock ]; then
     # `nc -w` does not cover a receiver that stops reading (nc blocks on write),
     # so a watchdog kills nc after 1 second no matter what.
     # A background job of a non-interactive sh gets /dev/null as its input (dash, the sh
-    # of Debian and Ubuntu, does so), so nc is given the hook's input on descriptor 3.
-    exec 3<&0
+    # of Debian and Ubuntu, does so), so nc is given the hook's input on descriptor 3;
+    # `command` keeps a failed redirection (no stdin at all) from ending the script.
+    command exec 3<&0
     /usr/bin/nc -U -w 1 sidequest.sock <&3 &
     NC=$!
     (/bin/sleep 1; kill "$NC") &

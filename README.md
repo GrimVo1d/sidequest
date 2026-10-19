@@ -48,7 +48,7 @@ and the task of the day.
   entries.
 - Everything else the game writes stays in `data/` inside the project folder.
 
-The whole hook is [27 lines of shell](hooks/sidequest-emit.sh). The events and fields it
+The whole hook is [28 lines of shell](hooks/sidequest-emit.sh). The events and fields it
 relies on are described in [docs/events.md](docs/events.md).
 
 ## Install
