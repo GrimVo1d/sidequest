@@ -33,8 +33,10 @@ class PlanTest(unittest.TestCase):
         self.assertEqual(new["hooks"]["Notification"], FOREIGN["hooks"]["Notification"])
         self.assertEqual(cs.find_entries(new), {event: [EMIT] for event in HOOK_EVENTS})
         entry = new["hooks"]["Stop"][0]["hooks"][0]
-        self.assertEqual(entry["command"], "/bin/sh")
-        self.assertEqual(entry["args"], [EMIT])
+        # The script itself, not /bin/sh with the script in `args`: a runner that ignored
+        # `args` would feed the hook's input to a bare shell.
+        self.assertEqual(entry["command"], EMIT)
+        self.assertEqual(entry["args"], [])
         self.assertNotIn("async", entry)
 
     def test_install_is_idempotent(self):
@@ -48,6 +50,22 @@ class PlanTest(unittest.TestCase):
         moved, changes = cs.plan_install(once, EMIT)
         self.assertEqual({what for _, what in changes}, {"update"})
         self.assertEqual(cs.find_entries(moved), {event: [EMIT] for event in HOOK_EVENTS})
+
+    def test_a_path_with_spaces_is_still_ours(self):
+        spaced = "/Users/someone/My Projects/sidequest/hooks/sidequest-emit.sh"
+        once, _ = cs.plan_install(FOREIGN, spaced)
+        self.assertEqual(cs.find_entries(once), {event: [spaced] for event in HOOK_EVENTS})
+        self.assertEqual(cs.plan_install(once, spaced)[1], [])
+        self.assertEqual(cs.plan_uninstall(once)[0], FOREIGN)
+
+    def test_old_exec_form_is_found_and_upgraded(self):
+        old = {"type": "command", "command": "/bin/sh", "args": [EMIT], "timeout": 5}
+        settings = {"hooks": {"Stop": [{"hooks": [old]}]}}
+        self.assertEqual(cs.find_entries(settings), {"Stop": [EMIT]})
+        new, changes = cs.plan_install(settings, EMIT)
+        self.assertIn(("Stop", "update"), changes)
+        self.assertEqual(new["hooks"]["Stop"][0]["hooks"][0], cs.hook_entry(EMIT))
+        self.assertEqual(cs.plan_uninstall(settings)[1], [("Stop", "remove")])
 
     def test_duplicates_are_removed(self):
         once, _ = cs.plan_install({}, EMIT)
@@ -114,6 +132,17 @@ class PlanTest(unittest.TestCase):
             cs.is_sidequest_hook({"command": "/bin/sh", "args": ["x-sidequest-emit.sh"]})
         )
         self.assertTrue(cs.is_sidequest_hook({"command": "sh /a/hooks/sidequest-emit.sh"}))
+        # Another program handed the script among its arguments is the user's.
+        logger = {
+            "command": "/usr/local/bin/logger",
+            "args": ["--tag", "x", "/backup/sidequest-emit.sh"],
+        }
+        self.assertFalse(cs.is_sidequest_hook(logger))
+        self.assertFalse(
+            cs.is_sidequest_hook({"command": "sh", "args": ["-c", "/a/sidequest-emit.sh"]})
+        )
+        settings = {"hooks": {"Stop": [{"hooks": [logger]}]}}
+        self.assertEqual(cs.plan_uninstall(settings), (settings, []))
         settings = {"hooks": {"Stop": [{"hooks": [own]}]}}
         self.assertEqual(cs.plan_uninstall(settings), (settings, []))
 
@@ -177,6 +206,16 @@ class FileTest(unittest.TestCase):
         with open(self.path) as f:
             self.assertEqual(f.read(), "{ not json")
         self.assertEqual(os.listdir(self.dir), ["settings.json"])
+
+    def test_numbers_beyond_json_are_left_alone(self):
+        # NaN, Infinity and 1e400 would come back out as text that is not JSON.
+        for text in ('{"a": NaN}', '{"a": Infinity}', '{"cleanupPeriodDays": 1e400}'):
+            with self.subTest(text=text):
+                self.write(text)
+                with self.assertRaises(cs.SettingsError):
+                    self.install()
+                with open(self.path) as f:
+                    self.assertEqual(f.read(), text)
 
     def test_declined_confirmation_changes_nothing(self):
         self.write(FOREIGN)

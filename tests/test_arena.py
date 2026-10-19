@@ -33,6 +33,11 @@ class ArenaTest(unittest.TestCase):
         found.update({"map " + k: v for k, v in self.result["maps"].items()})
         return found
 
+    def test_difficulty_stops_growing_with_the_clock(self):
+        g = self.result["growth"]
+        self.assertLess(g["early"], g["cap"])
+        self.assertAlmostEqual(g["cap"], g["late"])
+
     def test_met_things_are_tracked_for_hints(self):
         met = set(self.result["classic"]["alone"]["met"])
         self.assertIn("grunt", met)
@@ -549,7 +554,9 @@ class ArenaTest(unittest.TestCase):
         for a in self.balance["achievements"]:
             with self.subTest(a["id"]):
                 self.assertTrue(a["name"] and a["text"] and a["when"])
-                self.assertLessEqual(set(a["when"]), {"min", "max", "is", "total_min", "maps_all"})
+                self.assertLessEqual(
+                    set(a["when"]), {"min", "max", "is", "total_min", "maps_all", "kinds_min"}
+                )
         for a in ("first", "classic_win", "solo", "friday", "boss"):
             self.assertIn(a, p["after_win"])
         self.assertNotIn("tourist", p["after_win"])

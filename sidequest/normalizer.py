@@ -149,16 +149,37 @@ MAX_FILE = 256  # the longest file path a game event keeps
 MAX_COMMAND = 64 * 1024
 
 
+MAX_KINDS = 200  # the most different shapes, tools or events counted for the self-check
+# What a payload of a shape nobody expected can raise while it is read.
+BAD_INPUT = (TypeError, ValueError, AttributeError, KeyError, OverflowError)
+
+
 def _text(value: object, limit: int = MAX_TEXT) -> str | None:
     """A non-empty string field cut to `limit`, or None for anything else."""
     return value[:limit] if isinstance(value, str) and value else None
 
 
+def session_key(value: object) -> str | None:
+    """A session id as game events carry it (cut like every name), or None."""
+    return _text(value)
+
+
+def _count(table: dict[Any, int], key: Any) -> None:
+    """Count a kind; past MAX_KINDS different ones a new kind is not kept, so whatever
+    writes to the socket cannot grow the tables without end."""
+    if key in table or len(table) < MAX_KINDS:
+        table[key] = table.get(key, 0) + 1
+
+
 def _number(value: object) -> int | float | None:
-    """A finite number field (not a bool), or None for anything else."""
+    """A finite number field (not a bool), or None for anything else (an integer too big
+    for a float too: JSON allows it, math.isfinite does not)."""
     if isinstance(value, bool) or not isinstance(value, int | float):
         return None
-    return value if math.isfinite(value) else None
+    try:
+        return value if math.isfinite(value) else None
+    except OverflowError:
+        return None
 
 
 def _words(segment: str) -> list[str]:
@@ -310,8 +331,7 @@ class Normalizer:
         name = _text(payload.get("hook_event_name"))
         if name is None:
             return [self._unknown(ts, None, "_invalid")]
-        shape = (name, tuple(sorted(payload)))
-        self.shapes[shape] = self.shapes.get(shape, 0) + 1
+        _count(self.shapes, (name, tuple(sorted(str(k)[:MAX_TEXT] for k in payload))))
 
         session_id = _text(payload.get("session_id"))
         if session_id is None:
@@ -373,8 +393,8 @@ class Normalizer:
             # events, never the session_start or resume already in `out`.
             try:
                 out.extend(handler(ts, session_id, session, payload, agent))
-            except (TypeError, ValueError, AttributeError, KeyError):
-                self.unknown_events["_invalid"] = self.unknown_events.get("_invalid", 0) + 1
+            except BAD_INPUT:
+                _count(self.unknown_events, "_invalid")
         elif name not in IGNORED_EVENTS:
             out.append(self._unknown(ts, session_id, name, session))
         return out
@@ -591,7 +611,7 @@ class Normalizer:
         tool = _text(raw_tool) or "?"
         action = TOOL_ACTIONS.get(tool, "generic")
         if tool not in KNOWN_TOOLS:
-            self.unknown_tools[tool] = self.unknown_tools.get(tool, 0) + 1
+            _count(self.unknown_tools, tool)
         fields: dict[str, Any] = {"tool": tool, "action": action}
         tool_input = payload.get("tool_input")
         if not isinstance(tool_input, dict):
@@ -615,7 +635,7 @@ class Normalizer:
     def _unknown(
         self, ts: float, sid: str | None, name: str, session: _Session | None = None
     ) -> Event:
-        self.unknown_events[name] = self.unknown_events.get(name, 0) + 1
+        _count(self.unknown_events, name)
         return {
             "ts": ts,
             "session": sid,

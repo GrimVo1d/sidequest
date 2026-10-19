@@ -374,7 +374,7 @@
     checkStill(bytes);
     let bitmap;
     try {
-      bitmap = await createImageBitmap(file);
+      bitmap = await createImageBitmap(new Blob([bytes]));   // the bytes checked above, not a new read
     } catch (e) {
       throw new Error(tr("это не картинка или формат не поддерживается",
                              "not a picture, or the format is not supported"));

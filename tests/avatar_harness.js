@@ -13,6 +13,8 @@ for (const o of A.OPTIONS) {
   for (const c of o.choices) result.builder.push(A.compose({[o.key]: c.id}));
 }
 result.builder.push(A.compose({hair: "../../etc", skin: "nope"}));
+// Ids that are names on every object's prototype (a save edited by hand) get the default too.
+result.builder.push(A.compose({hair: "constructor", skin: "toString", bg: "__proto__"}));
 
 const frameHex = (f) => Array.from(f.rgba, (v) => v.toString(16).padStart(2, "0")).join("");
 const bytes = new Uint8Array(readFile(gifPath, "binary"));

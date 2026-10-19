@@ -927,5 +927,20 @@
     return {width: w, height: h, data};
   }
 
-  root.LCSSprites = {SPRITES, decode, decodeRows, shade, rgb, OUTLINE};
+  // Debris colors of each enemy: body, shade, highlight.
+  const GORE = {
+    grunt: ["#c8443c", "#9a3029", "#e87a6a"], runner: ["#e89a4a", "#b86a2a", "#f0c080"],
+    tank: ["#8a5bd0", "#6a40a8", "#8a8aa0"], boss: ["#c8443c", "#4a7ae8", "#e8c14a"],
+    leak: ["#5fbf5a", "#3f8f3c", "#a8e89a"], leak_small: ["#5fbf5a", "#3f8f3c", "#a8e89a"],
+    race: ["#4ac0c8", "#2e8a92", "#c8c8d4"], nullptr: ["#d07ad0", "#9a4a9a", "#7fe0e0"],
+    deprecated: ["#b8b4cc", "#8a86a0", "#e8e6f0"],
+    flaky: ["#4fbf6f", "#d9534f", "#e8e6f0"], spaghetti: ["#e8c14a", "#b8902a", "#c8443c"],
+    offbyone: ["#4ac0a0", "#2e8a72", "#fffbe0"], debt: ["#8a7a5a", "#6a5a40", "#e8c14a"],
+    logspam: ["#8a8aa0", "#1b1b2f", "#4fbf6f"], regression: ["#c84a8a", "#963066", "#fffbe0"],
+    scope: ["#e87aa8", "#b84a7a", "#fff0f6"], monolith: ["#6a6a82", "#4a4a62", "#5bd0e8"],
+    micro: ["#4ac0c8", "#2e8a92", "#e8e6f0"], boss_oom: ["#7fbf3a", "#5a8f2a", "#c8e87a"],
+    boss_loop: ["#5b6ad0", "#3a48a0", "#e8c14a"], loop_segment: ["#5b6ad0", "#3a48a0", "#e8c14a"],
+    boss_race: ["#4ac0c8", "#e89a4a", "#c8c8d4"], boss_fire: ["#5a5a72", "#e85a2a", "#ffe066"],
+  };
+  root.LCSSprites = {SPRITES, decode, decodeRows, shade, rgb, OUTLINE, GORE};
 })(typeof window !== "undefined" ? window : globalThis);

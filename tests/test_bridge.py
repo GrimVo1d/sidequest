@@ -170,6 +170,13 @@ class BridgeTest(unittest.TestCase):
         _, bridge = self.make()
         with self.assertRaises(ValueError):
             bridge.save("save", {"x": float("nan")})
+        # A save edited by hand with NaN or 1e400 is refused on the way back too: the page
+        # could not read it.
+        for text in ('{"x": NaN}', '{"x": 1e400}'):
+            with open(os.path.join(paths.GAME_DATA_DIR, "edited.json"), "w") as f:
+                f.write(text)
+            with self.assertRaises(ValueError):
+                bridge.load("edited")
 
     def test_balance_is_the_games(self):
         _, bridge = self.make()
@@ -205,6 +212,14 @@ class BridgeTest(unittest.TestCase):
         self.assertEqual(bridge.set_setting("silence_pause_seconds", 1), 10)
         self.assertEqual(bridge.set_setting("fps_limit", 45), 60)
         self.assertEqual(bridge.get_settings()["silence_pause_seconds"], 10)
+        self.assertEqual(bridge.set_setting("screen_shake", 0.3), 0.5)
+        self.assertEqual(bridge.set_setting("screen_shake", -5), 0)
+        self.assertIs(bridge.set_setting("outline", "yes"), False)
+        self.assertIs(bridge.set_setting("outline", True), True)
+        self.assertEqual(bridge.set_setting("ui_scale", 9), 1.5)
+        self.assertEqual(bridge.get_settings()["ui_scale"], 1.5)
+        with self.assertRaises(ValueError):
+            bridge.set_setting("anything", 1)
 
     def test_install_and_uninstall_from_the_page(self):
         _, bridge = self.make()

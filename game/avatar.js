@@ -316,20 +316,23 @@
     return Object.assign({size: SIZE, palette, frames: [{pixels, delay: 100}]}, extra);
   }
 
+  // A part's entry by its saved id; an id that is no choice of its own (a "constructor" in a
+  // save edited by hand) gets the default.
+  const choice = (table, key, id) => (Object.hasOwn(table, id) ? table[id] : table[DEFAULT_PARTS[key]]);
+
   function partsGrid(parts) {
     const p = Object.assign({}, DEFAULT_PARTS, parts);
     const color = (ch) => {
-      if (FIXED[ch]) return FIXED[ch];
-      const slot = SLOTS[ch];
+      if (Object.hasOwn(FIXED, ch)) return FIXED[ch];
+      const slot = Object.hasOwn(SLOTS, ch) ? SLOTS[ch] : null;
       if (!slot) return null;
-      const entry = COLORS[slot[0]][p[slot[0]]] || COLORS[slot[0]][DEFAULT_PARTS[slot[0]]];
-      return entry[slot[1]];
+      return choice(COLORS[slot[0]], slot[0], p[slot[0]])[slot[1]];
     };
-    const bg = (COLORS.bg[p.bg] || COLORS.bg.none)[1];
+    const bg = (Object.hasOwn(COLORS.bg, p.bg) ? COLORS.bg[p.bg] : COLORS.bg.none)[1];
     const grid = Array(SIZE * SIZE).fill(bg);
     for (const layer of LAYERS) {
       const sprite = layer === "head" ? HEAD
-        : (PARTS[layer][p[layer]] || PARTS[layer][DEFAULT_PARTS[layer]])[1];
+        : choice(PARTS[layer], layer, p[layer])[1];
       sprite.forEach((line, y) => {
         for (let x = 0; x < SIZE; x++) {
           if (line[x] !== ".") grid[y * SIZE + x] = color(line[x]);
@@ -343,7 +346,7 @@
     const clean = {};
     for (const o of OPTIONS) {
       const table = o.type === "shape" ? PARTS[o.key] : COLORS[o.key];
-      clean[o.key] = parts && table[parts[o.key]] ? parts[o.key] : DEFAULT_PARTS[o.key];
+      clean[o.key] = parts && Object.hasOwn(table, parts[o.key]) ? parts[o.key] : DEFAULT_PARTS[o.key];
     }
     return pack(partsGrid(clean), {source: "builder", parts: clean});
   }

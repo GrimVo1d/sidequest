@@ -9,21 +9,7 @@
   const DARK = SP.OUTLINE;
   const TAU = Math.PI * 2;
 
-  // Debris colors of each enemy: body, shade, highlight.
-  const GORE = {
-    grunt: ["#c8443c", "#9a3029", "#e87a6a"], runner: ["#e89a4a", "#b86a2a", "#f0c080"],
-    tank: ["#8a5bd0", "#6a40a8", "#8a8aa0"], boss: ["#c8443c", "#4a7ae8", "#e8c14a"],
-    leak: ["#5fbf5a", "#3f8f3c", "#a8e89a"], leak_small: ["#5fbf5a", "#3f8f3c", "#a8e89a"],
-    race: ["#4ac0c8", "#2e8a92", "#c8c8d4"], nullptr: ["#d07ad0", "#9a4a9a", "#7fe0e0"],
-    deprecated: ["#b8b4cc", "#8a86a0", "#e8e6f0"],
-    flaky: ["#4fbf6f", "#d9534f", "#e8e6f0"], spaghetti: ["#e8c14a", "#b8902a", "#c8443c"],
-    offbyone: ["#4ac0a0", "#2e8a72", "#fffbe0"], debt: ["#8a7a5a", "#6a5a40", "#e8c14a"],
-    logspam: ["#8a8aa0", "#1b1b2f", "#4fbf6f"], regression: ["#c84a8a", "#963066", "#fffbe0"],
-    scope: ["#e87aa8", "#b84a7a", "#fff0f6"], monolith: ["#6a6a82", "#4a4a62", "#5bd0e8"],
-    micro: ["#4ac0c8", "#2e8a92", "#e8e6f0"], boss_oom: ["#7fbf3a", "#5a8f2a", "#c8e87a"],
-    boss_loop: ["#5b6ad0", "#3a48a0", "#e8c14a"], loop_segment: ["#5b6ad0", "#3a48a0", "#e8c14a"],
-    boss_race: ["#4ac0c8", "#e89a4a", "#c8c8d4"], boss_fire: ["#5a5a72", "#e85a2a", "#ffe066"],
-  };
+  const GORE = SP.GORE;   // debris colors of each enemy
   // Enemies with a health bar over them: the tough ones, and every elite.
   const BAR_TYPES = new Set(["tank", "monolith", "debt", "scope"]);
   const ITEM_COLORS = {medkit: "#d9534f", coffee: "#e89a4a", duck: "#e8c14a", shield: "#5b8bd0",
@@ -287,6 +273,8 @@
     let last = null;       // the state drawn last time; a new one means a new match
     let lastTime = 0, lastLevel = 1, lastDead = 0, lastHurt = -1;
     let shake = 0, flash = 0, hurtFlash = 0, levelGlow = 0;
+    // The player's settings: how much the screen shakes (0..1), outlines for colorblind players.
+    let opts = {shake: 1, outline: false};
     let seen = new WeakSet();
     let flashes = new WeakMap(), prevPos = new WeakMap();
 
@@ -401,6 +389,7 @@
       else if (e.slow > 0) o.outline = "#7fb3e0";
       else if (e.final) o.outline = Math.floor(s.time * 4) & 1 ? "#e8c14a" : "#b8902a";
       else if (e.returned) o.outline = "#d9534f";
+      else if (opts.outline) o.outline = "#ffffff";
       if (e.type === "boss_race" && e.twinB) o.tint = "#e89a4a";
       const c = sprite(e.type, o);
       // Scope creep and out of memory grow in whole steps.
@@ -606,7 +595,7 @@
         return;
       }
       ctx.globalAlpha = Math.max(0, Math.min(1, left / 0.6));
-      pixelRing(h.x, h.y, h.r, "#e85a2a", 0.35, 1);
+      pixelRing(h.x, h.y, h.r, opts.outline ? "#ffffff" : "#e85a2a", opts.outline ? 0.8 : 0.35, 1);
       const n = Math.max(1, Math.round(h.r * h.r / 90));
       for (let i = 0; i < n; i++) {
         const a = hash(h.x | 0, h.y | 0, i) * TAU, d = i ? Math.sqrt(hash(h.y | 0, h.x | 0, i)) * (h.r - 3) : 0;
@@ -618,7 +607,7 @@
     }
 
     function drawEnemyShot(sh) {
-      const c = sprite("log_line", {});
+      const c = sprite("log_line", opts.outline ? {outline: "#ffffff"} : {});
       ctx.drawImage(c, px(sh.x) - (c.width >> 1), px(sh.y) - (c.height >> 1));
     }
 
@@ -925,8 +914,9 @@
       updateParticles(dt);
 
       const p = s.player, W = s.map.width, H = s.map.height;
-      const sx = shake > 0 ? Math.round((Math.random() - 0.5) * 2 * shake) : 0;
-      const sy = shake > 0 ? Math.round((Math.random() - 0.5) * 2 * shake) : 0;
+      const sh = shake * opts.shake;
+      const sx = sh > 0 ? Math.round((Math.random() - 0.5) * 2 * sh) : 0;
+      const sy = sh > 0 ? Math.round((Math.random() - 0.5) * 2 * sh) : 0;
       // A map smaller than the view sits in the middle.
       const cam = (pos, size, view) => (size <= view ? (size - view) / 2
         : Math.max(0, Math.min(size - view, pos - view / 2)));
@@ -1045,7 +1035,9 @@
 
     const view = () => ({width: VW, height: VH});
 
-    return {draw, preview, icon, view, bossBarsBottom};
+    const setOptions = (o) => { opts = Object.assign({}, opts, o); };
+
+    return {draw, preview, icon, view, bossBarsBottom, setOptions};
   }
 
   root.LCSRender = {createRenderer, THEMES};

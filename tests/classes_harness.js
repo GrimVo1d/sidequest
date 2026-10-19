@@ -157,4 +157,29 @@ result.start.unknown = make({cls: "nope"}).state.cls.id;
   result.meta.found = found;
 }
 
+// --- achievements of the classes ----------------------------------------------------------
+{
+  // Full stack: a match with each class, counted in the records' totals.
+  const full = balance.achievements.find((a) => a.id === "fullstack");
+  let records = LCSProgress.migrate({totals: {matches: 1, classes: {__proto__: 3, developer: 2, nope: "x"}}});
+  const known = LCSProgress.known(balance, LCS_MAPS);
+  // Names that are no class (left by an older version, or edited in) do not count.
+  const strangers = LCSProgress.migrate({totals: {classes: {a: 1, b: 1, c: 1, d: 1, e: 1, f: 1}}});
+  result.strangers = LCSProgress.earned([full], {}, strangers, known).length;
+  const steps = [];
+  for (const c of balance.classes) {
+    records = LCSProgress.addMatch(records, {mode: "classic", reason: "dead", time: 60, score: 0, level: 1,
+                                             kills: 0, map: "open", class: c.id});
+    steps.push([LCSProgress.earned([full], {}, records, known).length, LCSProgress.progressOf(full, records, {}, known).have]);
+  }
+  // Hotkeys: the ability's uses go into the match's results.
+  const game = make({cls: "junior"}), s = game.state;
+  for (let i = 0; i < 3; i++) {
+    s.cls.ready = 0;
+    game.ability();
+  }
+  result.awards = {steps, classes: Object.keys(records.totals.classes).sort(), safe: ({}).developer === undefined,
+                   abilities: game.finish("quit").abilities};
+}
+
 print(JSON.stringify(result));

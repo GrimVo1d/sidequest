@@ -12,14 +12,14 @@ import unittest
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 JS_GLOBS = ["game/*.js", "landing/*.js"]
-PY_GLOBS = ["sidequest/*.py", "tests/*.py", "dev/webkit/*.py", "landing/*.py"]
+PY_GLOBS = ["sidequest/*.py", "tests/*.py", "dev/*.py", "dev/webkit/*.py", "landing/*.py"]
 
 MAX_LINES = 1000
 # Files written before the size budget, with the size they may not grow past. Shrink the
 # number when a file gets smaller; remove the entry once the file is under MAX_LINES.
 LEGACY_SIZE = {
     "game/game.js": 1800,
-    "game/render.js": 1052,
+    "game/render.js": 1044,
 }
 
 FORBIDDEN_SINKS = re.compile(

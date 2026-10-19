@@ -41,6 +41,15 @@ class CoreTest(unittest.TestCase):
         self.feed(raw("SessionStart", source="startup"))
         self.feed(raw("UserPromptSubmit", prompt="x", prompt_id="p1"))
 
+    def test_a_long_session_id_still_pauses_on_silence(self):
+        long_id = "s" * 5000
+        self.feed(raw("SessionStart", long_id, source="startup"))
+        self.feed(raw("UserPromptSubmit", long_id, prompt="x", prompt_id="p1"))
+        self.assertTrue(all(len(k) <= 128 for k in self.core._last_activity))
+        self.clock.now += 91
+        self.core.check_silence()
+        self.assertIn("silent", self.kinds())
+
     def test_events_are_stored(self):
         self.working_session()
         stored = self.core.store.session_events(SID)
@@ -173,6 +182,13 @@ class CoreTest(unittest.TestCase):
         self.assertEqual(self.core.control_report, [])
         self.assertEqual(self.core.store.verified_version(), "9.9.9")
 
+    def test_control_session_survives_an_odd_event_name(self):
+        self.core.start_control_session("9.9.9")
+        self.working_session()
+        self.feed(raw("Stop", hook_event_name=["Stop"]))
+        self.feed(post("Read", "t1", {"file_path": "/x"}, {}))
+        self.assertEqual(self.kinds()[-1], "tool")
+
     def test_control_session_reports_missing_fields(self):
         # The report is in the user's language; this checks the Russian texts.
         self.addCleanup(i18n.set_language, i18n.language())
@@ -227,6 +243,25 @@ class ReplayTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             store.set_meta("k", float("inf"))
         self.assertEqual(store.session_events("s"), [])
+
+    def test_delete_all_leaves_nothing_in_the_file(self):
+        path = os.path.join(self.dir, "t.db")
+        store = Store(path)
+        self.addCleanup(store.close)
+        for i in range(50):
+            store.add_event(
+                {
+                    "ts": float(i),
+                    "session": "s1",
+                    "project": "zz-secret-project",
+                    "kind": "tool",
+                    "file": "zz-secret-file.py",
+                }
+            )
+        store.delete_all()
+        with open(path, "rb") as f:
+            data = f.read()
+        self.assertNotIn(b"zz-secret", data)
 
     def test_export_round_trip(self):
         store = Store(os.path.join(self.dir, "t.db"))

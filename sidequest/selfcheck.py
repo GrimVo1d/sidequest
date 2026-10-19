@@ -148,6 +148,13 @@ def check_hooks(settings_path: str, emit_path: str, expected_hash: str | None) -
             ),
             t("Нажмите «Подключить» ещё раз", "Press “Connect” again"),
         )
+    if claude_settings.plan_install(settings, emit_path)[1]:
+        return Result(
+            t("Хуки", "Hooks"),
+            False,
+            t("записи отличаются от нужных", "the entries differ from the current form"),
+            t("Нажмите «Подключить» ещё раз", "Press “Connect” again"),
+        )
     if not os.path.isfile(emit_path):
         return Result(
             t("Хуки", "Hooks"),
@@ -261,7 +268,8 @@ def check_pipeline(emit_path: str, probe: PipelineProbe, timeout: float = 1.0) -
     payload = json.dumps({"hook_event_name": SELFTEST_EVENT, "token": token}).encode()
     start = time.monotonic()
     try:
-        proc = subprocess.run(["/bin/sh", emit_path], input=payload, capture_output=True, timeout=5)
+        # Started the way Claude Code starts it: the script itself, so a lost execute bit shows.
+        proc = subprocess.run([emit_path], input=payload, capture_output=True, timeout=5)
     except (OSError, subprocess.TimeoutExpired) as e:
         return Result(
             t("Конвейер", "Pipeline"),
@@ -323,6 +331,8 @@ class ControlSession:
             return None
         session = payload.get("session_id")
         name = payload.get("hook_event_name")
+        if not isinstance(name, str):
+            return None
         if self.session is None:
             if name != "SessionStart":
                 return None  # wait for a session that starts while we watch

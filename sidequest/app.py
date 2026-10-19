@@ -269,6 +269,14 @@ class Bridge:
         elif name == "language":
             value = value if value in (*i18n.LANGS, "auto") else "en"
             i18n.set_language(i18n.resolve(value))
+        elif name == "screen_shake":
+            value = min((0, 0.5, 1), key=lambda v: abs(v - float(value)))
+        elif name == "outline":
+            value = value is True
+        elif name == "ui_scale":
+            value = min((1, 1.25, 1.5), key=lambda v: abs(v - float(value)))
+        else:
+            raise ValueError(f"unknown setting: {name!r}")
         self._core.store.set_setting(name, value)
         return value
 
@@ -285,7 +293,7 @@ class Bridge:
         except FileNotFoundError:
             return None
         with open(fd, encoding="utf-8") as f:
-            return json.load(f)
+            return claude_settings.strict_json(f.read())
 
     def save(self, key: Any, value: Any) -> bool:
         path = self._save_file(key)

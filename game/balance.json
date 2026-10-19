@@ -148,8 +148,8 @@
   },
 
   "xp": {
-    "per_action": {"attack": 6, "scout": 2, "cast": 5, "scout_far": 4, "summon": 8,
-                   "todo": 3, "generic": 2},
+    "per_action": {"attack": 9, "scout": 3, "cast": 8, "scout_far": 6, "summon": 12,
+                   "todo": 5, "generic": 3},
     "error": 2,
     "first_level": 20,
     "growth": 1.22
@@ -239,11 +239,12 @@
   },
 
   "spawn": {
-    "base_per_second": 0.6, "per_minute": 0.02, "per_level": 0.1, "max_per_second": 3,
+    "base_per_second": 0.6, "per_minute": 0.02, "per_level": 0.07, "max_per_second": 3,
     "max_alive": 250,
-    "hp_growth_per_minute": 0.02, "hp_growth_per_level": 0.06,
+    "hp_growth_per_minute": 0.02, "hp_growth_per_level": 0.045,
     "speed_growth_per_minute": 0.03, "max_speed_growth": 0.35,
     "damage_growth_per_minute": 0.03,
+    "growth_minutes": 12,
     "boss_every_minutes": 5,
     "weights": {"grunt": 6, "runner": 3, "tank": 1, "flaky": 1.2, "spaghetti": 0.8, "offbyone": 1,
                 "debt": 0.8, "logspam": 0.7, "regression": 1, "scope": 0.6, "monolith": 0.25},
@@ -426,7 +427,19 @@
      "when": {"is": {"mode": "campaign", "reason": "win"}}},
     {"id": "crits", "icon": "tests_ok", "name": "Покрытие 100%", "text": "100 критических ударов за матч",
      "name_en": "100% coverage", "text_en": "100 critical hits in a match",
-     "when": {"min": {"crits": 100}}}
+     "when": {"min": {"crits": 100}}},
+    {"id": "abilities", "icon": "keyboard", "name": "Горячие клавиши", "text": "25 раз применить способность класса за матч",
+     "name_en": "Hotkeys", "text_en": "Use the class ability 25 times in a match",
+     "when": {"min": {"abilities": 25}}},
+    {"id": "fullstack", "icon": "monitor", "name": "Фулстек", "text": "Сыграть матч каждым из шести классов",
+     "name_en": "Full stack", "text_en": "Play a match with each of the six classes",
+     "when": {"kinds_min": {"classes": 6}}},
+    {"id": "evolutions", "icon": "linters", "name": "Рефакторинг", "text": "4 эволюции оружия за матч",
+     "name_en": "Refactoring", "text_en": "4 weapon evolutions in a match",
+     "when": {"min": {"evolutions": 4}}},
+    {"id": "senior", "icon": "gem", "name": "Из джунов в лиды", "text": "Джуном дойти до 25-го уровня",
+     "name_en": "Junior to lead", "text_en": "Reach level 25 as the Junior",
+     "when": {"is": {"class": "junior"}, "min": {"level": 25}}}
   ],
 
   "ghost": {"max_gap": 15, "after_task": 2, "lead": 2, "end_after": 4},
@@ -515,8 +528,8 @@
     "stages": [
       {"map": "open", "boss": "boss_oom"},
       {"map": "legacy", "boss": "boss_loop"},
-      {"map": "cicd", "boss": "boss_fire"},
       {"map": "night", "boss": "boss_race"},
+      {"map": "cicd", "boss": "boss_fire"},
       {"map": "prod", "boss": "boss"}
     ],
     "ending": {"title": "Релиз выпущен", "title_en": "Shipped",
@@ -585,5 +598,33 @@
     {"id": "missiles",   "name": "Мультиправка",  "text": "+1 снаряд союзника за правку",
      "name_en": "Multi-edit", "text_en": "+1 ally missile per edit",
      "stat": "ally_missiles", "add": 1, "max_level": 4, "ally": true}
-  ]
+  ],
+  "tutorial": {
+    "steps": [
+      {"id": "move", "icon": "keyboard", "need": {"moved": 160},
+       "name": "Ходи", "name_en": "Move",
+       "text": "WASD, стрелки или стик геймпада. Стрелять не нужно: оружие само бьёт по ближайшему врагу.",
+       "text_en": "WASD, the arrows or a gamepad's stick. No need to shoot: the weapon fires at the closest enemy by itself."},
+      {"id": "kills", "icon": "grunt", "covers": ["grunt"], "need": {"kills": 5},
+       "name": "Убей {kills} багов", "name_en": "Squash {kills} bugs",
+       "text": "Держись на расстоянии и не стой в толпе: враг ранит при касании.",
+       "text_en": "Keep your distance and stay out of the crowd: enemies hurt on touch."},
+      {"id": "level", "icon": "gem", "covers": ["gem"], "need": {"level": 2}, "only": "gems",
+       "name": "Собирай кристаллы", "name_en": "Pick up crystals",
+       "text": "Враги роняют кристаллы опыта. Набери уровень и выбери одно из трёх улучшений.",
+       "text_en": "Enemies drop experience crystals. Gain a level and pick one of three upgrades."},
+      {"id": "ability", "icon": "keyboard", "covers": ["ability"], "need": {"ability": 1}, "only": "ability",
+       "name": "Способность класса", "name_en": "Class ability",
+       "text": "Нажми Пробел (X на геймпаде). Пока она перезаряжается, секунды видны в нижней панели.",
+       "text_en": "Press Space (X on a gamepad). While it recharges, the seconds show in the bottom panel."},
+      {"id": "agent", "icon": "ally", "covers": ["ally"], "need": {"seconds": 8}, "only": "agent",
+       "name": "Союзники", "name_en": "Allies",
+       "text": "Это твои агенты Claude Code: их правки, тесты и коммиты становятся атаками и бонусами.",
+       "text_en": "These are your Claude Code agents: their edits, tests and commits turn into attacks and bonuses."},
+      {"id": "pause", "icon": "monitor", "need": {"seconds": 8},
+       "name": "Пауза и справочник", "name_en": "Pause and handbook",
+       "text": "Esc — пауза. Всё, что встретишь на арене, описано в справочнике. Удачи!",
+       "text_en": "Esc pauses. Everything you meet on the arena is in the handbook. Good luck!"}
+    ]
+  }
 }

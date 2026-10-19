@@ -23,7 +23,7 @@ ignore = [
 
 [tool.mypy]
 python_version = "3.12"
-files = ["sidequest", "tests", "dev/webkit", "landing"]
+files = ["sidequest", "tests", "dev", "landing"]
 exclude = ["^\\.tmp/", "^data/"]
 warn_unused_ignores = true
 warn_redundant_casts = true

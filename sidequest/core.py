@@ -11,7 +11,7 @@ from typing import Any
 
 from . import paths, selfcheck
 from .db import Store
-from .normalizer import Event, Normalizer
+from .normalizer import BAD_INPUT, Event, Normalizer, session_key
 from .receiver import Receiver
 
 SILENCE_TICK = 1.0
@@ -87,16 +87,21 @@ class Core:
                         self.store.set_meta("verified_version", self.control.version)
                     self.control = None
             # Notifications are Claude Code calling the user, not the agent doing work.
-            if (
-                isinstance(payload, dict)
-                and isinstance(payload.get("session_id"), str)
-                and payload.get("hook_event_name") != "Notification"
-            ):
-                session = payload["session_id"]
+            # Keyed like the game events (a cut id): the pause on silence must find it, and
+            # an id of megabytes is not kept.
+            if isinstance(payload, dict) and payload.get("hook_event_name") != "Notification":
+                session = session_key(payload.get("session_id"))
+            else:
+                session = None
+            if session is not None:
                 self._last_activity[session] = ts
                 if self._paused.get(session) == "silent":
                     self.publish(self._core_event(session, "resumed", source="activity"))
-            for event in self.normalizer.process(payload, ts):
+            try:
+                events = self.normalizer.process(payload, ts)
+            except BAD_INPUT:
+                events = []  # one odd payload loses only its own events
+            for event in events:
                 self.publish(event)
 
     def publish(self, event: Event) -> None:

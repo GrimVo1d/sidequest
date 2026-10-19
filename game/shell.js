@@ -307,13 +307,34 @@ async function settingsFlow() {
   l1.appendChild(silence);
   const l2 = el("label"); l2.appendChild(el("span", t("Ограничение FPS: ", "FPS limit: "))); l2.appendChild(fps);
   const l3 = el("label"); l3.appendChild(el("span", t("Язык: ", "Language: "))); l3.appendChild(language);
-  modal(t("Настройки", "Settings"), [l1, l2, l3], [[t("Отмена", "Cancel"), closeModal], [t("Сохранить", "Save"), async () => {
+  const choice = (label, values, current) => {
+    const select = el("select");
+    for (const [v, text] of values) {
+      const o = el("option", text); o.value = v; o.selected = v === current; select.appendChild(o);
+    }
+    const l = el("label"); l.appendChild(el("span", label)); l.appendChild(select);
+    return {l, select};
+  };
+  const shake = choice(t("Тряска экрана: ", "Screen shake: "),
+                       [[0, t("Выкл.", "Off")], [0.5, t("Слабая", "Low")], [1, t("Полная", "Full")]], s.screen_shake);
+  const scale = choice(t("Размер интерфейса: ", "Interface size: "),
+                       [[1, "100%"], [1.25, "125%"], [1.5, "150%"]], s.ui_scale);
+  const outline = el("input"); outline.type = "checkbox"; outline.checked = s.outline;
+  const l4 = el("label"); l4.appendChild(outline);
+  l4.appendChild(el("span", t(" Белый контур у врагов и их выстрелов (для дальтоников)",
+                              " A white outline on enemies and their shots (for colorblind players)")));
+  modal(t("Настройки", "Settings"), [l1, l2, l3, shake.l, scale.l, l4], [[t("Отмена", "Cancel"), closeModal],
+                                                                        [t("Сохранить", "Save"), async () => {
     await api.set_setting("silence_pause_seconds", Number(silence.value));
     await api.set_setting("fps_limit", Number(fps.value));
-    const changed = language.value !== s.language;
+    await api.set_setting("screen_shake", Number(shake.select.value));
+    await api.set_setting("ui_scale", Number(scale.select.value));
+    await api.set_setting("outline", outline.checked);
+    const changed = language.value !== s.language || Number(shake.select.value) !== s.screen_shake
+      || Number(scale.select.value) !== s.ui_scale || outline.checked !== s.outline;
     await api.set_setting("language", language.value);
     closeModal();
-    // The whole page is drawn again in the other language; the core keeps running.
+    // The whole page is drawn again in the other language or look; the core keeps running.
     if (changed) location.reload();
   }, "primary"]]);
 }
@@ -474,7 +495,7 @@ window.addEventListener("keydown", (e) => {
   e.stopImmediatePropagation();
   if (e.code === "Escape" && overlay === $("agent")) { closeAgent(); e.preventDefault(); return; }
   if (e.code === "Escape" && overlay === $("modal")) { closeModal(); e.preventDefault(); return; }
-  SidequestKeys.handle(e, overlay);
+  SidequestKeys.handle(e, overlay, {rows: overlay === $("modal")});
 }, true);
 
 window.addEventListener("error", (e) => {
