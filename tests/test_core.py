@@ -182,6 +182,13 @@ class CoreTest(unittest.TestCase):
         self.assertEqual(self.core.control_report, [])
         self.assertEqual(self.core.store.verified_version(), "9.9.9")
 
+    def test_control_session_survives_an_odd_event_name(self):
+        self.core.start_control_session("9.9.9")
+        self.working_session()
+        self.feed(raw("Stop", hook_event_name=["Stop"]))
+        self.feed(post("Read", "t1", {"file_path": "/x"}, {}))
+        self.assertEqual(self.kinds()[-1], "tool")
+
     def test_control_session_reports_missing_fields(self):
         # The report is in the user's language; this checks the Russian texts.
         self.addCleanup(i18n.set_language, i18n.language())

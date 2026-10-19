@@ -150,6 +150,8 @@ MAX_COMMAND = 64 * 1024
 
 
 MAX_KINDS = 200  # the most different shapes, tools or events counted for the self-check
+# What a payload of a shape nobody expected can raise while it is read.
+BAD_INPUT = (TypeError, ValueError, AttributeError, KeyError, OverflowError)
 
 
 def _text(value: object, limit: int = MAX_TEXT) -> str | None:
@@ -170,10 +172,14 @@ def _count(table: dict[Any, int], key: Any) -> None:
 
 
 def _number(value: object) -> int | float | None:
-    """A finite number field (not a bool), or None for anything else."""
+    """A finite number field (not a bool), or None for anything else (an integer too big
+    for a float too: JSON allows it, math.isfinite does not)."""
     if isinstance(value, bool) or not isinstance(value, int | float):
         return None
-    return value if math.isfinite(value) else None
+    try:
+        return value if math.isfinite(value) else None
+    except OverflowError:
+        return None
 
 
 def _words(segment: str) -> list[str]:
@@ -387,7 +393,7 @@ class Normalizer:
             # events, never the session_start or resume already in `out`.
             try:
                 out.extend(handler(ts, session_id, session, payload, agent))
-            except (TypeError, ValueError, AttributeError, KeyError):
+            except BAD_INPUT:
                 _count(self.unknown_events, "_invalid")
         elif name not in IGNORED_EVENTS:
             out.append(self._unknown(ts, session_id, name, session))

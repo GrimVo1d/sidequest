@@ -11,7 +11,7 @@ from typing import Any
 
 from . import paths, selfcheck
 from .db import Store
-from .normalizer import Event, Normalizer, session_key
+from .normalizer import BAD_INPUT, Event, Normalizer, session_key
 from .receiver import Receiver
 
 SILENCE_TICK = 1.0
@@ -97,7 +97,11 @@ class Core:
                 self._last_activity[session] = ts
                 if self._paused.get(session) == "silent":
                     self.publish(self._core_event(session, "resumed", source="activity"))
-            for event in self.normalizer.process(payload, ts):
+            try:
+                events = self.normalizer.process(payload, ts)
+            except BAD_INPUT:
+                events = []  # one odd payload loses only its own events
+            for event in events:
                 self.publish(event)
 
     def publish(self, event: Event) -> None:

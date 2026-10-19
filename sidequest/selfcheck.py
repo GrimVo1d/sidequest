@@ -331,6 +331,8 @@ class ControlSession:
             return None
         session = payload.get("session_id")
         name = payload.get("hook_event_name")
+        if not isinstance(name, str):
+            return None
         if self.session is None:
             if name != "SessionStart":
                 return None  # wait for a session that starts while we watch

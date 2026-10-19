@@ -70,8 +70,9 @@ def base_exists(base: str) -> bool:
     return True
 
 
-def added_lines(span: str) -> list[tuple[str, str, str]]:
-    """(commit, file, line) for every line the commits add."""
+def texts(span: str) -> list[tuple[str, str, str]]:
+    """(commit, where, text) for everything the commits make public: every added line (where
+    is its file), every commit message and every file name."""
     out, commit, path = [], "", ""
     for line in git("log", "-p", "--no-color", "--format=commit %h", span).splitlines():
         if line.startswith("commit "):
@@ -80,6 +81,12 @@ def added_lines(span: str) -> list[tuple[str, str, str]]:
             path = line[6:] if line.startswith("+++ b/") else ""
         elif line.startswith("+") and path:
             out.append((commit, path, line[1:]))
+    for entry in git("log", "--format=%x00%h%x01%B", span).split("\0")[1:]:
+        commit, message = entry.split("\x01", 1)
+        out.append((commit, "the commit message", message))
+    for entry in git("log", "--name-only", "--format=%x00%h", span).split("\0")[1:]:
+        commit, *names = entry.split("\n")
+        out += [(commit, "a file name", name) for name in names if name]
     return out
 
 
@@ -107,9 +114,9 @@ def changed_files(base: str) -> set[str]:
 
 def check_privacy(base: str | None, span: str) -> list[str]:
     problems = []
-    lines = added_lines(span)
+    lines = texts(span)
     home, user = os.path.expanduser("~"), getpass.getuser()
-    who = re.compile(rf"(?<![\w-]){re.escape(user)}(?![\w-])", re.IGNORECASE)
+    who = re.compile(rf"(?<![A-Za-z0-9]){re.escape(user)}(?![A-Za-z0-9])", re.IGNORECASE)
     for commit, path, text in lines:
         if home in text:
             problems.append(f"{commit} {path}: the home folder's path")
@@ -118,10 +125,12 @@ def check_privacy(base: str | None, span: str) -> list[str]:
         if SECRETS.search(text):
             problems.append(f"{commit} {path}: looks like a key or a token")
 
+    hidden = []  # (pattern, label): a project name is never printed, even inside a path
     for number, name in enumerate(project_names(), 1):
+        pattern = re.compile(rf"(?<![A-Za-z0-9]){re.escape(name)}(?![A-Za-z0-9])", re.IGNORECASE)
+        hidden.append((pattern, f"<project #{number}>"))
         if base and in_tree(base, name):
             continue  # already public before these commits, e.g. a sample name
-        pattern = re.compile(rf"(?<![\w-]){re.escape(name)}(?![\w-])", re.IGNORECASE)
         hits = sorted({f"{c} {p}" for c, p, text in lines if pattern.search(text)})
         problems += [f"{hit}: project #{number}" for hit in hits]
 
@@ -140,6 +149,8 @@ def check_privacy(base: str | None, span: str) -> list[str]:
         changed = base is None or path in changed_files(base)
         if changed and size.isdigit() and int(size) > MAX_FILE_BYTES:
             problems.append(f"{path}: {int(size) // 1024} KB")
+    for pattern, label in hidden:
+        problems = [pattern.sub(label, p) for p in problems]
     return sorted(set(problems))
 
 

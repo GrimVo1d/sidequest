@@ -344,6 +344,16 @@ class HostileShapeTest(unittest.TestCase):
             self.assertLessEqual(len(table), MAX_KINDS)
         self.assertTrue(all(len(k) <= MAX_TEXT for _, keys in self.n.shapes for k in keys))
 
+    def test_a_number_too_big_for_a_float_is_dropped(self):
+        n = Normalizer()
+        out = n.process(raw("SessionStart", "s2", source="startup", duration_ms=10**400), 1)
+        self.assertEqual([e["kind"] for e in out], ["session_start"])
+        payload = post("Read", "t9", {"file_path": "/x"}, {})
+        payload["duration_ms"] = 10**400
+        out = self.n.process(payload, 3)
+        self.assertEqual(out[-1]["kind"], "tool")
+        self.assertIsNone(out[-1]["duration_ms"])
+
     def test_odd_types_never_raise(self):
         file = {"file_path": CWD + "/a"}
         shapes = [
