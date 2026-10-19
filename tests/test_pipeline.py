@@ -188,6 +188,29 @@ class PipelineTest(unittest.TestCase):
         self.assertTrue(self.arrived.wait(READ_DEADLINE + 2))
         self.assertLess(time.monotonic() - start, READ_DEADLINE + 2)
 
+    def test_whole_object_is_taken_while_the_client_keeps_the_line_open(self):
+        # The nc on Linux does not close its side when its input ends.
+        self.start_receiver()
+        with socket.socket(socket.AF_UNIX) as client:
+            client.connect(self.sock)
+            start = time.monotonic()
+            client.sendall(b'{"hook_event_name": "Stop", "x": "}"}\n')
+            self.assertTrue(self.arrived.wait(2))
+            self.assertLess(time.monotonic() - start, 0.5)
+        self.assertEqual(self.got, [{"hook_event_name": "Stop", "x": "}"}])
+
+    @unittest.skipUnless(os.path.exists("/bin/dash"), "no dash")
+    def test_hook_under_dash(self):
+        # dash, the sh of Debian and Ubuntu, gives a background job /dev/null as its input.
+        self.start_receiver()
+        payload = {"hook_event_name": "Stop", "session_id": "s"}
+        proc = subprocess.run(
+            ["/bin/dash", self.emit], input=json.dumps(payload).encode(), capture_output=True
+        )
+        self.assertEqual((proc.returncode, proc.stdout, proc.stderr), (0, b"", b""))
+        self.assertTrue(self.arrived.wait(2))
+        self.assertEqual(self.got, [payload])
+
     def test_second_instance_refuses(self):
         self.start_receiver()
         with self.assertRaises(AlreadyRunningError):
