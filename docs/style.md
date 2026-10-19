@@ -8,8 +8,8 @@ guide disagree, this file wins.
 
 Rules that a tool checks are marked **[ruff]**, **[mypy]** or **[test]**
 (`tests/test_style.py`). The rest is checked in review (the `code-reviewer` agent and the
-owner). The hard rules of `CLAUDE.md` (privacy, no network, the hook) are not repeated here
-and always come first.
+owner). The project's hard rules (privacy, no network, the hook; see "Privacy and safety" in
+`README.md`) are not repeated here and always come first.
 
 ## 1. General
 
@@ -32,7 +32,7 @@ and always come first.
   it when there is one. Every module starts with a header comment: what the module is and
   how it is used.
 - **English** in code, identifiers and comments; player-facing text only through `t()` /
-  `tr()` / `data-en` (see `CLAUDE.md`).
+  `tr()` / `data-en`, in both Russian and English.
 - **Errors are handled where something can be done about them.** Elsewhere let them
   propagate. Never swallow an exception silently unless that is the documented contract
   (the hook, the bridge, untrusted input) — and then say so in a comment.
