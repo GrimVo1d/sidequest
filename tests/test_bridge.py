@@ -11,6 +11,31 @@ from sidequest.core import Core
 from .helpers import SID, raw, temp_dir
 
 
+class GamePageTest(unittest.TestCase):
+    """The GTK bridge guard takes messages only while the window shows this page."""
+
+    def test_only_the_game_page_counts(self):
+        page = paths.GAME_PAGE
+        spaced = "/home/someone/My Projects/sidequest/game/index.html"
+        self.assertTrue(app.is_game_page("file://" + page))
+        self.assertTrue(app.is_game_page("file://localhost" + page))
+        with mock.patch.object(paths, "GAME_PAGE", spaced):
+            self.assertTrue(
+                app.is_game_page("file:///home/someone/My%20Projects/sidequest/game/index.html")
+            )
+        for other in (
+            "file://" + page + ".evil.html",
+            "file:///tmp/evil.html",
+            "file://evil.example" + page,
+            "https://example.com" + page,
+            "about:blank",
+            None,
+            "",
+        ):
+            with self.subTest(other=other):
+                self.assertFalse(app.is_game_page(other))
+
+
 class BridgeTest(unittest.TestCase):
     def make(self, dev=False):
         self.dir = temp_dir(self)

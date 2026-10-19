@@ -12,8 +12,9 @@ import sys
 import tempfile
 import threading
 import time
+import urllib.parse
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, TypedDict
+from typing import TYPE_CHECKING, Any, Literal, TypedDict
 
 from . import avatar, claude_settings, i18n, paths, replay, selfcheck
 from .core import Core
@@ -497,7 +498,23 @@ def exposed(bridge: Bridge) -> list[Callable[..., Any]]:
     ]
 
 
+# pywebview's backend for each system, and only these: the bridge guard below exists for them.
+# Without it pywebview may pick another one (Qt on Linux) that the guard does not cover.
+GUI: dict[str, Literal["cocoa", "gtk"]] = {"darwin": "cocoa", "linux": "gtk"}
+
 _guarded = False
+
+
+def is_game_page(uri: object) -> bool:
+    """Whether a page address is the game page itself (file://, any percent-encoding)."""
+    if not isinstance(uri, str):
+        return False
+    parts = urllib.parse.urlsplit(uri)
+    return (
+        parts.scheme == "file"
+        and parts.netloc in ("", "localhost")
+        and urllib.parse.unquote(parts.path) == paths.GAME_PAGE
+    )
 
 
 def _main_frame_only() -> None:
@@ -505,11 +522,24 @@ def _main_frame_only() -> None:
 
     WebKit gives every frame and every page the window navigates to
     window.webkit.messageHandlers.jsBridge, and pywebview's handler does not look at the
-    sender, so ours does (pywebview is pinned in requirements.txt): the main frame, and
-    only while it shows the game."""
+    sender, so ours does (pywebview is pinned in requirements.txt). A system with no guard
+    here gets no window."""
     global _guarded
-    if _guarded or sys.platform != "darwin":
+    if _guarded:
         return
+    if sys.platform == "darwin":
+        _guard_cocoa()
+    elif sys.platform == "linux":
+        _guard_gtk()
+    else:
+        raise RuntimeError(
+            t("Sidequest работает на macOS и Linux", "Sidequest runs on macOS and Linux")
+        )
+    _guarded = True
+
+
+def _guard_cocoa() -> None:
+    """The main frame, and only while it shows the game."""
     from webview.platforms import cocoa
 
     handler = cocoa.BrowserView.JSBridge
@@ -523,7 +553,22 @@ def _main_frame_only() -> None:
             forward(self, controller, message)
 
     handler.userContentController_didReceiveScriptMessage_ = from_game_only  # type: ignore[method-assign]
-    _guarded = True
+
+
+def _guard_gtk() -> None:
+    """Only while the window shows the game. WebKitGTK does not say which frame sent a
+    message, but the game page has no frames: its CSP (default-src 'none') loads none."""
+    from webview.platforms import gtk
+
+    forward = gtk.BrowserView.on_js_bridge_call
+
+    # Replaced on the class before the window exists: BrowserView connects the signal to
+    # self.on_js_bridge_call when it is made.
+    def from_game_only(self: Any, manager: Any, message: Any) -> None:
+        if is_game_page(self.webview.get_uri()):
+            forward(self, manager, message)
+
+    gtk.BrowserView.on_js_bridge_call = from_game_only  # type: ignore[method-assign]
 
 
 def create_window(bridge: Bridge, title: str, **options: Any) -> "webview.Window":
@@ -586,7 +631,7 @@ def run(dev: bool = False, settings_path: str = paths.CLAUDE_SETTINGS) -> None:
     signal.signal(signal.SIGTERM, lambda *_: window.destroy())
     try:
         # http_server=False plus a file:// URL: no port is ever opened.
-        webview.start(http_server=False, private_mode=True, debug=dev)
+        webview.start(gui=GUI[sys.platform], http_server=False, private_mode=True, debug=dev)
     finally:
         cleanup()
         # pywebview's bridge call threads are not daemons and can hang on a closed
