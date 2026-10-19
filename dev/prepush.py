@@ -6,8 +6,8 @@ In the commits after <base> it looks for:
 - the home folder's path and the user name in added lines;
 - keys and tokens (Anthropic, OpenAI, GitHub, AWS, private keys);
 - an author or committer e-mail that is not GitHub's noreply one;
-- files that stay local (data/, dev/recordings/, .tmp/, PLAN.md, CLAUDE.local.md, databases,
-  sockets, bundles) and files over 1 MB;
+- files that stay local (data/, dev/recordings/, .tmp/, PLAN.md, CLAUDE.md, CLAUDE.local.md,
+  databases, sockets, bundles) and files over 1 MB;
 - the names of the user's own projects, taken from Sidequest's local database (opened
   read-only). A name is never printed: a hit shows as "project #n".
 Then it runs the tests and landing/build.py: if the build changes the landing page, the page
@@ -32,6 +32,7 @@ LOCAL_FILES = [
     "dev/recordings/*",
     ".tmp/*",
     "PLAN.md",
+    "CLAUDE.md",
     "CLAUDE.local.md",
     "*.db",
     "*.sqlite",
