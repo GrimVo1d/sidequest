@@ -33,6 +33,9 @@ class ArenaTest(unittest.TestCase):
         found.update({"map " + k: v for k, v in self.result["maps"].items()})
         return found
 
+    def test_hero_faces_the_way_it_walks(self):
+        self.assertEqual(self.result["facing"], [-1, -1, 1, 1])
+
     def test_difficulty_stops_growing_with_the_clock(self):
         g = self.result["growth"]
         self.assertLess(g["early"], g["cap"])

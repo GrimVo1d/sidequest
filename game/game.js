@@ -90,7 +90,7 @@
             walls: T.still, special: map.special || null, terrain: T.objects},
       player: {x: W / 2, y: H / 2, r: B.player.radius, hp: B.player.hp, invulnerable: 0,
                dead: 0, sticky: 1, ammo: PISTOL.magazine, magazine: PISTOL.magazine, reload: 0,
-               reloadTotal: 0, shield: 0, moving: false, aim: 0, firedAt: -1, hurtAt: -1},
+               reloadTotal: 0, shield: 0, moving: false, face: 1, aim: 0, firedAt: -1, hurtAt: -1},
       // Passives and gear: multipliers and bonuses on top of every weapon (see weaponStats).
       stats: {damage: 1, cooldown: 1, amount: 0, area: 1, pierce: 0, magazine: 0, reload: 1, xp: 1,
               speed: B.player.speed, max_hp: B.player.hp, regen: 0,
@@ -1306,7 +1306,7 @@
       let ix = clamp(+input.x || 0, -1, 1), iy = clamp(+input.y || 0, -1, 1);
       const len = Math.hypot(ix, iy);
       if (len > 1) { ix /= len; iy /= len; }
-      p.moving = len > 0;
+      p.moving = len > 0; if (ix) p.face = ix < 0 ? -1 : 1;   // the hero looks where it walks
       p.x = clamp(p.x + ix * speed() * dt, p.r, W - p.r);
       p.y = clamp(p.y + iy * speed() * dt, p.r, H - p.r);
       pushOut(p, p.r, true);

@@ -1,9 +1,9 @@
 # Sidequest
 
-A pixel-art game for macOS that you play while Claude Code works. It is an arena survival
-in the spirit of Vampire Survivors, and the ally at your side is your agent: its edits,
-commands, failing tests and commits arrive through Claude Code hooks and turn into shots,
-waves, bosses and chests.
+A pixel-art game for macOS and Linux that you play while Claude Code works. It is an arena
+survival in the spirit of Vampire Survivors, and the ally at your side is your agent: its
+edits, commands, failing tests and commits arrive through Claude Code hooks and turn into
+shots, waves, bosses and chests.
 
 ![A match: the player and the agent's robot ally fighting waves of bugs](landing/assets/shots/arena-en.png)
 
@@ -48,19 +48,33 @@ and the task of the day.
   entries.
 - Everything else the game writes stays in `data/` inside the project folder.
 
-The whole hook is [24 lines of shell](hooks/sidequest-emit.sh). The events and fields it
+The whole hook is [28 lines of shell](hooks/sidequest-emit.sh). The events and fields it
 relies on are described in [docs/events.md](docs/events.md).
 
 ## Install
 
-You need macOS, Python 3.12 or newer, git and Claude Code. The `python3` that ships with
-macOS is too old: get a newer one from python.org or with `brew install python`.
+You need Python 3.12 or newer, git and Claude Code.
+
+**macOS.** The `python3` that ships with macOS is too old: get a newer one from python.org
+or with `brew install python`.
 
 ```sh
 git clone https://github.com/GrimVo1d/sidequest.git && cd sidequest
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 .venv/bin/python -m sidequest install   # connect the hooks to Claude Code
 .venv/bin/python -m sidequest           # open the game
+```
+
+**Linux** (checked on Debian 13; elsewhere the same packages go by their own names). The
+window is WebKitGTK from the system, so the environment is made with `--system-site-packages`
+to see it, and the hook needs an `nc` that speaks to Unix sockets:
+
+```sh
+sudo apt install python3-venv python3-gi gir1.2-webkit2-4.1 netcat-openbsd
+git clone https://github.com/GrimVo1d/sidequest.git && cd sidequest
+python3 -m venv --system-site-packages .venv && .venv/bin/pip install -r requirements.txt
+.venv/bin/python -m sidequest install
+.venv/bin/python -m sidequest
 ```
 
 Restart any open Claude Code sessions so they pick up the hooks, then work as usual.
@@ -96,7 +110,7 @@ tested with the `jsc` that comes with macOS, so Node is not needed.
 
 ## Status
 
-Version 1.0. Sidequest is an independent project and is not affiliated with Anthropic;
+Version 1.1. Sidequest is an independent project and is not affiliated with Anthropic;
 Claude Code is a product of Anthropic.
 
 There is no license yet: the code is public to read, and all rights are reserved.

@@ -9,6 +9,9 @@ import time
 from collections.abc import Callable
 
 MAX_PAYLOAD = 64 * 1024 * 1024  # Write / Read payloads carry whole files
+# A payload that looks whole is parsed only once nothing more arrives for this long, so a
+# big one is not parsed again and again on its way in.
+SETTLE = 0.01
 READ_TIMEOUT = 1.0  # matches `nc -w 1` in sidequest-emit.sh
 # A whole connection gets this long, so a client that trickles a byte a second cannot
 # hold the single receiver thread and stall the events behind it.
@@ -83,14 +86,9 @@ class Receiver:
     def _handle(self, conn: socket.socket) -> None:
         ts = time.time()
         with conn:
-            raw = _read_all(conn)
-        if not raw:  # oversized, timed out, or an empty probe connection
+            payload = _read_payload(conn)
+        if payload is _NOTHING:  # oversized, timed out, or an empty probe connection
             return
-        payload: object
-        try:
-            payload = json.loads(raw, parse_constant=reject_constant)
-        except (ValueError, RecursionError):  # not JSON, or nested too deep to parse
-            payload = None
         self.on_payload(payload, ts)
 
 
@@ -99,26 +97,61 @@ def reject_constant(name: str) -> None:
     raise ValueError(f"{name} is not allowed")
 
 
-def _read_all(conn: socket.socket) -> bytes | None:
+_NOTHING = object()  # a connection that brought no payload at all
+
+
+def _parse(raw: bytes) -> object:
+    """The JSON in `raw`, or None for what is not JSON or is nested too deep to parse."""
+    try:
+        return json.loads(raw, parse_constant=reject_constant)
+    except (ValueError, RecursionError):
+        return None
+
+
+def _settled(conn: socket.socket) -> bool:
+    """True when nothing more arrives within SETTLE (the end of the stream counts too)."""
+    conn.settimeout(SETTLE)
+    try:
+        return not conn.recv(1, socket.MSG_PEEK)
+    except TimeoutError:
+        return True
+
+
+def _read_payload(conn: socket.socket) -> object:
+    """One hook call's payload: the parsed JSON, None when it is not JSON, or _NOTHING."""
     deadline = time.monotonic() + READ_DEADLINE
     chunks: list[bytes] = []
-    size = 0
+    size, tail = 0, b""
     try:
         while True:
             left = deadline - time.monotonic()
             if left <= 0:
-                return None
+                return _NOTHING
             conn.settimeout(min(READ_TIMEOUT, left))
-            chunk = conn.recv(65536)
+            try:
+                chunk = conn.recv(65536)
+            except TimeoutError:
+                if chunks and left > READ_TIMEOUT:
+                    break  # the client went quiet after its payload: that is its end
+                return _NOTHING
             if not chunk:
                 break
             size += len(chunk)
             if size > MAX_PAYLOAD:
-                return None
+                return _NOTHING
             chunks.append(chunk)
+            # The payload is one JSON object. Once it is whole it is taken without waiting
+            # for the end of the stream: the nc on Linux (OpenBSD's) keeps the connection
+            # open after its input ends, while macOS's closes it.
+            tail = chunk.rstrip() or tail
+            if tail.endswith(b"}") and _settled(conn):
+                payload = _parse(b"".join(chunks))
+                if isinstance(payload, dict):
+                    return payload
     except OSError:
-        return None
-    return b"".join(chunks)
+        return _NOTHING
+    raw = b"".join(chunks)
+    return _parse(raw) if raw else _NOTHING
 
 
 def _remove_stale_socket(path: str) -> None:

@@ -9,8 +9,9 @@ import subprocess
 import threading
 import time
 import unittest
+from unittest import mock
 
-from sidequest import paths, selfcheck
+from sidequest import paths, receiver, selfcheck
 from sidequest.receiver import (
     READ_DEADLINE,
     AlreadyRunningError,
@@ -187,6 +188,61 @@ class PipelineTest(unittest.TestCase):
         self.run_hook(json.dumps({"hook_event_name": "Stop"}).encode())
         self.assertTrue(self.arrived.wait(READ_DEADLINE + 2))
         self.assertLess(time.monotonic() - start, READ_DEADLINE + 2)
+
+    def test_whole_object_is_taken_while_the_client_keeps_the_line_open(self):
+        # The nc on Linux does not close its side when its input ends.
+        self.start_receiver()
+        with socket.socket(socket.AF_UNIX) as client:
+            client.connect(self.sock)
+            start = time.monotonic()
+            client.sendall(b'{"hook_event_name": "Stop", "x": "}"}\n')
+            self.assertTrue(self.arrived.wait(2))
+            self.assertLess(time.monotonic() - start, 0.5)
+        self.assertEqual(self.got, [{"hook_event_name": "Stop", "x": "}"}])
+
+    def test_a_big_payload_is_parsed_once(self):
+        # Every chunk of it ends in "}", but it is parsed only once the data stops coming.
+        parsed = []
+
+        def parse(raw):
+            parsed.append(len(raw))
+            return real_parse(raw)
+
+        real_parse = receiver._parse
+        payload = {"hook_event_name": "PostToolUse", "content": "}" * 4_000_000}
+        with mock.patch.object(receiver, "_parse", parse):
+            self.start_receiver()
+            with socket.socket(socket.AF_UNIX) as client:
+                client.connect(self.sock)
+                client.sendall(json.dumps(payload).encode())
+                self.assertTrue(self.arrived.wait(5))
+        self.assertEqual(self.got, [payload])
+        self.assertLess(len(parsed), 10)
+
+    @unittest.skipUnless(os.path.exists("/bin/dash"), "no dash")
+    def test_hook_under_dash(self):
+        # dash, the sh of Debian and Ubuntu, gives a background job /dev/null as its input.
+        self.start_receiver()
+        payload = {"hook_event_name": "Stop", "session_id": "s"}
+        proc = subprocess.run(
+            ["/bin/dash", self.emit], input=json.dumps(payload).encode(), capture_output=True
+        )
+        self.assertEqual((proc.returncode, proc.stdout, proc.stderr), (0, b"", b""))
+        self.assertTrue(self.arrived.wait(2))
+        self.assertEqual(self.got, [payload])
+
+    def test_hook_without_stdin_still_exits_0(self):
+        # A failed redirection on `exec` ends a POSIX sh with a non-zero code, and 2 tells
+        # Claude Code to block the tool.
+        self.start_receiver()
+        for shell in ("/bin/sh", "/bin/dash"):
+            if not os.path.exists(shell):
+                continue
+            with self.subTest(shell=shell):
+                proc = subprocess.run(
+                    [shell, "-c", f'{shell} "$0" <&-', self.emit], capture_output=True
+                )
+                self.assertEqual((proc.returncode, proc.stdout, proc.stderr), (0, b"", b""))
 
     def test_second_instance_refuses(self):
         self.start_receiver()

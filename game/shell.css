@@ -4,6 +4,14 @@
 
 input, select { font: inherit; color: var(--text); background: var(--btn); border: 2px solid var(--edge);
   padding: 4px 8px; }
+/* A list is drawn by the page, not the system: GTK's theme painted it white under the light
+   text. Its arrow is three steps of a pixel triangle. */
+select { appearance: none; -webkit-appearance: none; border-radius: 0; padding-right: 26px;
+  background-image: linear-gradient(var(--text), var(--text)), linear-gradient(var(--text), var(--text)),
+    linear-gradient(var(--text), var(--text));
+  background-repeat: no-repeat; background-size: 10px 2px, 6px 2px, 2px 2px;
+  background-position: right 8px top calc(50% - 2px), right 10px top 50%, right 12px top calc(50% + 2px); }
+option { background: var(--btn); color: var(--text); }
 input[type=range] { border: none; background: transparent; padding: 0; }
 button.small { padding: 1px 8px; font-size: 11px; box-shadow: none; }
 .tag { font-size: 11px; color: var(--dim); }
@@ -86,6 +94,7 @@ button.small { padding: 1px 8px; font-size: 11px; box-shadow: none; }
   overflow-y: auto; }
 #dev .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 4px 0; }
 #dev button, #dev select { padding: 2px 6px; box-shadow: none; }
+#dev select { padding-right: 24px; }
 #dev-seek { flex: 1; min-width: 120px; }
 .flag { color: var(--yellow); }
 /* The dev panel keeps the plain look: its buttons are clicked, not walked with the keys. */

@@ -173,11 +173,12 @@ dd { margin: 0; text-align: right; }
 #results-note { margin: 0; }
 
 /* Nine maps and more: small cards, the description of the chosen one under the grid. The
-   previews are drawn at their own size and only ever scaled whole, by the screen. */
+   previews are drawn at their own size and only ever scaled whole, by the screen. The name
+   gets 92px: WebKitGTK sets each letter on a whole pixel, so "Microservices" takes 91px there. */
 #maps { display: grid; grid-template-columns: repeat(auto-fill, 100px); justify-content: center;
   gap: 6px; width: 100%; }
 .map { width: 100px; box-sizing: border-box; display: flex; flex-direction: column; align-items: center;
-  gap: 2px; padding: 4px; box-shadow: none; font-size: 11px; line-height: 1.2; }
+  gap: 2px; padding: 4px 2px; box-shadow: none; font-size: 11px; line-height: 1.2; }
 .map.on { border-color: var(--accent); box-shadow: 3px 3px 0 var(--edge); }
 .map .preview { image-rendering: pixelated; border: 1px solid var(--edge); background: var(--bg); }
 .map .name { color: var(--title); text-align: center; overflow-wrap: anywhere; }
