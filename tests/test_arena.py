@@ -33,6 +33,11 @@ class ArenaTest(unittest.TestCase):
         found.update({"map " + k: v for k, v in self.result["maps"].items()})
         return found
 
+    def test_difficulty_stops_growing_with_the_clock(self):
+        g = self.result["growth"]
+        self.assertLess(g["early"], g["cap"])
+        self.assertAlmostEqual(g["cap"], g["late"])
+
     def test_met_things_are_tracked_for_hints(self):
         met = set(self.result["classic"]["alone"]["met"])
         self.assertIn("grunt", met)

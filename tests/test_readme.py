@@ -33,6 +33,13 @@ class ReadmeTest(unittest.TestCase):
         self.assertEqual(self.quoted(r"(\d+) maps"), maps)
         self.assertEqual(self.quoted(r"(\d+) modes"), len(modes.group(1).split(",")))
 
+    def test_agent_numbers_match_the_balance(self):
+        agent = json.loads(read("game/balance.json"))["agent"]
+        self.assertEqual(
+            self.quoted(r"turret next to the ally for (\d+) seconds"), agent["turret"]["seconds"]
+        )
+        self.assertEqual(self.quoted(r"more often for (\d+) seconds"), agent["red_ci"]["seconds"])
+
     def test_hook_size(self):
         with open(os.path.join(ROOT, "hooks", "sidequest-emit.sh")) as f:
             lines = len(f.read().splitlines())

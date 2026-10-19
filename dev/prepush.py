@@ -55,7 +55,9 @@ def git(*args: str) -> str:
 
 def in_tree(tree: str, text: str) -> bool:
     found = subprocess.run(
-        ["git", "grep", "-q", "-i", "-I", "-F", text, tree, "--"], cwd=ROOT, capture_output=True
+        ["git", "grep", "-q", "-i", "-I", "-F", "-e", text, tree, "--"],
+        cwd=ROOT,
+        capture_output=True,
     )
     return found.returncode == 0
 

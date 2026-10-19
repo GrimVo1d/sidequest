@@ -732,6 +732,18 @@ const put = (s, e, dx, dy, extra) => Object.assign(e, {x: s.player.x + dx, y: s.
 // A bullet that hits whatever stands at `e` on the next step.
 const shoot = (s, e, damage) => s.shots.push({x: e.x, y: e.y, vx: 0, vy: 0, r: 2, damage, pierce: 0,
                                               hit: new Set(), life: 0.2, color: "#fff"});
+// The clock's part of the difficulty stops at growth_minutes: a grunt at that minute and one
+// much later are as tough as each other.
+{
+  const hpAt = (minute) => {
+    const game = quiet(7);
+    game.state.time = minute * 60;
+    game.dev.enemy("grunt");
+    return newest(game.state, "grunt").maxHp;
+  };
+  const cap = balance.spawn.growth_minutes;
+  result.growth = {early: hpAt(cap / 2), cap: hpAt(cap), late: hpAt(cap * 3)};
+}
 const BE = balance.enemies;
 result.bestiary = {};
 // Flaky test: about half the bullets go past.
