@@ -744,6 +744,15 @@ const shoot = (s, e, damage) => s.shots.push({x: e.x, y: e.y, vx: 0, vy: 0, r: 2
   const cap = balance.spawn.growth_minutes;
   result.growth = {early: hpAt(cap / 2), cap: hpAt(cap), late: hpAt(cap * 3)};
 }
+// The hero faces the way it walks; walking only up or down keeps the last side.
+{
+  const game = quiet(3), faces = [];
+  for (const x of [-1, 0, 1, 0]) {
+    stepFor(game, 0.2, () => ({x, y: x ? 0 : 1}));
+    faces.push(game.state.player.face);
+  }
+  result.facing = faces;
+}
 const BE = balance.enemies;
 result.bestiary = {};
 // Flaky test: about half the bullets go past.

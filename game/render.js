@@ -483,14 +483,13 @@
     const heroes = new Map();
     function heroSprite(look, anim, n, gun, flip, fill) {
       const key = [Object.values(look), anim, n, !!gun.recoil, !!gun.rest, flip, fill].join("|");
-      let h = heroes.get(key);
-      if (h) return h;
+      if (heroes.has(key)) return heroes.get(key);
       const f = HERO.frame(look, anim, n, gun);
       const img = SP.decodeRows(f.rows, f.palette, {fill});
       // Where the body's middle and the muzzle are on the canvas (the outline adds 1).
       const bodyX = flip ? img.width - 2 - HERO.BODY_X : HERO.BODY_X + 1;
       const muzzle = f.muzzle && {x: flip ? img.width - 2 - f.muzzle.x : f.muzzle.x + 1, y: f.muzzle.y + 1};
-      h = {canvas: toCanvas(img, flip), bodyX, muzzle};
+      const h = {canvas: toCanvas(img, flip), bodyX, muzzle};
       heroes.set(key, h);
       return h;
     }
@@ -507,7 +506,8 @@
     // with its rings and bars on top, so the crowd in front never hides the hero.
     function drawPlayer(p, s, look, over) {
       const [anim, n] = heroPose(p, s);
-      const flip = Math.cos(p.aim) < 0, shot = s.time - p.firedAt;
+      const face = p.moving ? p.face : Math.sign(Math.cos(p.aim)), flip = face < 0;   // walking: its way
+      const shot = Math.cos(p.aim) * face < 0 ? Infinity : s.time - p.firedAt;   // a target behind: gun down
       const gun = {recoil: !p.dead && shot < 0.06, rest: shot > GUN_REST};
       const h = heroSprite(look, anim, n, gun, flip);
       const x = px(p.x) - h.bodyX, y = px(p.y) + HERO_FEET - (h.canvas.height - 2);
