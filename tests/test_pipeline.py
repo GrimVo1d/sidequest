@@ -9,8 +9,9 @@ import subprocess
 import threading
 import time
 import unittest
+from unittest import mock
 
-from sidequest import paths, selfcheck
+from sidequest import paths, receiver, selfcheck
 from sidequest.receiver import (
     READ_DEADLINE,
     AlreadyRunningError,
@@ -198,6 +199,25 @@ class PipelineTest(unittest.TestCase):
             self.assertTrue(self.arrived.wait(2))
             self.assertLess(time.monotonic() - start, 0.5)
         self.assertEqual(self.got, [{"hook_event_name": "Stop", "x": "}"}])
+
+    def test_a_big_payload_is_parsed_once(self):
+        # Every chunk of it ends in "}", but it is parsed only once the data stops coming.
+        parsed = []
+
+        def parse(raw):
+            parsed.append(len(raw))
+            return real_parse(raw)
+
+        real_parse = receiver._parse
+        payload = {"hook_event_name": "PostToolUse", "content": "}" * 4_000_000}
+        with mock.patch.object(receiver, "_parse", parse):
+            self.start_receiver()
+            with socket.socket(socket.AF_UNIX) as client:
+                client.connect(self.sock)
+                client.sendall(json.dumps(payload).encode())
+                self.assertTrue(self.arrived.wait(5))
+        self.assertEqual(self.got, [payload])
+        self.assertLess(len(parsed), 10)
 
     @unittest.skipUnless(os.path.exists("/bin/dash"), "no dash")
     def test_hook_under_dash(self):

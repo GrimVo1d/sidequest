@@ -9,6 +9,9 @@ import time
 from collections.abc import Callable
 
 MAX_PAYLOAD = 64 * 1024 * 1024  # Write / Read payloads carry whole files
+# A payload that looks whole is parsed only once nothing more arrives for this long, so a
+# big one is not parsed again and again on its way in.
+SETTLE = 0.01
 READ_TIMEOUT = 1.0  # matches `nc -w 1` in sidequest-emit.sh
 # A whole connection gets this long, so a client that trickles a byte a second cannot
 # hold the single receiver thread and stall the events behind it.
@@ -105,6 +108,15 @@ def _parse(raw: bytes) -> object:
         return None
 
 
+def _settled(conn: socket.socket) -> bool:
+    """True when nothing more arrives within SETTLE (the end of the stream counts too)."""
+    conn.settimeout(SETTLE)
+    try:
+        return not conn.recv(1, socket.MSG_PEEK)
+    except TimeoutError:
+        return True
+
+
 def _read_payload(conn: socket.socket) -> object:
     """One hook call's payload: the parsed JSON, None when it is not JSON, or _NOTHING."""
     deadline = time.monotonic() + READ_DEADLINE
@@ -132,7 +144,7 @@ def _read_payload(conn: socket.socket) -> object:
             # for the end of the stream: the nc on Linux (OpenBSD's) keeps the connection
             # open after its input ends, while macOS's closes it.
             tail = chunk.rstrip() or tail
-            if tail.endswith(b"}"):
+            if tail.endswith(b"}") and _settled(conn):
                 payload = _parse(b"".join(chunks))
                 if isinstance(payload, dict):
                     return payload
