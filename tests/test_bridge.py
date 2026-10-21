@@ -262,6 +262,24 @@ class BridgeTest(unittest.TestCase):
         self.assertTrue(result["backup"].startswith(os.path.join(self.dir, "backups")))
         self.assertFalse(bridge.status()["connected"])
 
+    def test_check_holds_only_the_real_install_to_the_hook_hash(self):
+        core, bridge = self.make()
+        self.assertTrue(bridge.install_apply()["ok"])
+        core.store.set_meta("emit_hash", "the hash of an older script")
+        version = (app.selfcheck.Result("v", True, "x"), "2.1.286")
+        pipeline = app.selfcheck.Result("p", True, "x")
+        with (
+            mock.patch.object(app.selfcheck, "check_version", return_value=version),
+            mock.patch.object(app.selfcheck, "check_pipeline", return_value=pipeline),
+        ):
+            self.assertTrue(bridge.run_check()[0]["ok"])
+            with mock.patch.object(
+                paths, "CLAUDE_SETTINGS", os.path.join(self.dir, "settings.json")
+            ):
+                hooks = bridge.run_check()[0]
+        self.assertFalse(hooks["ok"])
+        self.assertIn("sidequest-emit.sh", hooks["detail"])
+
     def test_uninstall_may_delete_the_saves(self):
         _, bridge = self.make()
         bridge.save("records", {"x": 1})
