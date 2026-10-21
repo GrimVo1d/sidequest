@@ -1,11 +1,12 @@
 # Development tools, not needed to play (docs/style.md, section 2), with their whole tree
 # pinned like the game's, with hashes (dev/hashes.py).
+# Wheels only: an sdist would be built with build tools that have no hash.
+--only-binary=:all:
 ruff==0.17.0 \
     --hash=sha256:0e271826af9a20d18c6cfae8c51e82959167c24859686ddd3eb9a7f0842ce81e \
     --hash=sha256:13ee90156522998c3037059d8f66885c8adeeaf7643bdce2caceee196ecd23e0 \
     --hash=sha256:3d8cc360e666d1914e47b0777c6906d70cf18891a55532bd0a16844195d70859 \
     --hash=sha256:3d8e4a002a94cd9d0dc48b51dc69d807a172b5b9bf2b668e656424dc5b55ead1 \
-    --hash=sha256:5cd03240d8208a557c2a9655a5cb07ebe36aa6bb35065f97d48c1f6adef5a322 \
     --hash=sha256:5e50aa5b84decd9fe5b0bb0e6f71c3b592f1767ed09faa4b7207d933961e35cd \
     --hash=sha256:5f0ca4a40f81403689c04f12966e22f44e329ae362072d8f1587b7bda87f603b \
     --hash=sha256:7bb08489e234876fa2da67ae3ea938e9a2156da80293e0e4365abd6973d98329 \
@@ -44,7 +45,6 @@ mypy==2.4.0 \
     --hash=sha256:6306086b87cf7f8a29aa618d9fd9bffb56c59247166b9660fdb54d86d7714ecd \
     --hash=sha256:6be721bd4bd57576193653b75b4af3461c9d0bf7dd8b528f782e9be210dc75bb \
     --hash=sha256:720434d48542ecfe84d32d287b727569d3fc8f5769acd39051130e490a5c295c \
-    --hash=sha256:77bdaebd452f43fcfc4cc3ba94352a3ea537cd01e3f2d0879f48673d2ec00d6e \
     --hash=sha256:7c4f8f8d1d1c0e2832d8ee7113dd08f6df6c7aad9e863fcbed9f25832be0b8c4 \
     --hash=sha256:7da85fbcff6dac1abcc636707bed38b45598131fb7a605d9719c70b5cc733af8 \
     --hash=sha256:7f38f57d344f8b6accb40e01c3d83cfc590498231724d16c07ffb7940f157818 \
@@ -110,7 +110,6 @@ ast_serialize==0.13.0 \
     --hash=sha256:8f672c8e6d3b9ef6e365a5543aee2012247d1d58d948ceddb75b33a6679609ca \
     --hash=sha256:98edcd24240fa217d903c8f221bc05575baf38a87a207264ee7c800d21eef5a4 \
     --hash=sha256:9eaa20714acf43ef0a0c82850a2ec8097f834648f527c38f1483e2fd9a52cd3e \
-    --hash=sha256:a0bdcef01e643e0810d2dedfb64d924bcfe079a15dc20d1c067870cc01d5c5e6 \
     --hash=sha256:a1714ee591a8e19833c0530a89e5a9faa7f62a11fc88f62fc5b722c7425dcc1f \
     --hash=sha256:a918572608ceb20fba8c2b83560f3d20be90effa4614589477b46d81672f0c3d \
     --hash=sha256:b004c3bdab0beb45194cd66c0b8feea40d676e461d26296f9c791c8e3e1b7061 \
@@ -222,7 +221,6 @@ librt==0.16.0 \
     --hash=sha256:a4aaefb4ba6c07e1aeebb2795c8958148f1d6f9af3b555b53d23d766edb6d67a \
     --hash=sha256:a8afb6557920860b7a3a596eb804cf37e09e7cf8a803db2478c202acc72d8c2e \
     --hash=sha256:aa9357a1b4d4fc787bb718a59cb1112c28c8a976d6bfa268b71cc0a4ab8f3a94 \
-    --hash=sha256:ac38d6d8d66bf3d744148dbbc0b8e193e195a51e364ed55e224631f5721891fc \
     --hash=sha256:ad37d5b9abd49c9a655dcda7ea52a8a752884062ef1ee71ae17c2f2a0f81fe6a \
     --hash=sha256:aea7b1f2b125dad5de85f049136651bff256c883c65e6b9209b2da0a1ac3cdef \
     --hash=sha256:afced3dfc17cd805ecf7a3d77996a71cf5f2c75aa66eb0c21a9930f4fc992f86 \
@@ -269,8 +267,6 @@ librt==0.16.0 \
     --hash=sha256:fe52bf4641069e7978a14253b036cb9002def1926317e710f2e249f8a8c47742 \
     --hash=sha256:ff7baa55f8e7c69851419e50a666015d02a74198716fd45c0125a2112e0a389f
 mypy_extensions==1.1.0 \
-    --hash=sha256:1be4cccdb0f2482337c4743e60421de3a356cd97508abadd57d47403e94f5505 \
-    --hash=sha256:52e68efc3284861e772bbcd66823fde5ae21fd2fdb51c62a211403730b916558
+    --hash=sha256:1be4cccdb0f2482337c4743e60421de3a356cd97508abadd57d47403e94f5505
 pathspec==1.1.1 \
-    --hash=sha256:17db5ecd524104a120e173814c90367a96a98d07c45b2e10c2f3919fff91bf5a \
     --hash=sha256:a00ce642f577bf7f473932318056212bc4f8bfdf53128c78bbd5af0b9b20b189

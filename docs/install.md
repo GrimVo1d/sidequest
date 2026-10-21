@@ -144,6 +144,10 @@ nothing anywhere else.
 - **The Python version is too old.** `python3` is the system one: on macOS install a newer
   one (step 1) and open a new terminal; or name it in full, for example `python3.12 -m venv
   .venv`.
+- **`No matching distribution found` in step 3.** The dependencies are installed only as
+  ready-made packages, never built from source, and that Python is newer than the ones they
+  are made for (3.12 to 3.15 now). Make `.venv` with one of those, for example `python3.14
+  -m venv .venv`.
 - **The self-check says "Sidequest is not connected to Claude Code"** after step 5: the
   hooks went into another settings file than the one Claude Code reads. If it says
   "disableAllHooks is on", Claude Code calls no hooks at all until that is removed.
