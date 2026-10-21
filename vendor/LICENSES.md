@@ -3,9 +3,10 @@
 ## proxy_tools-0.1.0-py3-none-any.whl
 
 Built by `dev/vendor_wheel.py` from proxy_tools 0.1.0 on PyPI
-(<https://pypi.org/project/proxy_tools/0.1.0/>), unchanged. Its metadata names Jonathan
-Tushman as the author and MIT as the license; the release ships no license text, so the MIT
-text is given here. Its module says it was extracted from Werkzeug, "(c) 2013 by Armin
+(<https://pypi.org/project/proxy_tools/0.1.0/>): the module unchanged, the metadata converted
+for a wheel. Its metadata names Jonathan Tushman as the author and MIT as the license; the
+release ships no license text, so the MIT text is given here, with the copyright line
+reconstructed from the author and the module's docstring. Its module says it was extracted from Werkzeug, "(c) 2013 by Armin
 Ronacher (adapted by Jonathan Tushman 2014)", under the BSD license, whose text follows the
 MIT one.
 
