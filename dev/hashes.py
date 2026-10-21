@@ -1,9 +1,11 @@
 """Pin the hashes of every pinned dependency in requirements*.txt.
 
-Each `name==version` line gets the sha256 of every file PyPI has for that release (every
-platform's wheels and the sdist), so pip installs only files that were there when the
-version was pinned: with a hash on every line pip turns on --require-hashes by itself. A
-line that is a wheel in vendor/ (dev/vendor_wheel.py) gets the hash of that file.
+Each `name==version` line gets the sha256 of every wheel PyPI has for that release (every
+platform's), so pip installs only files that were there when the version was pinned: with a
+hash on every line pip turns on --require-hashes by itself. The sdist is left out, and the
+files say --only-binary=:all:: building one would make pip fetch its build tools with no hash
+at all, so a Python with no wheel fails instead. A line that is a wheel in vendor/
+(dev/vendor_wheel.py) gets the hash of that file.
 Run it after changing a version: `.venv/bin/python dev/hashes.py`. It reads PyPI, so it is
 a development tool; the game itself never goes online.
 """
@@ -25,9 +27,10 @@ def release_hashes(name: str, version: str) -> list[str]:
     url = f"https://pypi.org/pypi/{name}/{version}/json"
     with urllib.request.urlopen(url, timeout=30) as response:
         release = json.load(response)
-    hashes = sorted({f["digests"]["sha256"] for f in release["urls"]})
+    wheels = [f for f in release["urls"] if f["packagetype"] == "bdist_wheel"]
+    hashes = sorted({f["digests"]["sha256"] for f in wheels})
     if not hashes:
-        raise SystemExit(f"{name}=={version}: PyPI has no files")
+        raise SystemExit(f"{name}=={version}: PyPI has no wheels, vendor one (dev/vendor_wheel.py)")
     return hashes
 
 
