@@ -116,5 +116,30 @@ class InstallCommandTest(unittest.TestCase):
         self.assertTrue(os.path.exists(settings))
 
 
+class CheckCommandTest(unittest.TestCase):
+    def test_a_copy_is_not_held_to_the_real_install_hash(self):
+        root = temp_dir(self)
+        settings = os.path.join(root, "settings.json")
+        db = os.path.join(root, "sidequest.db")
+        store = Store(db)
+        store.set_meta("emit_hash", "the hash of an older script")
+        store.close()
+        receiver = mock.Mock()
+        receiver.return_value.start.side_effect = cli.AlreadyRunningError("running")
+        out = io.StringIO()
+        with (
+            mock.patch.object(cli, "_open_store", lambda: Store(db)),
+            mock.patch.object(cli, "Receiver", receiver),
+            mock.patch.object(cli.claude_settings.paths, "BACKUPS_DIR", os.path.join(root, "b")),
+            contextlib.redirect_stdout(out),
+        ):
+            cli.main(["install", "--settings", settings, "--yes"])
+            cli.main(["check", "--settings", settings])
+        hooks = next(
+            line for line in out.getvalue().splitlines() if "Hooks" in line or "Хуки" in line
+        )
+        self.assertTrue(hooks.startswith("✓"), hooks)
+
+
 if __name__ == "__main__":
     unittest.main()

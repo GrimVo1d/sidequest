@@ -156,11 +156,10 @@ class Bridge:
 
     def run_check(self) -> list[selfcheck.CheckResult]:
         store = self._core.store
-        results = [
-            selfcheck.check_hooks(
-                self._settings_path, paths.EMIT_SCRIPT, store.get_meta("emit_hash")
-            )
-        ]
+        # The script's hash is kept for the real install only; a copy is not held to it.
+        real = paths.is_claude_settings(self._settings_path)
+        expected = store.get_meta("emit_hash") if real else None
+        results = [selfcheck.check_hooks(self._settings_path, paths.EMIT_SCRIPT, expected)]
         version_result, version = selfcheck.check_version(store.verified_version())
         results.append(version_result)
         if version and version != store.verified_version() and self._core.control is None:

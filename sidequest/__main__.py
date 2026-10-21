@@ -139,7 +139,10 @@ def _path_too_long_message() -> str:
 
 def cmd_check(args: argparse.Namespace) -> int:
     store = _open_store()
-    results = [selfcheck.check_hooks(args.settings, paths.EMIT_SCRIPT, store.get_meta("emit_hash"))]
+    # The script's hash is kept for the real install only; a copy is not held to it.
+    real = paths.is_claude_settings(args.settings)
+    expected = store.get_meta("emit_hash") if real else None
+    results = [selfcheck.check_hooks(args.settings, paths.EMIT_SCRIPT, expected)]
     version_result, _ = selfcheck.check_version(store.verified_version())
     results.append(version_result)
     store.close()
