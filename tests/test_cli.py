@@ -117,28 +117,41 @@ class InstallCommandTest(unittest.TestCase):
 
 
 class CheckCommandTest(unittest.TestCase):
-    def test_a_copy_is_not_held_to_the_real_install_hash(self):
+    """The hook's stored hash: the real install is held to it, a settings copy is not."""
+
+    def check(self, real):
         root = temp_dir(self)
         settings = os.path.join(root, "settings.json")
         db = os.path.join(root, "sidequest.db")
-        store = Store(db)
-        store.set_meta("emit_hash", "the hash of an older script")
-        store.close()
         receiver = mock.Mock()
         receiver.return_value.start.side_effect = cli.AlreadyRunningError("running")
+        version = (cli.selfcheck.Result("v", True, "x"), "2.1.286")
         out = io.StringIO()
         with (
             mock.patch.object(cli, "_open_store", lambda: Store(db)),
             mock.patch.object(cli, "Receiver", receiver),
+            mock.patch.object(cli.selfcheck, "check_version", return_value=version),
             mock.patch.object(cli.claude_settings.paths, "BACKUPS_DIR", os.path.join(root, "b")),
+            mock.patch.object(cli.paths, "CLAUDE_SETTINGS", settings if real else "/nowhere"),
             contextlib.redirect_stdout(out),
         ):
             cli.main(["install", "--settings", settings, "--yes"])
+            store = Store(db)
+            store.set_meta("emit_hash", "the hash of an older script")
+            store.close()
             cli.main(["check", "--settings", settings])
-        hooks = next(
+        return next(
             line for line in out.getvalue().splitlines() if "Hooks" in line or "Хуки" in line
         )
+
+    def test_a_copy_is_not_held_to_the_real_install_hash(self):
+        hooks = self.check(real=False)
         self.assertTrue(hooks.startswith("✓"), hooks)
+
+    def test_a_changed_script_is_flagged_for_the_real_install(self):
+        hooks = self.check(real=True)
+        self.assertTrue(hooks.startswith("✗"), hooks)
+        self.assertIn("sidequest-emit.sh", hooks)
 
 
 if __name__ == "__main__":
