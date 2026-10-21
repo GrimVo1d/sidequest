@@ -1,5 +1,5 @@
 """The numbers README.md quotes match the game, so the front page of the repository never
-drifts from it (the landing page has the same check in landing/build.py)."""
+drifts from it."""
 
 import json
 import os

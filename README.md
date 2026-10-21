@@ -5,7 +5,7 @@ survival in the spirit of Vampire Survivors, and the ally at your side is your a
 edits, commands, failing tests and commits arrive through Claude Code hooks and turn into
 shots, waves, bosses and chests.
 
-![A match: the player and the agent's robot ally fighting waves of bugs](landing/assets/shots/arena-en.png)
+![A match: the player and the agent's robot ally fighting waves of bugs](docs/arena.png)
 
 The game is in Russian and English and works fully offline.
 
@@ -104,7 +104,6 @@ python3 -m unittest                     # all tests; pywebview is not needed
 - `dev/scenarios/` holds hand-written agent sessions for replay mode, so the game can be
   developed without a running agent. `dev/webkit/` has checks that drive a real WebKit
   window.
-- `landing/` is the project's static site.
 - The code style is in [docs/style.md](docs/style.md).
 
 JavaScript that does not need the DOM (the arena simulation, avatars, GIF parsing) is

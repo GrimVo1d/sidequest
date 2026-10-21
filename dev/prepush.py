@@ -10,8 +10,7 @@ In the commits after <base> it looks for:
   databases, sockets, bundles) and files over 1 MB;
 - the names of the user's own projects, taken from Sidequest's local database (opened
   read-only). A name is never printed: a hit shows as "project #n".
-Then it runs the tests and landing/build.py: if the build changes the landing page, the page
-was not refreshed. Exits with 1 when anything is found. It never pushes.
+Then it runs the tests. Exits with 1 when anything is found. It never pushes.
 """
 
 import fnmatch
@@ -165,11 +164,6 @@ def check_build() -> list[str]:
     if tests.returncode:
         tail = tests.stderr.strip().splitlines()[-1:] or ["?"]
         problems.append(f"the tests fail: {tail[0]}")
-    landing = run(os.path.join("landing", "build.py"))
-    if landing.returncode:
-        problems.append("landing/build.py: " + (landing.stdout + landing.stderr).strip())
-    elif git("status", "--porcelain", "--", "landing").strip():
-        problems.append("landing/build.py changed the page: commit the refreshed landing")
     return problems
 
 

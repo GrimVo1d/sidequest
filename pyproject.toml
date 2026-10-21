@@ -19,11 +19,10 @@ ignore = [
 "tests/*" = ["N806"]
 # Window checks carry JavaScript snippets as long strings.
 "dev/webkit/*" = ["E501"]
-"landing/*.py" = ["E501"]
 
 [tool.mypy]
 python_version = "3.12"
-files = ["sidequest", "tests", "dev", "landing"]
+files = ["sidequest", "tests", "dev"]
 exclude = ["^\\.tmp/", "^data/"]
 warn_unused_ignores = true
 warn_redundant_casts = true
