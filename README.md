@@ -53,7 +53,9 @@ relies on are described in [docs/events.md](docs/events.md).
 
 ## Install
 
-You need Python 3.12 or newer, git and Claude Code.
+You need Python 3.12 or newer and git. Claude Code is what makes the agent your ally, but
+the game plays without it too: skip the `install` line. Step by step, with updating,
+removing and what to do when something goes wrong: [docs/install.md](docs/install.md).
 
 **macOS.** The `python3` that ships with macOS is too old: get a newer one from python.org
 or with `brew install python`.
