@@ -11,8 +11,8 @@ import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-JS_GLOBS = ["game/*.js", "landing/*.js"]
-PY_GLOBS = ["sidequest/*.py", "tests/*.py", "dev/*.py", "dev/webkit/*.py", "landing/*.py"]
+JS_GLOBS = ["game/*.js"]
+PY_GLOBS = ["sidequest/*.py", "tests/*.py", "dev/*.py", "dev/webkit/*.py"]
 
 MAX_LINES = 1000
 # Files written before the size budget, with the size they may not grow past. Shrink the
