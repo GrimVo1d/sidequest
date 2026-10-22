@@ -6,9 +6,8 @@ In the commits after <base> it looks for:
 - the home folder's path and the user name in added lines;
 - keys and tokens (Anthropic, OpenAI, GitHub, AWS, private keys);
 - an author or committer e-mail that is not GitHub's noreply one;
-- files that stay local (data/, dev/recordings/, .tmp/, landing/, .claude/, PLAN.md, CLAUDE.md,
-  CLAUDE.local.md, databases, sockets, bundles) and files over 1 MB; on main also .github/,
-  which lives only in the private repository's dev;
+- files that stay local (data/, dev/recordings/, .tmp/, landing/, .claude/, .github/, PLAN.md,
+  CLAUDE.md, CLAUDE.local.md, databases, sockets, bundles) and files over 1 MB;
 - the names of the user's own projects, taken from Sidequest's local database (opened
   read-only). A name is never printed: a hit shows as "project #n".
 Then it runs the tests. Exits with 1 when anything is found. It never pushes.
@@ -33,6 +32,7 @@ LOCAL_FILES = [
     ".tmp/*",
     "landing/*",
     ".claude/*",
+    ".github/*",
     "PLAN.md",
     "CLAUDE.md",
     "CLAUDE.local.md",
@@ -41,8 +41,6 @@ LOCAL_FILES = [
     "*.sock",
     "*.bundle",
 ]
-# On dev, pushed to the private repository, and never on the public main.
-PRIVATE_FILES = [".github/*"]
 MAX_FILE_BYTES = 1024 * 1024
 SECRETS = re.compile(
     r"sk-ant-[\w-]{10,}|sk-[A-Za-z0-9]{32,}|gh[pousr]_[A-Za-z0-9]{30,}|github_pat_\w{20,}"
@@ -117,7 +115,7 @@ def changed_files(base: str) -> set[str]:
     return _changed[base]
 
 
-def check_privacy(base: str | None, span: str, public: bool) -> list[str]:
+def check_privacy(base: str | None, span: str) -> list[str]:
     problems = []
     lines = texts(span)
     home, user = os.path.expanduser("~"), getpass.getuser()
@@ -145,9 +143,8 @@ def check_privacy(base: str | None, span: str, public: bool) -> list[str]:
         if any(not e.endswith(NOREPLY) for e in emails):
             problems.append(f"{commit}: an e-mail that is not GitHub's noreply one")
 
-    local = LOCAL_FILES + (PRIVATE_FILES if public else [])
     for path in git("log", "--name-only", "--format=", span).splitlines():
-        if path and any(fnmatch.fnmatch(path, p) for p in local):
+        if path and any(fnmatch.fnmatch(path, p) for p in LOCAL_FILES):
             problems.append(f"{path}: a file that stays local")
     for line in git("ls-tree", "-r", "-l", "HEAD").splitlines():
         meta, path = line.split("\t", 1)
@@ -184,8 +181,7 @@ def main(argv: list[str]) -> int:
         print("Nothing to push.")
         return 0
     print(f"{len(commits)} commit(s) to check")
-    public = git("rev-parse", "--abbrev-ref", "HEAD").strip() == "main"
-    problems = check_privacy(base, span, public) + check_build()
+    problems = check_privacy(base, span) + check_build()
     if git("status", "--porcelain").strip():
         print("note: there are uncommitted changes; they are not part of the push")
     for problem in problems:
