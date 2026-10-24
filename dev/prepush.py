@@ -2,7 +2,8 @@
 
     .venv/bin/python dev/prepush.py [<base>]     # <base> is origin/main by default
 
-In the commits after <base> it looks for:
+Both public branches are checked: main (the game) against <base>, and gh-pages (the landing
+page, the worktree in landing/) against origin/gh-pages. In their new commits it looks for:
 - the home folder's path and the user name in added lines;
 - keys and tokens (Anthropic, OpenAI, GitHub, AWS, private keys);
 - an author or committer e-mail that is not GitHub's noreply one;
@@ -10,7 +11,8 @@ In the commits after <base> it looks for:
   CLAUDE.md, CLAUDE.local.md, databases, sockets, bundles) and files over 1 MB;
 - the names of the user's own projects, taken from Sidequest's local database (opened
   read-only). A name is never printed: a hit shows as "project #n".
-Then it runs the tests. Exits with 1 when anything is found. It never pushes.
+Then it runs the tests, when main has new commits. Exits with 1 when anything is found. It
+never pushes.
 """
 
 import fnmatch
@@ -41,6 +43,8 @@ LOCAL_FILES = [
     "*.sock",
     "*.bundle",
 ]
+# The public branches, each with what GitHub already has of it.
+BRANCHES = {"main": "origin/main", "gh-pages": "origin/gh-pages"}
 MAX_FILE_BYTES = 1024 * 1024
 SECRETS = re.compile(
     r"sk-ant-[\w-]{10,}|sk-[A-Za-z0-9]{32,}|gh[pousr]_[A-Za-z0-9]{30,}|github_pat_\w{20,}"
@@ -65,9 +69,9 @@ def in_tree(tree: str, text: str) -> bool:
     return found.returncode == 0
 
 
-def base_exists(base: str) -> bool:
+def exists(ref: str) -> bool:
     try:
-        git("rev-parse", "--verify", "--quiet", base + "^{commit}")
+        git("rev-parse", "--verify", "--quiet", ref + "^{commit}")
     except subprocess.CalledProcessError:
         return False
     return True
@@ -106,16 +110,7 @@ def project_names() -> list[str]:
     return sorted(n for n in names if len(n) >= SHORTEST_NAME and n.lower() != "sidequest")
 
 
-_changed: dict[str, set[str]] = {}
-
-
-def changed_files(base: str) -> set[str]:
-    if base not in _changed:
-        _changed[base] = set(git("diff", "--name-only", base, "HEAD").splitlines())
-    return _changed[base]
-
-
-def check_privacy(base: str | None, span: str) -> list[str]:
+def check_privacy(base: str | None, span: str, tip: str) -> list[str]:
     problems = []
     lines = texts(span)
     home, user = os.path.expanduser("~"), getpass.getuser()
@@ -146,10 +141,11 @@ def check_privacy(base: str | None, span: str) -> list[str]:
     for path in git("log", "--name-only", "--format=", span).splitlines():
         if path and any(fnmatch.fnmatch(path, p) for p in LOCAL_FILES):
             problems.append(f"{path}: a file that stays local")
-    for line in git("ls-tree", "-r", "-l", "HEAD").splitlines():
+    changed_files = set(git("diff", "--name-only", base, tip).splitlines()) if base else set()
+    for line in git("ls-tree", "-r", "-l", tip).splitlines():
         meta, path = line.split("\t", 1)
         size = meta.split()[3]
-        changed = base is None or path in changed_files(base)
+        changed = base is None or path in changed_files
         if changed and size.isdigit() and int(size) > MAX_FILE_BYTES:
             problems.append(f"{path}: {int(size) // 1024} KB")
     for pattern, label in hidden:
@@ -171,17 +167,27 @@ def check_build() -> list[str]:
 
 
 def main(argv: list[str]) -> int:
-    wanted = argv[1] if len(argv) > 1 else "origin/main"
-    base = wanted if base_exists(wanted) else None
-    if base is None:
-        print(f"{wanted} not found: checking the whole history")
-    span = f"{base}..HEAD" if base else "HEAD"
-    commits = git("rev-list", span).split()
-    if not commits:
+    problems: list[str] = []
+    checked = []
+    for branch, default in BRANCHES.items():
+        if not exists(branch):
+            continue
+        wanted = argv[1] if branch == "main" and len(argv) > 1 else default
+        base = wanted if exists(wanted) else None
+        span = f"{base}..{branch}" if base else branch
+        commits = git("rev-list", span).split()
+        if not commits:
+            continue
+        if base is None:
+            print(f"{branch}: {wanted} not found, checking the whole history")
+        print(f"{branch}: {len(commits)} commit(s) to check")
+        checked.append(branch)
+        problems += check_privacy(base, span, branch)
+    if not checked:
         print("Nothing to push.")
         return 0
-    print(f"{len(commits)} commit(s) to check")
-    problems = check_privacy(base, span) + check_build()
+    if "main" in checked:
+        problems += check_build()
     if git("status", "--porcelain").strip():
         print("note: there are uncommitted changes; they are not part of the push")
     for problem in problems:
