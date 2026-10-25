@@ -490,7 +490,7 @@ for (const cfg of balance.weapons) {
   result.arsenal.filler = {kinds, healed: s.player.hp - hp, score: s.score - score};
 }
 
-result.arsenal.level_text = LCS.levelText(balance.weapons.find((w) => w.id === "shotgun"),
+result.arsenal.level_text = LCSBuild.levelText(balance.weapons.find((w) => w.id === "shotgun"),
                                           {count: 2, cooldown: 0.85});
 
 // --- the agent's real work: git, builds, tests, answers, spirits, the orchestra --------------
@@ -612,6 +612,70 @@ result.arsenal.level_text = LCS.levelText(balance.weapons.find((w) => w.id === "
   }
 }
 
+// --- Infinity: classic with no end but death -----------------------------------------------
+{
+  const r = result.infinity = {};
+  const LOOP = tweak((B) => {
+    B.classic.seconds = 60;
+    B.infinity.final_every_minutes = 1;
+    B.spawn.boss_every_minutes = 0.25;
+  });
+  const boss = (e) => LOOP.enemies[e.type].boss && !e.final;
+  // The final boss falls and the run goes on; it comes back at the next of its minutes, and
+  // the usual bosses come between.
+  const game = LCS.createGame(LOOP, {seed: 24, map: at("hotfix"), mode: "infinity"});
+  const s = game.state;
+  game.dev.immortal();
+  stepFor(game, 61);
+  const final = s.enemies.find((e) => e.final);
+  if (final) final.hp = 1;
+  const toFinal = () => (final ? {x: Math.sign(final.x - s.player.x), y: Math.sign(final.y - s.player.y)}
+    : {x: 0, y: 0});
+  stepFor(game, 30, toFinal);
+  r.after_final = {boss: Boolean(final), dead: Boolean(final && final.dead), over: s.over, final_at: s.finalAt};
+  let usual = 0;
+  while (s.time < 119) {
+    game.step(DT, {x: 0, y: 0});
+    if (s.choices) game.choose(0);
+    usual = Math.max(usual, s.enemies.filter(boss).length);
+  }
+  r.usual_bosses = usual;
+  stepFor(game, 2);
+  r.again = s.enemies.some((e) => e.final);
+  // Past the classic's end the bugs grow tougher: the same match as classic, a minute over.
+  // The player's level takes no part, so the two matches differ only in the overtime.
+  const FLAT = tweak((B) => { B.classic.seconds = 60; B.spawn.hp_growth_per_level = 0; });
+  const grunt = (mode) => {
+    const g = LCS.createGame(FLAT, {seed: 31, map: at("open"), mode});
+    g.dev.immortal();
+    stepFor(g, 120, () => ({x: 0, y: 0}));
+    g.dev.enemy("grunt");
+    const e = g.state.enemies[g.state.enemies.length - 1];
+    return {hp: e.maxHp, damage: e.damage, time: g.state.time};
+  };
+  r.overtime = {classic: grunt("classic"), infinity: grunt("infinity")};
+  // The spawn rate over one step, at a given time: the base alone is over the usual cap.
+  const RATE = tweak((B) => { B.spawn.base_per_second = 4; B.spawn.per_minute = 0; B.spawn.per_level = 0; });
+  const rate = (mode, time) => {
+    const g = LCS.createGame(RATE, {seed: 32, map: at("open"), mode});
+    Object.assign(g.state, {time, spawnAcc: 0});
+    g.step(DT, {x: 0, y: 0});
+    return g.state.spawnAcc / DT;
+  };
+  const C = RATE.classic.seconds;
+  r.rate = {classic: rate("classic", C + 600), ten: rate("infinity", C + 600), hour: rate("infinity", C + 3600)};
+  // Only death ends it.
+  const alone = LCS.createGame(balance, {seed: 22, map: at("open"), mode: "infinity"});
+  stepFor(alone, 600, () => ({x: 0, y: 0}));
+  r.dead = alone.state.results;
+  // The week's modifiers: the same Monday to Sunday, others the next week.
+  const wk = (d) => LCSModes.week(balance, d);
+  const mondays = Array.from({length: 20}, (_, i) => new Date(Date.UTC(2026, 0, 5 + 7 * i)).toISOString().slice(0, 10));
+  r.week = {mon: wk("2026-10-19"), sun: wk("2026-10-25"), next: wk("2026-10-26"), new_year: wk("2027-01-03").week,
+            sets: new Set(mondays.map((d) => wk(d).modifiers.join())).size};
+  const res = Object.assign({}, result.classic.still.results, {mode: "infinity"});
+  r.records = LCSProgress.addMatch(null, res).infinity;
+}
 // --- solo modes: the ghost, the daily task, modifiers ----------------------------------------
 {
   const r = result.solo = {};

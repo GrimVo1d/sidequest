@@ -3,7 +3,8 @@
 //                                 // maps.js; mode "agent", "classic" (alone, 20 minutes),
 //                                 // "daily" (classic with the day's seed, LCS.daily) or
 //                                 // "ghost" (a past session plays the ally: ghost.events) or
-//                                 // "campaign" (stage, carry: modes.js); modifiers: ids
+//                                 // "campaign" (stage, carry: modes.js) or "infinity"
+//                                 // (classic with no end but death); modifiers: ids
 //                                 // from balance.modifiers; cls, perks: classes.js
 //   game.agentEvent(event)        // a game event from Sidequest.on("*")
 //   game.step(1 / 60, {x, y})      // input: movement direction, each -1..1
@@ -16,34 +17,11 @@
   const tr = (ru, en) => root.SidequestI18n ? root.SidequestI18n.t(ru, en) : ru;
   const REJOIN_KINDS = new Set(["session_start", "prompt", "tool", "tool_error",
                                 "subagent_start", "compact"]);
-  const {makeRandom, ghostSchedule} = root.LCSModes;
+  const {MODES, makeRandom, ghostSchedule} = root.LCSModes;
+  const {MUL_KEYS} = root.LCSBuild;   // weapon stats that multiply rather than add
 
   const dist2 = (a, b) => (a.x - b.x) ** 2 + (a.y - b.y) ** 2;
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-
-  // What a weapon's next level changes, as [ru, en]: "урон +3, задержка −15%".
-  const LABELS = {damage: ["урон", "damage"], cooldown: ["задержка", "cooldown"],
-                  area: ["размер", "size"], pierce: ["пробивание", "pierce"],
-                  magazine: ["обойма", "magazine"], reload: ["перезарядка", "reload"],
-                  duration: ["длительность", "duration"], chain: ["прыжки", "jumps"],
-                  max: ["мин на поле", "mines on the floor"], range: ["дальность", "range"]};
-  const MUL_KEYS = new Set(["cooldown", "area", "reload", "duration"]);
-  function levelText(cfg, changes) {
-    const parts = [[], []];
-    for (const [k, v] of Object.entries(changes)) {
-      const label = k === "count" ? cfg.count_name : LABELS[k] || [k, k];
-      let value;
-      if (MUL_KEYS.has(k)) {
-        const pct = Math.round((v - 1) * 100);
-        value = (pct < 0 ? "−" : "+") + Math.abs(pct) + "%";
-      } else {
-        value = (v < 0 ? "−" : "+") + Math.abs(v);
-      }
-      parts[0].push(`${label[0]} ${value}`);
-      parts[1].push(`${label[1]} ${value}`);
-    }
-    return [parts[0].join(", "), parts[1].join(", ")];
-  }
 
   function createGame(B, options) {
     const random = makeRandom((options && options.seed) || Date.now());
@@ -57,16 +35,15 @@
     const PISTOL = WEAPONS.get("pistol").base;
     const CELL = 32;   // px per cell of the enemies' grid for nearby()
     const TEXT_PILE = 5;   // floating texts over one spot at once
-    const modeName = ["classic", "daily", "ghost", "campaign"].includes(options && options.mode)
-      ? options.mode : "agent";
-    // Classic, the daily task and the campaign are played alone: crystals, a final boss, death ends it.
-    const classic = modeName === "classic" || modeName === "daily" || modeName === "campaign";
+    const modeName = Object.hasOwn(MODES, options && options.mode) ? options.mode : "agent";
+    // Classic, the daily task, the campaign and Infinity are played alone: crystals, a final
+    // boss, death ends it. Only the ghost's own events reach a ghost match; the daily task
+    // ignores agents. Infinity goes on after its final boss.
+    const {solo: classic, agents: ownAgents, endless} = MODES[modeName];
     const stage = root.LCSModes.stage(B, options);
-    // Only the ghost's own events reach a ghost match; the daily task ignores agents.
-    const ownAgents = modeName === "agent" || modeName === "classic" || modeName === "campaign";
     const MODS = new Set((options && options.modifiers || []).filter((id) => B.modifiers.some((m) => m.id === id)));
     const mod = (id) => (MODS.has(id) ? B.modifiers.find((m) => m.id === id) : null);
-    const EV = B.events, EL = B.elites;
+    const EV = B.events, EL = B.elites, OT = B.infinity.overtime;
     // Bosses come in turn: the new ones in a random order, then the merge conflict, again.
     const bossOrder = B.bosses.order.slice();
     for (let i = bossOrder.length - 1; i > 0; i--) {
@@ -207,12 +184,13 @@
         if (tries >= 10) return null;
       }
       // Difficulty follows both the clock and the player's level, so a busy agent
-      // (many level-ups) and a slow one both keep the arena tense.
+      // (many level-ups) and a slow one both keep the arena tense; Infinity's overtime adds on.
+      const over = overtimeMinutes();
       const hp = cfg.hp * (1 + B.spawn.hp_growth_per_minute * minute
-                           + B.spawn.hp_growth_per_level * (s.level - 1));
+                           + B.spawn.hp_growth_per_level * (s.level - 1)) * (1 + OT.hp_per_minute * over);
       const speed = cfg.speed * (1 + Math.min(B.spawn.max_speed_growth,
                                               B.spawn.speed_growth_per_minute * minute));
-      const damage = cfg.damage * (1 + B.spawn.damage_growth_per_minute * minute);
+      const damage = cfg.damage * (1 + B.spawn.damage_growth_per_minute * minute) * (1 + OT.damage_per_minute * over);
       const e = Object.assign({type, x, y, r: cfg.radius, hp, maxHp: hp, speed, damage,
                                score: cfg.score, slow: 0, slowFactor: 1,
                                flash: 0, dead: false, incoming: 0, born: s.time, hitAt: {}},
@@ -295,6 +273,8 @@
 
     // The clock's part of the difficulty stops at `growth_minutes`, so a long agent session levels off.
     const clockMinute = () => Math.min(s.time / 60, B.spawn.growth_minutes);
+    // Infinity's minutes past the classic's end: there the difficulty keeps growing.
+    const overtimeMinutes = () => (endless ? Math.max(0, (s.time - C.seconds) / 60) : 0);
 
     // The usual bugs, and the map's own enemy (maps.js, `special`).
     function pickType() {
@@ -430,7 +410,8 @@
       e.y = y;
     }
 
-    // The final boss of a classic run is down: everyone else vanishes, the run is won.
+    // The final boss of a classic run is down: everyone else vanishes, the run is won. In
+    // Infinity the run goes on, and the final boss comes again at the next of its minutes.
     function win(boss) {
       effect({type: "ult", x: boss.x, y: boss.y, r: Math.hypot(s.view.width, s.view.height),
               color: "#e8c14a", life: 1});
@@ -442,6 +423,12 @@
       s.hazards = [];
       s.enemyShots = [];
       s.comebacks = [];
+      if (endless) {
+        text(boss.x, boss.y - 30, tr("БАГИ НЕ КОНЧАЮТСЯ", "THE BUGS NEVER END"), "#e8c14a", 3);
+        const every = B.infinity.final_every_minutes * 60;
+        s.finalAt = C.seconds + (Math.floor((s.time - C.seconds) / every) + 1) * every;
+        return;
+      }
       const next = s.stage && !s.stage.final;
       text(boss.x, boss.y - 30, next ? tr("ЭТАП ПРОЙДЕН", "STAGE CLEAR")
         : tr("КОНФЛИКТ РАЗРЕШЁН", "CONFLICT RESOLVED"), "#e8c14a", 3);
@@ -905,7 +892,7 @@
       return pistol ? weaponStats(pistol).magazine : 0;
     };
     const {addXp, choose, reroll, banish, nextChoice, chestLeft, offers, take} = root.LCSBuild.create(B, s,
-      {random, text, effect, tr, mod, magazine, levelText});
+      {random, text, effect, tr, mod, magazine});
     // The class and the stars' bonuses (classes.js); a campaign's next stage takes the run on.
     const kit = root.LCSClasses.create(B, s, {random, effect, text, tr, pushOut}, options);
     if (!(stage && options.carry)) kit.start();
@@ -1317,8 +1304,13 @@
     function updateSpawns(dt) {
       if (s.finaleAt !== null || s.endAt !== null) return;
       const active = classic || s.allies.some((a) => a.state === "active"), minute = clockMinute();
-      const rate = Math.min(B.spawn.max_per_second, B.spawn.base_per_second
-                            + B.spawn.per_minute * minute + B.spawn.per_level * (s.level - 1))
+      // Infinity's overtime lifts the cap as fast as the rate, up to its own.
+      const over = overtimeMinutes();
+      const cap = Math.min(Math.max(OT.max_per_second, B.spawn.max_per_second),
+                           B.spawn.max_per_second + OT.spawn_per_minute * over);
+      const rate = Math.min(cap,
+                            B.spawn.base_per_second + B.spawn.per_minute * minute
+                            + B.spawn.per_level * (s.level - 1) + OT.spawn_per_minute * over)
         * (active ? 1 : B.spawn.no_ally_factor) * (s.redCi > 0 ? AG.red_ci.spawn : 1)
         * (s.deploy ? EV.deploy.spawn : 1);
       s.spawnAcc += rate * dt;
@@ -1796,5 +1788,5 @@
     return {state: s, step, agentEvent, choose, reroll, banish, finish, setView, dev, ability: kit.use};
   }
 
-  root.LCS = {createGame, levelText};
+  root.LCS = {createGame};
 })(typeof window !== "undefined" ? window : globalThis);

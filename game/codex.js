@@ -114,8 +114,8 @@
        text: [`Босс: поджигает пол у тебя под ногами — место сначала мигает — и оставляет огонь за собой. Не стой в огне.`,
               `A boss: sets the floor under you on fire — the spot blinks first — and leaves fire behind it. Don't stand in it.`]},
       {id: "final", icon: "boss", name: ["Финальный конфликт", "Final conflict"],
-       text: [`Финальный босс «Классики» на ${B.classic.seconds / 60}-й минуте, в ${B.classic.final_hp} раза прочнее. Победи его — и забег выигран.`,
-              `The final boss of Classic at minute ${B.classic.seconds / 60}, ${B.classic.final_hp} times tougher. Beat it and the run is won.`]},
+       text: [`Финальный босс «Классики» на ${B.classic.seconds / 60}-й минуте, в ${B.classic.final_hp} раза прочнее. Победи его — и забег выигран. В «Бесконечности» он возвращается каждые ${B.infinity.final_every_minutes} минут, а забег идёт дальше.`,
+              `The final boss of Classic at minute ${B.classic.seconds / 60}, ${B.classic.final_hp} times tougher. Beat it and the run is won. In Infinity it comes back every ${B.infinity.final_every_minutes} minutes and the run goes on.`]},
     ];
   }
 

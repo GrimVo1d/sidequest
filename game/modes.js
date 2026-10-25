@@ -1,6 +1,8 @@
 // The arena: what the modes need besides the simulation itself. No DOM here.
+//   LCSModes.MODES        // {id: {name, name_en, text, text_en, solo, agents, wins, endless}}
 //   const random = LCSModes.makeRandom(seed)      // the seeded random the whole match uses
 //   LCSModes.daily(balance, LCS_MAPS, "2026-10-09")   // the day's seed, map and modifiers
+//   LCSModes.week(balance, "2026-10-09")         // Infinity's week: {week: 41, modifiers}
 //   LCSModes.ghostSchedule(balance.ghost, events)     // a past session as the ghost's schedule
 //   LCSModes.stage(balance, options)    // the campaign's stage options.stage, or null
 //   LCSModes.carry(state)               // what the next stage takes from this one
@@ -20,17 +22,91 @@
     };
   }
 
+  // The modes, in the menu's order: their names and what they are, in both languages, and
+  // how they play. solo: alone, crystals, a final boss, death ends the run; agents: live
+  // agents' events reach the match; wins: the run can be won; endless: it goes on after
+  // the final boss until death.
+  const MODES = {
+    agent: {solo: false, agents: true, wins: false, endless: false,
+            name: "С агентом", name_en: "With an agent",
+            text: "Союзники — твои агенты: их действия становятся атаками. "
+                  + "Матч заканчивается, когда все агенты закончили задачу.",
+            text_en: "Your allies are your agents: what they do turns into attacks. "
+                     + "The match ends when every agent has finished its task."},
+    classic: {solo: true, agents: true, wins: true, endless: false,
+              name: "Классика", name_en: "Classic",
+              text: "Один, 20 минут: опыт — кристаллы с врагов, в конце — финальный босс. "
+                    + "Смерть заканчивает забег. Агент, начавший работу, придёт на помощь.",
+              text_en: "Alone, 20 minutes: experience comes as crystals from enemies, the "
+                       + "final boss comes at the end. Death ends the run. An agent that "
+                       + "starts working joins in to help."},
+    campaign: {solo: true, agents: true, wins: true, endless: false,
+               name: "Кампания", name_en: "Campaign",
+               text: "Пять карт подряд, в конце каждой — босс. Оружие, вещи и уровень идут дальше, "
+                     + "смерть заканчивает кампанию. Агент, начавший работу, придёт на помощь.",
+               text_en: "Five maps in a row, a boss at the end of each. Weapons, gear and level carry "
+                        + "over; death ends the campaign. An agent that starts working joins in to help."},
+    ghost: {solo: false, agents: false, wins: false, endless: false,
+            name: "Призрак сессии", name_en: "Session ghost",
+            text: "Союзник — твоя прошлая сессия Claude Code: её действия повторяются, "
+                  + "долгие паузы сжаты. Живые агенты в этом режиме не участвуют.",
+            text_en: "Your ally is one of your past Claude Code sessions: its actions play "
+                     + "again, long pauses squeezed. Live agents stay out of this mode."},
+    daily: {solo: true, agents: false, wins: true, endless: false,
+            name: "Задача дня", name_en: "Daily task",
+            text: "«Классика» с картой, модификаторами и случайностью дня — одинаковыми весь "
+                  + "день. Рекорд дня и серия дней подряд. Без агентов.",
+            text_en: "Classic with the day's map, modifiers and luck, the same all day long. "
+                     + "A record for the day and a streak of days. No agents."},
+    infinity: {solo: true, agents: true, wins: false, endless: true,
+               name: "Бесконечность", name_en: "Infinity",
+               text: "«Классика» без конца: на 20-й минуте финальный босс, а дальше баги идут "
+                     + "и сильнеют, пока ты жив. Модификаторы недели — одни на всю неделю. "
+                     + "Агент, начавший работу, придёт на помощь.",
+               text_en: "Classic with no end: the final boss comes at the 20th minute, then the "
+                        + "bugs keep coming and growing stronger for as long as you live. The "
+                        + "week's modifiers stay the same all week. An agent that starts working "
+                        + "joins in to help."},
+  };
+
+  // FNV-1a of a text: the seed of a day or a week.
+  function seedOf(text) {
+    let h = 0x811c9dc5;
+    for (const ch of text) h = Math.imul(h ^ ch.charCodeAt(0), 0x01000193) >>> 0;
+    return h;
+  }
+
+  // `n` different modifiers of the balance's, drawn with `random`.
+  function pickModifiers(B, random, n) {
+    const pool = B.modifiers.map((m) => m.id), out = [];
+    while (out.length < Math.min(n, pool.length)) out.push(pool.splice(Math.floor(random() * pool.length), 1)[0]);
+    return out;
+  }
+
   // The day's task: the same seed, map and modifiers for everyone on that date ("2026-10-09").
   function daily(B, maps, date) {
-    let h = 0x811c9dc5;  // FNV-1a
-    for (const ch of "lcs-daily-" + date) h = Math.imul(h ^ ch.charCodeAt(0), 0x01000193) >>> 0;
+    const h = seedOf("lcs-daily-" + date);
     const random = makeRandom(h);
     const map = maps[Math.floor(random() * maps.length)];
-    const pool = B.modifiers.map((m) => m.id), modifiers = [];
-    while (modifiers.length < Math.min(B.daily.modifiers, pool.length)) {
-      modifiers.push(pool.splice(Math.floor(random() * pool.length), 1)[0]);
-    }
-    return {date, seed: h, map: map.id, modifiers};
+    return {date, seed: h, map: map.id, modifiers: pickModifiers(B, random, B.daily.modifiers)};
+  }
+
+  // The ISO week of a date: "2026-10-09" -> {year: 2026, n: 41}. The week's Thursday names
+  // its year.
+  function isoWeek(date) {
+    const [y, m, d] = date.split("-").map(Number);
+    const day = new Date(Date.UTC(y, m - 1, d));
+    day.setUTCDate(day.getUTCDate() + 4 - (day.getUTCDay() || 7));
+    const year = day.getUTCFullYear();
+    const n = Math.ceil(((day - Date.UTC(year, 0, 1)) / 86400000 + 1) / 7);
+    return {year, n};
+  }
+
+  // Infinity's modifiers for the week of a date: the same all week.
+  function week(B, date) {
+    const {year, n} = isoWeek(date);
+    const random = makeRandom(seedOf(`lcs-week-${year}-W${String(n).padStart(2, "0")}`));
+    return {week: n, modifiers: pickModifiers(B, random, B.infinity.week_modifiers)};
   }
 
   // A past session as the ghost's schedule: long pauses squeezed, every event at a game time.
@@ -87,5 +163,5 @@
     s.player.hp = s.stats.max_hp;
   }
 
-  root.LCSModes = {makeRandom, daily, ghostSchedule, stage, carry, resume};
+  root.LCSModes = {MODES, makeRandom, daily, week, ghostSchedule, stage, carry, resume};
 })(typeof window !== "undefined" ? window : globalThis);
