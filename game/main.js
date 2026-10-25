@@ -82,34 +82,7 @@
 
   // --- menu and records -------------------------------------------------------------
 
-  const MODES = {
-    agent: {name: "С агентом", name_en: "With an agent",
-            text: "Союзники — твои агенты: их действия становятся атаками. "
-                  + "Матч заканчивается, когда все агенты закончили задачу.",
-            text_en: "Your allies are your agents: what they do turns into attacks. "
-                     + "The match ends when every agent has finished its task."},
-    classic: {name: "Классика", name_en: "Classic",
-              text: "Один, 20 минут: опыт — кристаллы с врагов, в конце — финальный босс. "
-                    + "Смерть заканчивает забег. Агент, начавший работу, придёт на помощь.",
-              text_en: "Alone, 20 minutes: experience comes as crystals from enemies, the "
-                       + "final boss comes at the end. Death ends the run. An agent that "
-                       + "starts working joins in to help."},
-    campaign: {name: "Кампания", name_en: "Campaign",
-               text: "Пять карт подряд, в конце каждой — босс. Оружие, вещи и уровень идут дальше, "
-                     + "смерть заканчивает кампанию. Агент, начавший работу, придёт на помощь.",
-               text_en: "Five maps in a row, a boss at the end of each. Weapons, gear and level carry "
-                        + "over; death ends the campaign. An agent that starts working joins in to help."},
-    ghost: {name: "Призрак сессии", name_en: "Session ghost",
-            text: "Союзник — твоя прошлая сессия Claude Code: её действия повторяются, "
-                  + "долгие паузы сжаты. Живые агенты в этом режиме не участвуют.",
-            text_en: "Your ally is one of your past Claude Code sessions: its actions play "
-                     + "again, long pauses squeezed. Live agents stay out of this mode."},
-    daily: {name: "Задача дня", name_en: "Daily task",
-            text: "«Классика» с картой, модификаторами и случайностью дня — одинаковыми весь "
-                  + "день. Рекорд дня и серия дней подряд. Без агентов.",
-            text_en: "Classic with the day's map, modifiers and luck, the same all day long. "
-                     + "A record for the day and a streak of days. No agents."},
-  };
+  const MODES = LCSModes.MODES;
 
   // The local date as "2026-10-09": the daily task changes at the player's midnight.
   function today() {
@@ -117,6 +90,10 @@
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   }
   const todayTask = () => LCSModes.daily(balance, LCS_MAPS, today());
+  const thisWeek = () => LCSModes.week(balance, today());
+  // The daily task and Infinity come with their own modifiers; the other modes take the player's.
+  const fixedMods = () => (mode === "daily" ? todayTask().modifiers
+    : mode === "infinity" ? thisWeek().modifiers : null);
   const modifier = (id) => balance.modifiers.find((m) => m.id === id);
 
   async function savePrefs() {
@@ -175,7 +152,7 @@
                   [t("Дольше всего", "Longest"), clock(r.best_time)],
                   [t("Лучший уровень", "Best level"), r.best_level],
                   [t("Матчей", "Matches"), r.matches], [t("Убито", "Kills"), r.kills]];
-    if (["classic", "daily", "campaign"].includes(mode)) rows.push([t("Побед", "Wins"), r.wins]);
+    if (MODES[mode].wins) rows.push([t("Побед", "Wins"), r.wins]);
     if (mode === "daily") {
       rows.push([t("Рекорд дня", "Today's best"), days[today()] || 0],
                 [t("Дней подряд", "Days in a row"), LCSProgress.streak(days, today())]);
@@ -200,7 +177,7 @@
     $("mode-text").textContent = tf(MODES[mode], "text");
     renderRecords();
     renderGhosts();
-    renderDaily();
+    renderFixed();
     renderMaps();
     renderMods();
     renderClasses();
@@ -241,13 +218,19 @@
     }
   }
 
-  function renderDaily() {
-    const p = $("daily-text");
-    p.hidden = mode !== "daily";
-    if (mode !== "daily") return;
-    const task = todayTask(), map = LCS_MAPS.find((m) => m.id === task.map);
-    p.textContent = t(`Сегодня: ${tf(map, "name")}, `, `Today: ${tf(map, "name")}, `)
-      + task.modifiers.map((id) => tf(modifier(id), "name")).join(", ") + ".";
+  // The fixed modifiers' line: the day's map and modifiers, or Infinity's week and its.
+  function renderFixed() {
+    const p = $("daily-text"), fixed = fixedMods();
+    p.hidden = !fixed;
+    if (!fixed) return;
+    const names = fixed.map((id) => tf(modifier(id), "name")).join(", ") + ".";
+    if (mode === "infinity") {
+      const n = thisWeek().week;
+      p.textContent = t(`Неделя ${n}: `, `Week ${n}: `) + names;
+      return;
+    }
+    const map = LCS_MAPS.find((m) => m.id === todayTask().map);
+    p.textContent = t(`Сегодня: ${tf(map, "name")}, `, `Today: ${tf(map, "name")}, `) + names;
   }
 
   function renderClasses() {
@@ -258,15 +241,15 @@
     });
   }
 
-  // The modifiers of the next match; the daily task has its own, fixed.
+  // The modifiers of the next match; the daily task and Infinity have their own, fixed.
   function renderMods() {
     const box = $("mods");
     clear(box);
-    const fixed = mode === "daily", on = fixed ? todayTask().modifiers : mods;
+    const fixed = fixedMods(), on = fixed || mods;
     for (const m of balance.modifiers) {
       const b = el("button", tf(m, "name"), "mod" + (on.includes(m.id) ? " on" : ""));
       b.title = `${tf(m, "text")} · ${t("счёт", "score")} ×${m.score}`;
-      b.disabled = fixed;
+      b.disabled = Boolean(fixed);
       b.addEventListener("click", () => {
         mods = mods.includes(m.id) ? mods.filter((id) => id !== m.id) : mods.concat(m.id);
         renderMods();
@@ -358,6 +341,8 @@
       const task = todayTask();
       options = {seed: task.seed, map: LCS_MAPS.find((m) => m.id === task.map), mode,
                  modifiers: task.modifiers, day: task.date};
+    } else if (mode === "infinity") {
+      options.modifiers = thisWeek().modifiers;
     } else if (mode === "ghost") {
       if (!ghostId) return;
       const events = await Sidequest.history.events(ghostId);
@@ -411,8 +396,8 @@
     $("results-ending").textContent = ending ? tf(ending, "text") : "";
     $("results-ending").hidden = !ending;
     // The mode, the map and the modifiers in one line; the score big; then the rest.
-    const sub = [tf(MODES[res.mode], "name")
-      + (res.mode === "classic" && res.with_agent ? t(" с агентом", " with an agent") : ""),
+    const helped = MODES[res.mode].solo && MODES[res.mode].agents && !res.stage && res.with_agent;
+    const sub = [tf(MODES[res.mode], "name") + (helped ? t(" с агентом", " with an agent") : ""),
                  tf(game.state.map, "name")];
     if (res.stage) sub.push(`${t("этап", "stage")} ${res.stage}/${balance.campaign.stages.length}`);
     if (res.class !== "developer") sub.push(tf(LCSClasses.byId(balance, res.class), "name"));
@@ -568,6 +553,8 @@
     $("time").textContent = s.stage
       ? `${t("этап", "stage")} ${s.stage.index + 1}/${s.stage.count} · ${clock(s.time - s.stage.start)}`
         + ` / ${clock(balance.campaign.stage_seconds)}`
+      // Infinity counts to its next final boss, and only the clock while that boss is up.
+      : s.mode === "infinity" ? clock(s.time) + (s.finalAt === null ? "" : ` / ${clock(s.finalAt)}`)
       : s.solo ? `${clock(s.time)} / ${clock(balance.classic.seconds)}` : clock(s.time);
     $("score").textContent = `${t("счёт", "score")} ${Math.floor(s.score * s.scoreMul)}`;
     $("multiplier").textContent = s.multiplier > 1 ? `×${s.multiplier}` : "";

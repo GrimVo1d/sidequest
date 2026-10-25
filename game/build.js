@@ -6,15 +6,41 @@
 //   build.chestLeft()   // a chest still has something to give
 //   build.offers(), build.take(key)   // for the dev panel: what a level-up could bring, take one
 // hooks: random(), text(x, y, value, color, life), effect(fx), tr(ru, en), mod(id),
-//        magazine() (the pistol's magazine now), levelText(cfg, changes)
+//        magazine() (the pistol's magazine now)
+//   LCSBuild.levelText(cfg, changes)   // [ru, en]: "урон +3, задержка −15%"
+//   LCSBuild.MUL_KEYS                  // the weapon stats that multiply rather than add
 // Gear (0.8): a chest offers three pieces not taken yet. Once every usual piece is taken,
 // it offers three of: a taken piece's next level (up to `chest.max_level`) and the rare
 // pieces that come only from a chest. With nothing left, it gives score.
 "use strict";
 
 (function (root) {
+  // What a weapon's next level changes, as [ru, en]: "урон +3, задержка −15%".
+  const LABELS = {damage: ["урон", "damage"], cooldown: ["задержка", "cooldown"],
+                  area: ["размер", "size"], pierce: ["пробивание", "pierce"],
+                  magazine: ["обойма", "magazine"], reload: ["перезарядка", "reload"],
+                  duration: ["длительность", "duration"], chain: ["прыжки", "jumps"],
+                  max: ["мин на поле", "mines on the floor"], range: ["дальность", "range"]};
+  const MUL_KEYS = new Set(["cooldown", "area", "reload", "duration"]);
+  function levelText(cfg, changes) {
+    const parts = [[], []];
+    for (const [k, v] of Object.entries(changes)) {
+      const label = k === "count" ? cfg.count_name : LABELS[k] || [k, k];
+      let value;
+      if (MUL_KEYS.has(k)) {
+        const pct = Math.round((v - 1) * 100);
+        value = (pct < 0 ? "−" : "+") + Math.abs(pct) + "%";
+      } else {
+        value = (v < 0 ? "−" : "+") + Math.abs(v);
+      }
+      parts[0].push(`${label[0]} ${value}`);
+      parts[1].push(`${label[1]} ${value}`);
+    }
+    return [parts[0].join(", "), parts[1].join(", ")];
+  }
+
   function create(B, s, hooks) {
-    const {random, text, effect, tr, mod, magazine, levelText} = hooks;
+    const {random, text, effect, tr, mod, magazine} = hooks;
     const WEAPONS = new Map(B.weapons.map((w) => [w.id, w]));
     const PASSIVES = new Map(B.upgrades.map((u) => [u.id, u]));
     const GEAR = new Map(B.gear.map((g) => [g.id, g]));
@@ -233,5 +259,5 @@
     return {addXp, choose, reroll, banish, nextChoice, chestLeft, offers, take};
   }
 
-  root.LCSBuild = {create};
+  root.LCSBuild = {create, levelText, MUL_KEYS};
 })(typeof window !== "undefined" ? window : globalThis);

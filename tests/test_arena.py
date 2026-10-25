@@ -67,6 +67,16 @@ class ArenaTest(unittest.TestCase):
         self.assertTrue(d["repeat"])  # same day, same input: the same match
         self.assertEqual(len(d["task"]["modifiers"]), self.balance["daily"]["modifiers"])
         self.assertEqual(len(set(d["task"]["modifiers"])), len(d["task"]["modifiers"]))
+        # A known day, pinned: it changes only when the maps or the modifiers do.
+        self.assertEqual(
+            d["task"],
+            {
+                "date": "2026-10-09",
+                "seed": 3772275296,
+                "map": "hotfix",
+                "modifiers": ["eternal_rage", "no_medkits"],
+            },
+        )
         self.assertGreaterEqual(d["maps"], 3)
         self.assertGreaterEqual(d["sets"], 8)
         self.assertEqual(d["allies"], 0)  # live agents stay out
@@ -355,6 +365,46 @@ class ArenaTest(unittest.TestCase):
         self.assertTrue(final["over"])
         self.assertEqual(final["results"]["reason"], "win")
         self.assertEqual(final["results"]["bosses"], 1)
+
+    # --- Infinity ---
+
+    def test_infinity_goes_on_after_the_final_boss(self):
+        r = self.result["infinity"]
+        after = r["after_final"]
+        self.assertTrue(after["boss"] and after["dead"])
+        self.assertFalse(after["over"])
+        # The harness's loop: a 60 s classic and a final boss every minute, so the next one
+        # comes at 2:00, whenever the first fell.
+        self.assertEqual(after["final_at"], 120)
+        self.assertGreater(r["usual_bosses"], 0)
+        self.assertTrue(r["again"])
+
+    def test_infinity_overtime_makes_bugs_tougher(self):
+        o, ot = self.result["infinity"]["overtime"], self.balance["infinity"]["overtime"]
+        over = (o["infinity"]["time"] - 60) / 60
+        for key in ("hp", "damage"):
+            ratio = o["infinity"][key] / o["classic"][key]
+            self.assertAlmostEqual(ratio, 1 + ot[key + "_per_minute"] * over, places=3)
+
+    def test_infinity_overtime_spawns_faster_past_the_cap(self):
+        rate, ot = self.result["infinity"]["rate"], self.balance["infinity"]["overtime"]
+        cap = self.balance["spawn"]["max_per_second"]
+        self.assertAlmostEqual(rate["classic"], cap)
+        self.assertAlmostEqual(rate["ten"], cap + ot["spawn_per_minute"] * 10, places=3)
+        self.assertAlmostEqual(rate["hour"], ot["max_per_second"])
+
+    def test_infinity_ends_only_with_death(self):
+        dead = self.result["infinity"]["dead"]
+        self.assertEqual((dead["reason"], dead["mode"]), ("dead", "infinity"))
+        self.assertEqual(self.result["infinity"]["records"]["matches"], 1)
+
+    def test_infinity_week_modifiers(self):
+        w, n = self.result["infinity"]["week"], self.balance["infinity"]["week_modifiers"]
+        self.assertEqual(w["mon"], w["sun"])
+        self.assertEqual((w["mon"]["week"], w["next"]["week"]), (43, 44))
+        self.assertEqual(w["new_year"], 53)
+        self.assertEqual(len(set(w["mon"]["modifiers"])), n)
+        self.assertGreaterEqual(w["sets"], 5)
 
     def test_chest_offers_new_gear_then_levels_and_rare_pieces(self):
         gear, top = self.result["gear"], self.balance["chest"]["max_level"]

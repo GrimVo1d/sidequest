@@ -11,7 +11,7 @@
 "use strict";
 
 (function (root) {
-  const MODES = ["agent", "classic", "daily", "ghost", "campaign"];
+  const MODES = Object.keys(root.LCSModes.MODES);
   const KEEP_DAYS = 400, KEEP_GHOSTS = 100;
 
   function emptyMode() {

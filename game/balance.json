@@ -446,6 +446,12 @@
 
   "daily": {"modifiers": 2},
 
+  "infinity": {
+    "final_every_minutes": 20, "week_modifiers": 2,
+    "overtime": {"hp_per_minute": 0.06, "damage_per_minute": 0.04, "spawn_per_minute": 0.06,
+                 "max_per_second": 5}
+  },
+
   "modifiers": [
     {"id": "glass_cannon", "name": "Стеклянная пушка", "text": "урон ×2, но здоровья вдвое меньше",
      "name_en": "Glass cannon", "text_en": "damage ×2, but half the health",

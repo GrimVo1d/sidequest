@@ -129,8 +129,9 @@ body:has(.screen:not([hidden])) :is(#tip, #notice) { display: none; }
   gap: 4px; padding: 8px 12px 6px; background: var(--bar); border-top: 2px solid var(--edge); }
 .menu-actions .hint { margin: 0; font-size: 11px; }
 
-#modes, .menu-buttons { display: flex; gap: 8px; }
-#modes { flex-wrap: wrap; justify-content: center; }
+.menu-buttons { display: flex; gap: 8px; }
+/* Six modes in two even rows of three: none is left alone on a row. */
+#modes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; width: min(480px, 100%); }
 #ghosts { display: flex; flex-direction: column; gap: 4px; width: min(420px, 100%); max-height: 210px;
   overflow-y: auto; }
 .ghost { display: flex; flex-direction: column; gap: 2px; text-align: left; box-shadow: none; }
