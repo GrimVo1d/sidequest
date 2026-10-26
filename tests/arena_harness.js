@@ -8,6 +8,8 @@ load(GAME + "/maps.js");
 load(GAME + "/terrain.js");
 load(GAME + "/modes.js");
 load(GAME + "/build.js");
+load(GAME + "/events.js");
+load(GAME + "/trials.js");
 load(GAME + "/classes.js");
 load(GAME + "/game.js");
 load(GAME + "/progress.js");
@@ -675,6 +677,153 @@ result.arsenal.level_text = LCSBuild.levelText(balance.weapons.find((w) => w.id 
             sets: new Set(mondays.map((d) => wk(d).modifiers.join())).size};
   const res = Object.assign({}, result.classic.still.results, {mode: "infinity"});
   r.records = LCSProgress.addMatch(null, res).infinity;
+}
+// --- trials: short runs alone with a goal and a condition ---------------------------------
+{
+  const r = result.trials = {};
+  const TR = balance.trials, R = TR.rush;
+  const trialGame = (B, id) => {
+    const T = LCSTrials.byId(B, id);
+    return LCS.createGame(B, {seed: 41, map: at(T.map), mode: "trials", trial: id, modifiers: T.modifiers || []});
+  };
+  const isBoss = (e) => balance.enemies[e.type].boss;
+  // The rush: the bosses one by one in their order, the last one final; weak bosses here, so
+  // the bot gets through them.
+  const WEAK = tweak((B) => { for (const id of R.bosses) B.enemies[id].hp = 1; });
+  const rush = trialGame(WEAK, "rush"), rs = rush.state;
+  rush.dev.immortal();
+  const order = [], seen = new Set();
+  let most = 0, finalType = null;
+  while (!rs.over && rs.time < 300) {
+    if (rs.choices) rush.choose(0);
+    rush.step(DT, bot(rs));
+    const bosses = rs.enemies.filter((e) => isBoss(e) && !e.dead);
+    for (const e of bosses) {
+      if (!seen.has(e.type)) { seen.add(e.type); order.push(e.type); }
+      if (e.final) finalType = e.type;
+    }
+    most = Math.max(most, new Set(bosses.map((e) => e.type)).size);
+  }
+  // No boss but the rush's, and no final boss of the classic's.
+  r.rush = {order, most, final: finalType, results: rs.results,
+            no_final: rs.finalAt === Infinity, no_boss: rs.nextBoss === Infinity};
+  // Race twins in the rush: one down alone comes back, and the next boss waits until the
+  // whole pair is down, the revived twin too.
+  {
+    const g = trialGame(balance, "rush"), ts = g.state, still = () => ({x: 0, y: 0});
+    g.dev.immortal();
+    Object.assign(ts.trial, {index: R.bosses.indexOf("boss_race"), nextAt: 0});
+    g.step(DT, still());
+    const race = () => ts.enemies.filter((e) => e.type === "boss_race" && !e.dead);
+    const bosses = () => [...new Set(ts.enemies.filter((e) => isBoss(e) && !e.dead).map((e) => e.type))];
+    const put = (e, near, hp) => Object.assign(e, {x: ts.player.x + (near ? 60 : 1000), y: ts.player.y, hp, speed: 0});
+    const until = (done) => { for (let t = 0; !done() && t < 10; t += DT) g.step(DT, still()); };
+    const [a, b] = race();
+    put(a, true, 1);
+    put(b, false, 1e9);
+    until(() => a.dead);
+    ts.stats.damage = 0;  // the revived twin must live
+    stepFor(g, balance.enemies.boss_race.revive_seconds + 0.5, still);
+    const back = race().find((e) => e !== b);
+    ts.stats.damage = 1;
+    put(b, true, 1);
+    put(back, false, 1e9);
+    until(() => b.dead);
+    ts.stats.damage = 0;
+    stepFor(g, R.pause + 1, still);
+    r.twins = {revived: Boolean(back), waiting: bosses()};
+    ts.stats.damage = 1;
+    race().forEach((e, i) => { put(e, true, 1); e.y += i ? 8 : -8; });
+    until(() => race().length === 0);
+    stepFor(g, R.pause + 1, still);
+    r.twins.next = bosses();
+  }
+  // Rush+: the same first boss with an elite's trait and more health.
+  const first = (id) => {
+    const g = trialGame(balance, id);
+    g.dev.immortal();
+    stepFor(g, R.first_at + 0.5, () => ({x: 0, y: 0}));
+    const e = g.state.enemies.find(isBoss);
+    return e && {type: e.type, hp: e.maxHp, elite: e.elite || null};
+  };
+  r.plus = {plain: first("rush"), plus: first("rush_plus")};
+  // No damage: one hit fails the trial.
+  const clean = trialGame(balance, "clean");
+  stepFor(clean, 1, () => ({x: 0, y: 0}));
+  clean.dev.enemy("tank");
+  const {enemies, player} = clean.state;
+  Object.assign(enemies[enemies.length - 1], {x: player.x, y: player.y});
+  stepFor(clean, 5, () => ({x: 0, y: 0}));
+  r.clean = {results: clean.state.results, damage: clean.state.damageTaken};
+  // Once decided, the match stays so: a dead player's final boss down is no pass...
+  const dead = trialGame(balance, "hotfix");
+  stepFor(dead, 1, () => ({x: 0, y: 0}));
+  dead.state.player.hp = 1;
+  dead.dev.enemy("tank");
+  Object.assign(dead.state.enemies[dead.state.enemies.length - 1], {x: dead.state.player.x, y: dead.state.player.y});
+  for (let t = 0; dead.state.endAt === null && t < 5; t += DT) dead.step(DT, {x: 0, y: 0});
+  dead.dev.stage();
+  stepFor(dead, 10, () => ({x: 0, y: 0}));
+  // Holding out: won at the trial's seconds.
+  const SHORT = tweak((B) => {
+    LCSTrials.byId(B, "night").seconds = 15;
+    Object.assign(LCSTrials.byId(B, "refactor"), {kills: 5, limit: 600});
+    LCSTrials.byId(B, "hotfix").final_at = 30;
+  });
+  const night = trialGame(SHORT, "night");
+  night.dev.immortal();
+  stepFor(night, 60);
+  r.night = night.state.results;
+  // ...and a hit after a pass is no fail.
+  const kept = trialGame(SHORT, "night"), ks = kept.state;
+  kept.dev.immortal();
+  for (let t = 0; ks.endAt === null && t < 30; t += DT) kept.step(DT, {x: 0, y: 0});
+  kept.dev.immortal();
+  ks.player.hp = 1;
+  kept.dev.enemy("tank");
+  Object.assign(ks.enemies[ks.enemies.length - 1], {x: ks.player.x, y: ks.player.y});
+  stepFor(kept, 10, () => ({x: 0, y: 0}));
+  r.decided = {dead: dead.state.results.reason, kept: ks.results.reason, hp: ks.player.hp};
+  // Kills: won once there are enough, failed when the time runs out first.
+  const kills = trialGame(SHORT, "refactor");
+  kills.dev.immortal();
+  stepFor(kills, 600);
+  const SLOW = tweak((B) => Object.assign(LCSTrials.byId(B, "refactor"), {kills: 100000, limit: 10}));
+  const late = trialGame(SLOW, "refactor");
+  late.dev.immortal();
+  stepFor(late, 60);
+  r.kills = {won: kills.state.results, late: late.state.results};
+  // A short classic: its final boss at the trial's minute, beating it wins.
+  const hot = trialGame(SHORT, "hotfix");
+  r.hotfix = {final_at: hot.state.finalAt};
+  hot.dev.immortal();
+  stepFor(hot, 31, () => ({x: 0, y: 0}));
+  r.hotfix.final = hot.state.enemies.some((e) => e.final);
+  hot.dev.stage();
+  stepFor(hot, 10, () => ({x: 0, y: 0}));
+  r.hotfix.results = hot.state.results;
+  // Agents stay out; the modifiers are the trial's.
+  const alone = trialGame(balance, "edge");
+  alone.agentEvent({kind: "session_start", session: "t1", project: "demo", ts: 1});
+  alone.agentEvent({kind: "prompt", session: "t1", project: "demo", ts: 2});
+  stepFor(alone, 2, () => ({x: 0, y: 0}));
+  r.alone = {allies: alone.state.allies.length, modifiers: alone.state.modifiers};
+  // What the menu and the HUD say.
+  r.goals = TR.list.map((T) => LCSTrials.goal(balance, T));
+  r.goal_kinds = Object.keys(LCSTrials.GOALS);
+  r.status = {rush: LCSTrials.status(balance, rush.state), night: LCSTrials.status(SHORT, night.state),
+              kills: LCSTrials.status(SHORT, kills.state)};
+  // The records: passed once and for all, the best time of a pass, only known trials.
+  const res = (trial, reason, time) => ({mode: "trials", trial, reason, trial_time: reason === "passed" ? time : null});
+  let saved = JSON.parse('{"__proto__": {"done": true}, "nope": {"done": true},'
+                         + ' "rush": {"done": true, "best": -5, "tries": 1.5}}');
+  for (const x of [res("clean", "failed", 20), res("clean", "passed", 100), res("clean", "passed", 80),
+                   res("clean", "dead", 10), res("nope", "passed", 5)]) saved = LCSProgress.addTrial(saved, TR.list, x);
+  r.records = {saved, done: LCSProgress.trialsDone(saved), proto: Object.getPrototypeOf(saved) === Object.prototype};
+  const known = LCSProgress.known(balance, LCS_MAPS);
+  const ach = (x) => LCSProgress.earned(balance.achievements, x, LCSProgress.migrate(null), known);
+  r.achievements = {plus: ach(Object.assign({}, rs.results, {trial: "rush_plus"})),
+                    all: ach(Object.assign({}, night.state.results, {trials_done: TR.list.length}))};
 }
 // --- solo modes: the ghost, the daily task, modifiers ----------------------------------------
 {

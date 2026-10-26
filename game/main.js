@@ -34,6 +34,8 @@
   let ghostList = [];        // past sessions, from the core
   let ghostRecords = {};
   let days = {};             // the daily task: best score per day
+  let trialId = null;        // the trial picked (trials.js) and the trials passed
+  let trialRecords = {};
   const keys = new Set();
   let look = null;           // the hero's look (hero.js)
   let matchLook = null;      // the look with the class's own parts on top, for the arena
@@ -91,13 +93,14 @@
   }
   const todayTask = () => LCSModes.daily(balance, LCS_MAPS, today());
   const thisWeek = () => LCSModes.week(balance, today());
-  // The daily task and Infinity come with their own modifiers; the other modes take the player's.
+  const trial = () => LCSTrials.byId(balance, trialId);
+  // The daily task, Infinity and a trial come with their own modifiers; the other modes take the player's.
   const fixedMods = () => (mode === "daily" ? todayTask().modifiers
-    : mode === "infinity" ? thisWeek().modifiers : null);
+    : mode === "infinity" ? thisWeek().modifiers : mode === "trials" ? trial().modifiers || [] : null);
   const modifier = (id) => balance.modifiers.find((m) => m.id === id);
 
   async function savePrefs() {
-    await Sidequest.storage.set("prefs", {map: mapId, mode, mods, ghost: ghostId, cls});
+    await Sidequest.storage.set("prefs", {map: mapId, mode, mods, ghost: ghostId, cls, trial: trialId});
   }
 
   async function progress() {
@@ -126,6 +129,7 @@
     if (Object.hasOwn(MODES, prefs.mode)) mode = prefs.mode;
     if (Array.isArray(prefs.mods)) mods = prefs.mods.filter((id) => modifier(id));
     if (typeof prefs.ghost === "string") ghostId = prefs.ghost;
+    trialId = LCSTrials.byId(balance, prefs.trial).id;
     const {records, got} = await progress();
     menuGot = got;
     cls = LCSClasses.isOpen(balance, prefs.cls, got) ? prefs.cls : "developer";
@@ -134,6 +138,7 @@
     taught = records.totals.matches > 0 || Boolean(await Sidequest.storage.get("tutorial"));
     ghostRecords = LCSProgress.addGhost(await Sidequest.storage.get("ghosts"), {});
     days = LCSProgress.addDay(await Sidequest.storage.get("days"), {});
+    trialRecords = LCSProgress.addTrial(await Sidequest.storage.get("trials"), balance.trials.list, {});
     try { ghostList = await Sidequest.history.sessions(); } catch (e) { ghostList = []; }
     if (!ghostList.some((g) => g.session === ghostId)) ghostId = ghostList.length ? ghostList[0].session : null;
     menuRecords = records;
@@ -176,7 +181,16 @@
     }
     $("mode-text").textContent = tf(MODES[mode], "text");
     renderRecords();
-    renderGhosts();
+    screens.ghosts(mode === "ghost", ghostList, ghostId, ghostRecords, (id) => {
+      ghostId = id;
+      renderModes();
+      savePrefs();
+    });
+    screens.trials(mode === "trials", trialId, trialRecords, (id) => {
+      trialId = id;
+      renderModes();
+      savePrefs();
+    });
     renderFixed();
     renderMaps();
     renderMods();
@@ -184,43 +198,11 @@
     $("btn-play").disabled = mode === "ghost" && !ghostId;
   }
 
-  function dateText(seconds) {
-    const d = new Date(seconds * 1000);
-    return `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")} `
-      + `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-  }
-
-  // Past sessions to play as a ghost; the project name is shown as text only.
-  function renderGhosts() {
-    const box = $("ghosts");
-    clear(box);
-    box.hidden = mode !== "ghost";
-    if (mode !== "ghost") return;
-    if (!ghostList.length) {
-      box.appendChild(el("p", t("Прошлых сессий пока нет: поиграй с агентом, и его сессия появится здесь.",
-                                "No past sessions yet: play with an agent and its session shows up here."),
-                         "hint"));
-      return;
-    }
-    for (const g of ghostList) {
-      const b = el("button", null, "ghost" + (g.session === ghostId ? " on" : ""));
-      b.appendChild(el("span", g.project || "?", "name"));
-      const best = ghostRecords[g.session] ? ghostRecords[g.session].best_score : null;
-      b.appendChild(el("span", `${dateText(g.started_at)} · ${clock(g.duration)} · `
-        + `${t("действий", "actions")} ${g.actions}`
-        + (best !== null ? ` · ${t("рекорд", "best")} ${best}` : ""), "text"));
-      b.addEventListener("click", () => {
-        ghostId = g.session;
-        renderGhosts();
-        savePrefs();
-      });
-      box.appendChild(b);
-    }
-  }
-
   // The fixed modifiers' line: the day's map and modifiers, or Infinity's week and its.
   function renderFixed() {
-    const p = $("daily-text"), fixed = fixedMods();
+    const p = $("daily-text");
+    // A trial's modifiers are in its own row.
+    const fixed = mode === "trials" ? null : fixedMods();
     p.hidden = !fixed;
     if (!fixed) return;
     const names = fixed.map((id) => tf(modifier(id), "name")).join(", ") + ".";
@@ -266,7 +248,10 @@
   function renderMaps() {
     const box = $("maps");
     clear(box);
-    const daily = mode === "daily" ? todayTask().map : null;
+    // A trial names its own map in its row.
+    box.hidden = mode === "trials";
+    $("map-text").hidden = mode === "trials";
+    const daily = mode === "daily" ? todayTask().map : mode === "trials" ? trial().map : null;
     const chain = mode === "campaign" ? balance.campaign.stages.map((st) => st.map) : null;
     for (const m of LCS_MAPS) {
       const on = chain ? chain.includes(m.id) : (daily || mapId) === m.id;
@@ -303,6 +288,11 @@
       days = LCSProgress.addDay(await Sidequest.storage.get("days"), res);
       await Sidequest.storage.set("days", days);
       res.daily_streak = LCSProgress.streak(days, res.day);
+    }
+    if (res.mode === "trials") {
+      trialRecords = LCSProgress.addTrial(await Sidequest.storage.get("trials"), balance.trials.list, res);
+      await Sidequest.storage.set("trials", trialRecords);
+      res.trials_done = LCSProgress.trialsDone(trialRecords);
     }
     if (res.mode === "ghost") {
       ghostRecords = LCSProgress.addGhost(await Sidequest.storage.get("ghosts"),
@@ -343,6 +333,8 @@
                  modifiers: task.modifiers, day: task.date};
     } else if (mode === "infinity") {
       options.modifiers = thisWeek().modifiers;
+    } else if (mode === "trials") {
+      Object.assign(options, {map: LCS_MAPS.find((m) => m.id === trial().map), modifiers: fixedMods(), trial: trialId});
     } else if (mode === "ghost") {
       if (!ghostId) return;
       const events = await Sidequest.history.events(ghostId);
@@ -384,7 +376,8 @@
 
   const TITLES = {done: ["Последний коммит выстоял", "The last commit stands"],
                   win: ["Конфликт разрешён", "Conflict resolved"],
-                  dead: ["Забег окончен", "The run is over"], quit: ["Матч завершён", "Match over"]};
+                  dead: ["Забег окончен", "The run is over"], quit: ["Матч завершён", "Match over"],
+                  passed: ["Испытание пройдено", "Trial passed"], failed: ["Испытание провалено", "Trial failed"]};
 
   async function endMatch() {
     const res = game.state.results;
@@ -399,6 +392,7 @@
     const helped = MODES[res.mode].solo && MODES[res.mode].agents && !res.stage && res.with_agent;
     const sub = [tf(MODES[res.mode], "name") + (helped ? t(" с агентом", " with an agent") : ""),
                  tf(game.state.map, "name")];
+    if (res.trial) sub.push(tf(LCSTrials.byId(balance, res.trial), "name"));
     if (res.stage) sub.push(`${t("этап", "stage")} ${res.stage}/${balance.campaign.stages.length}`);
     if (res.class !== "developer") sub.push(tf(LCSClasses.byId(balance, res.class), "name"));
     if (res.modifiers) {
@@ -553,6 +547,7 @@
     $("time").textContent = s.stage
       ? `${t("этап", "stage")} ${s.stage.index + 1}/${s.stage.count} · ${clock(s.time - s.stage.start)}`
         + ` / ${clock(balance.campaign.stage_seconds)}`
+      : s.trial ? t(...LCSTrials.status(balance, s))
       // Infinity counts to its next final boss, and only the clock while that boss is up.
       : s.mode === "infinity" ? clock(s.time) + (s.finalAt === null ? "" : ` / ${clock(s.finalAt)}`)
       : s.solo ? `${clock(s.time)} / ${clock(balance.classic.seconds)}` : clock(s.time);

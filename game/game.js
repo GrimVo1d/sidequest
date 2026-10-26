@@ -4,7 +4,8 @@
 //                                 // "daily" (classic with the day's seed, LCS.daily) or
 //                                 // "ghost" (a past session plays the ally: ghost.events) or
 //                                 // "campaign" (stage, carry: modes.js) or "infinity"
-//                                 // (classic with no end but death); modifiers: ids
+//                                 // (classic with no end but death) or "trials" (trial:
+//                                 // an id of balance.trials, trials.js); modifiers: ids
 //                                 // from balance.modifiers; cls, perks: classes.js
 //   game.agentEvent(event)        // a game event from Sidequest.on("*")
 //   game.step(1 / 60, {x, y})      // input: movement direction, each -1..1
@@ -40,6 +41,7 @@
     // boss, death ends it. Only the ghost's own events reach a ghost match; the daily task
     // ignores agents. Infinity goes on after its final boss.
     const {solo: classic, agents: ownAgents, endless} = MODES[modeName];
+    const trial = modeName === "trials" ? root.LCSTrials.byId(B, options.trial) : null;
     const stage = root.LCSModes.stage(B, options);
     const MODS = new Set((options && options.modifiers || []).filter((id) => B.modifiers.some((m) => m.id === id)));
     const mod = (id) => (MODS.has(id) ? B.modifiers.find((m) => m.id === id) : null);
@@ -88,6 +90,8 @@
       elites: 0, incidents: 0, deploys: 0, bossKinds: {},
       buffs: {coffee: 0, duck: 0}, itemAt: B.items.every_seconds,
       spawnAcc: 0, nextBoss: B.spawn.boss_every_minutes * 60, rage: 0,
+      // When the final boss comes; null once it is up (and in the modes with agents), Infinity
+      // in a trial without one.
       finalAt: classic ? C.seconds : null,
       score: 0, kills: 0, damageTaken: 0, deaths: 0, streak: 0, streakTimer: 0,
       bestStreak: 0, multiplier: 1, maxMultiplier: 1, everAlly: false, bosses: 0, picked: 0,
@@ -251,12 +255,13 @@
     }
 
     // An elite: a golden outline, much tougher, one trait, and a chest when it dies.
-    function makeElite(e, kind) {
+    // `hpScale`: a trial's enhanced boss is less tough than an elite bug.
+    function makeElite(e, kind, hpScale = EL.hp) {
       const kinds = Object.keys(EL.kinds);
       kind = EL.kinds[kind] ? kind : kinds[Math.floor(random() * kinds.length)];
       const k = EL.kinds[kind];
       e.elite = kind;
-      e.hp *= EL.hp;
+      e.hp *= hpScale;
       e.maxHp = e.hp;
       e.score *= EL.score;
       if (k.speed) e.speed *= k.speed;
@@ -364,7 +369,8 @@
         drop("chest", e.x, e.y, true);
       }
       if (e.boss) {
-        if (e.final && classic && pairDone) { bossDown(e, false); win(e); return; }
+        // Once the match is decided (a death, a failed trial), the final boss changes nothing.
+        if (e.final && classic && pairDone) { bossDown(e, false); if (s.endAt === null) win(e); return; }
         // Twins are down only both at once.
         if (pairDone) bossDown(e, true);
       } else if (!e.elite && !e.noLoot && random() < I.drop_chance) {
@@ -412,6 +418,7 @@
 
     // The final boss of a classic run is down: everyone else vanishes, the run is won. In
     // Infinity the run goes on, and the final boss comes again at the next of its minutes.
+    // A trial won without a boss (its goal reached) wins the same way, around the player.
     function win(boss) {
       effect({type: "ult", x: boss.x, y: boss.y, r: Math.hypot(s.view.width, s.view.height),
               color: "#e8c14a", life: 1});
@@ -430,10 +437,13 @@
         return;
       }
       const next = s.stage && !s.stage.final;
-      text(boss.x, boss.y - 30, next ? tr("ЭТАП ПРОЙДЕН", "STAGE CLEAR")
-        : tr("КОНФЛИКТ РАЗРЕШЁН", "CONFLICT RESOLVED"), "#e8c14a", 3);
+      text(boss.x, boss.y - 30, trial ? tr("ИСПЫТАНИЕ ПРОЙДЕНО", "TRIAL PASSED")
+        : next ? tr("ЭТАП ПРОЙДЕН", "STAGE CLEAR") : tr("КОНФЛИКТ РАЗРЕШЁН", "CONFLICT RESOLVED"), "#e8c14a", 3);
       s.endAt = s.time + C.win_delay;
-      s.endReason = next ? "stage" : "win";
+      // A trial's pass is not a classic's win: the trials keep their own records. Its time is
+      // the pass's moment, not the end of the match.
+      s.endReason = next ? "stage" : trial ? "passed" : "win";
+      if (trial) s.trial.time = s.time;
     }
 
     // --- crystals of experience (classic) ---------------------------------------------
@@ -570,7 +580,8 @@
     // True when the hit landed, even on the shield.
     function hurtPlayer(damage) {
       const p = s.player;
-      if (s.immortal || p.dead || p.invulnerable > 0) return false;
+      // Once the match is decided, nothing changes the decision.
+      if (s.immortal || p.dead || p.invulnerable > 0 || s.endAt !== null) return false;
       p.invulnerable = B.player.hit_invulnerable;
       p.hurtAt = s.time;
       if (p.shield > 0) {
@@ -897,6 +908,7 @@
     const kit = root.LCSClasses.create(B, s, {random, effect, text, tr, pushOut}, options);
     if (!(stage && options.carry)) kit.start();
     if (stage) root.LCSModes.resume(s, B, stage, options.carry);
+    const trialRun = trial && root.LCSTrials.create(B, s, trial, {spawnBoss, spawnFinal, makeElite, win, text, tr});
     s.player.ammo = s.player.magazine = magazine();
 
     // --- allies: the agents ------------------------------------------------------
@@ -1312,7 +1324,7 @@
                             B.spawn.base_per_second + B.spawn.per_minute * minute
                             + B.spawn.per_level * (s.level - 1) + OT.spawn_per_minute * over)
         * (active ? 1 : B.spawn.no_ally_factor) * (s.redCi > 0 ? AG.red_ci.spawn : 1)
-        * (s.deploy ? EV.deploy.spawn : 1);
+        * (s.deploy ? EV.deploy.spawn : 1) * (trialRun ? trialRun.spawn : 1);
       s.spawnAcc += rate * dt;
       while (s.spawnAcc >= 1) {
         s.spawnAcc -= 1;
@@ -1320,7 +1332,7 @@
       }
       if (s.finalAt !== null && s.time >= s.finalAt) {
         s.finalAt = null;
-        spawnFinal();
+        if (!spawnFinal()) s.finalAt = s.time + 1;   // no room now: a second later
       } else if (s.time >= s.nextBoss) {
         s.nextBoss += B.spawn.boss_every_minutes * 60;
         // In a classic run the final boss takes the last boss's place.
@@ -1328,17 +1340,19 @@
       }
     }
 
-    // The final boss, or a campaign stage's boss: twins are both final.
-    function spawnFinal() {
-      const F = s.stage || {boss: "boss", hp: C.final_hp, score: C.final_score, final: true};
+    // The final boss, or a campaign stage's boss: twins are both final. A trial's rush names
+    // its own. Null when there is no room: the caller tries again.
+    function spawnFinal(type) {
+      const F = s.stage || {boss: type || "boss", hp: C.final_hp, score: C.final_score, final: true};
       const boss = spawnAny(F.boss), cfg = B.enemies[F.boss];
-      if (!boss) { s.finalAt = s.time + 1; return; }
+      if (!boss) return null;
       for (const e of [boss, boss.partner].filter(Boolean)) {
         Object.assign(e, {final: true, hp: e.hp * F.hp, maxHp: e.hp * F.hp, score: F.score});
       }
       s.met.final = true;
       const name = F.final ? tr("ФИНАЛЬНЫЙ БОСС", "FINAL BOSS") : tr(cfg.name, cfg.name_en).toUpperCase();
       text(s.player.x, s.player.y - 30, name, "#e8c14a", 3);
+      return boss;
     }
 
     // What each kind of enemy does besides walking at the player; true: it moved itself.
@@ -1519,66 +1533,17 @@
       s.comebacks = s.comebacks.filter((c) => !c.done);
     }
 
-    // --- arena events: a Friday deploy, an incident --------------------------------------
+    // --- arena events: a Friday deploy, an incident (events.js) ----------------------------
 
-    function startEvent(kind) {
-      const p = s.player, [lo, hi] = EV.every;
-      s.eventAt = s.time + lo + random() * (hi - lo);
-      s.nextEvent = kind === "deploy" ? "incident" : "deploy";
-      s.met[kind] = true;
-      if (kind === "deploy") {
-        s.deploy = {left: EV.deploy.seconds};
-        text(p.x, p.y - 30, tr("ПЯТНИЧНЫЙ ДЕПЛОЙ", "FRIDAY DEPLOY"), "#e89a4a", 3);
-        return;
-      }
-      const Z = EV.incident;
-      let at = {x: p.x, y: p.y};
-      for (let tries = 0; tries < 30; tries++) {
-        const angle = random() * Math.PI * 2, d = Z.distance[0] + random() * (Z.distance[1] - Z.distance[0]);
-        const x = clamp(p.x + Math.cos(angle) * d, Z.radius, W - Z.radius);
-        const y = clamp(p.y + Math.sin(angle) * d, Z.radius, H - Z.radius);
-        if (!inWall(x, y, Z.radius / 2, true)) { at = {x, y}; break; }
-      }
-      s.incident = {x: at.x, y: at.y, r: Z.radius, held: 0, left: Z.seconds};
-      text(p.x, p.y - 30, tr("ИНЦИДЕНТ", "INCIDENT"), "#d9534f", 3);
-    }
+    const events = root.LCSEvents.create(B, s, {random, text, effect, tr, drop, inWall, size: {width: W, height: H}});
 
+    // A new one in a few minutes, while the arena is alive and the final boss is not up.
     function updateEvents(dt) {
-      const p = s.player;
-      if (s.deploy) {
-        s.deploy.left -= dt;
-        if (s.deploy.left <= 0) {
-          s.deploy = null;
-          if (s.endAt === null) {
-            s.deploys++;
-            s.score += EV.deploy.score * s.multiplier;
-            text(p.x, p.y - 24, tr("ДЕПЛОЙ ПЕРЕЖИТ", "DEPLOY SURVIVED"), "#4fbf6f", 2.5);
-          }
-        }
-      }
-      if (s.incident) {
-        const z = s.incident, Z = EV.incident;
-        z.left -= dt;
-        if (!p.dead && dist2(z, p) <= z.r * z.r) z.held += dt;
-        if (z.held >= Z.hold) {
-          s.incident = null;
-          s.incidents++;
-          s.score += Z.score * s.multiplier;
-          drop("chest", z.x, z.y, true);
-          effect({type: "ring", x: z.x, y: z.y, r: z.r + 10, color: "#4fbf6f", life: 0.6});
-          text(z.x, z.y - 20, tr("ИНЦИДЕНТ ЗАКРЫТ", "INCIDENT CLOSED"), "#4fbf6f", 2.5);
-        } else if (z.left <= 0) {
-          s.incident = null;
-          s.rage = Math.max(s.rage, Z.fail_rage * s.stats.rage);
-          s.met.rage = true;
-          text(p.x, p.y - 24, tr("ИНЦИДЕНТ ЭСКАЛИРОВАН", "INCIDENT ESCALATED"), "#d9534f", 2.5);
-        }
-      }
-      // A new one in a few minutes, while the arena is alive and the final boss is not up.
+      events.update(dt);
       const live = classic || s.allies.some((a) => a.state === "active");
       if (s.deploy || s.incident || s.time < s.eventAt || s.finaleAt !== null || s.endAt !== null
           || !live || (classic && s.finalAt === null)) return;
-      startEvent(s.nextEvent);
+      events.start(s.nextEvent);
     }
 
     function updateEnemies(dt) {
@@ -1707,6 +1672,7 @@
       s.effects = s.effects.filter((x) => x.t < x.life);
       s.texts = s.texts.filter((x) => x.t < x.life);
 
+      if (trialRun) trialRun.update();
       if (s.finaleAt !== null && s.time >= s.finaleAt) finish("done");
       if (s.endAt !== null && s.time >= s.endAt) finish(s.endReason);
     }
@@ -1731,6 +1697,7 @@
                    evolved_ids: s.weapons.filter((w) => w.evolved).map((w) => w.id)};
       if (ghost) s.results.ghost = ghost.session;
       if (s.mode === "daily") s.results.day = s.day;
+      if (trial) Object.assign(s.results, {trial: trial.id, trial_time: s.trial.time || null});
       return s.results;
     }
 
@@ -1764,8 +1731,8 @@
         const e = spawn(B.enemies[type] ? type : "grunt");
         if (e) makeElite(e, kind);
       },
-      event(kind) { if (!s.deploy && !s.incident) startEvent(kind === "deploy" ? "deploy" : "incident"); },
-      final() { spawnFinal(); },
+      event(kind) { if (!s.deploy && !s.incident) events.start(kind === "deploy" ? "deploy" : "incident"); },
+      final() { if (!spawnFinal()) s.finalAt = s.time + 1; },
       // The final boss (or a stage's boss) comes and goes down at once: a campaign's next stage.
       stage() {
         spawnFinal();

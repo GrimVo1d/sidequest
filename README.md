@@ -27,9 +27,10 @@ turns the event into a mechanic:
 | Asks you something | the game pauses and shows which project is waiting |
 | Finishes the task | the ally casts its ultimate and the match ends |
 
-There are 8 weapons with evolutions, 6 classes with their own ability, 9 maps and 6 modes:
+There are 8 weapons with evolutions, 6 classes with their own ability, 9 maps and 7 modes:
 with your live agents, alone, a five-stage campaign, against a ghost of a past session,
-the task of the day, and Infinity, an endless run with the week's modifiers.
+the task of the day, Infinity, an endless run with the week's modifiers, and Trials, short
+runs with a goal and a condition, from a boss rush to holding out without a single hit.
 
 ## Privacy and safety
 

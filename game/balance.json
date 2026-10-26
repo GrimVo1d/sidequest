@@ -439,7 +439,13 @@
      "when": {"min": {"evolutions": 4}}},
     {"id": "senior", "icon": "gem", "name": "Из джунов в лиды", "text": "Джуном дойти до 25-го уровня",
      "name_en": "Junior to lead", "text_en": "Reach level 25 as the Junior",
-     "when": {"is": {"class": "junior"}, "min": {"level": 25}}}
+     "when": {"is": {"class": "junior"}, "min": {"level": 25}}},
+    {"id": "rush_plus", "icon": "elite", "name": "Без передышки", "text": "пройти испытание «Босс-раш+»",
+     "name_en": "No breather", "text_en": "Pass the Boss rush+ trial",
+     "when": {"is": {"trial": "rush_plus", "reason": "passed"}}},
+    {"id": "trials_all", "icon": "shield", "name": "Полное покрытие", "text": "пройти все испытания",
+     "name_en": "Full coverage", "text_en": "Pass every trial",
+     "when": {"min": {"trials_done": 8}}}
   ],
 
   "ghost": {"max_gap": 15, "after_task": 2, "lead": 2, "end_after": 4},
@@ -450,6 +456,31 @@
     "final_every_minutes": 20, "week_modifiers": 2,
     "overtime": {"hp_per_minute": 0.06, "damage_per_minute": 0.04, "spawn_per_minute": 0.06,
                  "max_per_second": 5}
+  },
+
+  "trials": {
+    "rush": {"first_at": 25, "pause": 6, "spawn": 0.5, "elite_hp": 1.25,
+             "bosses": ["boss_oom", "boss_loop", "boss_race", "boss_fire", "boss"]},
+    "list": [
+      {"id": "rush", "map": "open", "goal": "rush",
+       "name": "Босс-раш", "name_en": "Boss rush"},
+      {"id": "rush_plus", "map": "prod", "goal": "rush", "elite": true,
+       "name": "Босс-раш+", "name_en": "Boss rush+"},
+      {"id": "clean", "map": "legacy", "goal": "survive", "seconds": 180, "no_damage": true,
+       "name": "Чистый код", "name_en": "Clean code"},
+      {"id": "oldschool", "map": "monorepo",
+       "goal": "survive", "seconds": 600, "modifiers": ["pistol_only"],
+       "name": "Олдскул", "name_en": "Old school"},
+      {"id": "hotfix", "map": "hotfix", "goal": "final", "final_at": 300,
+       "name": "Срочный фикс", "name_en": "Urgent fix"},
+      {"id": "night", "map": "night", "goal": "survive", "seconds": 600, "modifiers": ["no_medkits"],
+       "name": "Ночная смена", "name_en": "Night shift"},
+      {"id": "edge", "map": "cicd",
+       "goal": "survive", "seconds": 300, "modifiers": ["glass_cannon", "eternal_rage"],
+       "name": "На нервах", "name_en": "On edge"},
+      {"id": "refactor", "map": "micro", "goal": "kills", "kills": 350, "limit": 300,
+       "name": "Рефакторинг", "name_en": "Refactoring"}
+    ]
   },
 
   "modifiers": [

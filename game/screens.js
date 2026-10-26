@@ -5,6 +5,8 @@
 //   screens.achievements(got)              // the menu's count and the latest one
 //   screens.awards({records, got, bests})  // the achievements screen
 //   screens.classes(cls, got, pick)        // the class picker; pick(id) on a click
+//   screens.ghosts(shown, list, id, records, pick)   // past sessions for a ghost match
+//   screens.trials(shown, id, records, pick)   // the trials' list (trials.js); pick(id) on a click
 //   screens.stars(meta, buy)               // the stars screen; buy(id) on a click
 //   screens.found(entry, meta)             // the handbook: has this weapon been found
 //   screens.abilityChip(state)             // {id, icon, cls, text} for the HUD, or null
@@ -163,6 +165,56 @@
       return Boolean(entry.gold ? meta.evolutions[entry.icon] : meta.weapons[entry.id]);
     }
 
+    // --- the ghost's sessions and the trials -------------------------------------------
+
+    function dateText(seconds) {
+      const d = new Date(seconds * 1000);
+      return `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")} `
+        + `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+    }
+
+    // Past sessions to play as a ghost; the project name is shown as text only.
+    function ghosts(shown, list, current, records, pick) {
+      const box = $("ghosts");
+      clear(box);
+      box.hidden = !shown;
+      if (!shown) return;
+      if (!list.length) {
+        box.appendChild(el("p", t("Прошлых сессий пока нет: поиграй с агентом, и его сессия появится здесь.",
+                                  "No past sessions yet: play with an agent and its session shows up here."),
+                           "hint"));
+        return;
+      }
+      for (const g of list) {
+        const b = el("button", null, "ghost" + (g.session === current ? " on" : ""));
+        b.appendChild(el("span", g.project || "?", "name"));
+        const best = records[g.session] ? records[g.session].best_score : null;
+        b.appendChild(el("span", `${dateText(g.started_at)} · ${clock(g.duration)} · `
+          + `${t("действий", "actions")} ${g.actions}`
+          + (best !== null ? ` · ${t("рекорд", "best")} ${best}` : ""), "text"));
+        b.addEventListener("click", () => pick(g.session));
+        box.appendChild(b);
+      }
+    }
+
+    // The trials: the passed ones marked, each with its map, its goal and the best time of a pass.
+    function trials(shown, current, records, pick) {
+      const box = $("trials");
+      clear(box);
+      box.hidden = !shown;
+      if (!shown) return;
+      for (const x of balance.trials.list) {
+        const r = records[x.id], done = Boolean(r && r.done);
+        const b = el("button", null, "trial" + (x.id === current ? " on" : "") + (done ? " done" : ""));
+        b.appendChild(el("span", (done ? "✓ " : "") + tf(x, "name"), "name"));
+        const map = LCS_MAPS.find((m) => m.id === x.map);
+        b.appendChild(el("span", `${tf(map, "name")} · ${t(...LCSTrials.goal(balance, x))}`
+          + (r && r.best ? ` · ${t("лучшее", "best")} ${clock(r.best)}` : ""), "text"));
+        b.addEventListener("click", () => pick(x.id));
+        box.appendChild(b);
+      }
+    }
+
     // --- the HUD ----------------------------------------------------------------------
 
     function abilityChip(s) {
@@ -175,7 +227,7 @@
               text: `${tf(A, "name")} · ` + (waiting ? Math.ceil(left) + t(" с", "s") : t(...KEY))};
     }
 
-    return {achievements, awards, classes, stars, found, abilityChip};
+    return {achievements, awards, classes, stars, found, ghosts, trials, abilityChip};
   }
 
   root.LCSScreens = {create};

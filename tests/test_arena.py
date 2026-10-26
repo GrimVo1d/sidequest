@@ -418,6 +418,104 @@ class ArenaTest(unittest.TestCase):
         self.assertEqual(len(set(w["mon"]["modifiers"])), n)
         self.assertGreaterEqual(w["sets"], 5)
 
+    # --- trials ---
+
+    def test_trials_rush_brings_every_boss_in_turn(self):
+        rush, bosses = self.result["trials"]["rush"], self.balance["trials"]["rush"]["bosses"]
+        self.assertEqual(rush["order"], bosses)
+        self.assertEqual(rush["most"], 1)  # one boss (or one pair of twins) at a time
+        self.assertEqual(rush["final"], bosses[-1])
+        self.assertEqual(rush["results"]["reason"], "passed")
+        self.assertEqual(rush["results"]["bosses"], len(bosses))
+        self.assertTrue(rush["no_final"])
+        self.assertTrue(rush["no_boss"])
+
+    def test_trials_rush_waits_for_both_race_twins(self):
+        twins, bosses = self.result["trials"]["twins"], self.balance["trials"]["rush"]["bosses"]
+        after = bosses[bosses.index("boss_race") + 1]
+        self.assertTrue(twins["revived"])
+        self.assertEqual(twins["waiting"], ["boss_race"])
+        self.assertIn(after, twins["next"])
+        self.assertNotIn("boss_race", twins["next"])
+
+    def test_trials_decision_sticks(self):
+        decided = self.result["trials"]["decided"]
+        self.assertEqual(decided["dead"], "dead")
+        self.assertEqual(decided["kept"], "passed")
+        self.assertEqual(decided["hp"], 1)
+
+    def test_trials_rush_plus_bosses_are_enhanced(self):
+        plus, k = self.result["trials"]["plus"], self.balance["trials"]["rush"]["elite_hp"]
+        self.assertEqual(plus["plain"]["type"], plus["plus"]["type"])
+        self.assertIsNone(plus["plain"]["elite"])
+        self.assertIn(plus["plus"]["elite"], self.balance["elites"]["kinds"])
+        self.assertAlmostEqual(plus["plus"]["hp"], plus["plain"]["hp"] * k, places=3)
+
+    def test_trials_goals_pass_and_conditions_fail(self):
+        r = self.result["trials"]
+        self.assertEqual(
+            (r["clean"]["results"]["reason"], r["clean"]["results"]["trial"]), ("failed", "clean")
+        )
+        self.assertGreater(r["clean"]["damage"], 0)
+        win_delay = self.balance["classic"]["win_delay"]
+        self.assertEqual(r["night"]["reason"], "passed")
+        self.assertAlmostEqual(r["night"]["time"], 15 + win_delay, delta=1)
+        self.assertAlmostEqual(r["night"]["trial_time"], 15, delta=0.1)
+        self.assertIsNone(r["clean"]["results"]["trial_time"])
+        n = len(self.balance["trials"]["rush"]["bosses"])
+        self.assertRegex(r["status"]["rush"][1], rf"^boss {n}/{n} · \d+:\d\d$")
+        self.assertRegex(r["status"]["night"][1], r"^0:\d\d / 0:15$")
+        self.assertRegex(r["status"]["kills"][1], r"^kills \d+/5 · \d+:\d\d / 10:00$")
+        self.assertEqual(r["kills"]["won"]["reason"], "passed")
+        self.assertGreaterEqual(r["kills"]["won"]["kills"], 5)
+        self.assertEqual(r["kills"]["late"]["reason"], "failed")
+        self.assertEqual(r["hotfix"]["final_at"], 30)
+        self.assertTrue(r["hotfix"]["final"])
+        self.assertEqual(r["hotfix"]["results"]["reason"], "passed")
+
+    def test_trials_are_played_alone_with_their_modifiers(self):
+        alone = self.result["trials"]["alone"]
+        edge = next(t for t in self.balance["trials"]["list"] if t["id"] == "edge")
+        self.assertEqual(alone["allies"], 0)
+        self.assertEqual(alone["modifiers"], edge["modifiers"])
+
+    def test_trials_data(self):
+        with open(os.path.join(GAME, "maps.js"), encoding="utf-8") as f:
+            maps = set(re.findall(r'^    \{id: "(\w+)"', f.read(), re.MULTILINE))
+        trials = self.balance["trials"]
+        ids = [t["id"] for t in trials["list"]]
+        self.assertEqual(len(ids), len(set(ids)))
+        modifiers = {m["id"] for m in self.balance["modifiers"]}
+        for t in trials["list"]:
+            self.assertIn(t["map"], maps)
+            self.assertTrue(set(t.get("modifiers", [])) <= modifiers, t["id"])
+            needs = {"rush": [], "survive": ["seconds"], "final": ["final_at"]}
+            for k in needs.get(t["goal"], ["kills", "limit"]):
+                self.assertGreater(t[k], 0, t["id"])
+            self.assertIn(t["goal"], self.result["trials"]["goal_kinds"], t["id"])
+            self.assertNotRegex(t["name_en"], "[А-Яа-яЁё]")
+        for b in trials["rush"]["bosses"]:
+            self.assertTrue(self.balance["enemies"][b].get("boss"), b)
+        for _ru, en in self.result["trials"]["goals"]:
+            self.assertNotRegex(en, "[А-Яа-яЁё]")
+        all_done = next(a for a in self.balance["achievements"] if a["id"] == "trials_all")
+        self.assertEqual(all_done["when"]["min"]["trials_done"], len(ids))
+
+    def test_trials_records_and_achievements(self):
+        r = self.result["trials"]
+        self.assertEqual(
+            r["records"]["saved"],
+            {
+                "rush": {"done": True, "best": 0, "tries": 0},
+                "clean": {"done": True, "best": 80, "tries": 4},
+            },
+        )
+        self.assertEqual(r["records"]["done"], 2)
+        self.assertTrue(r["records"]["proto"])
+        self.assertIn("rush_plus", r["achievements"]["plus"])
+        self.assertNotIn("classic_win", r["achievements"]["plus"])
+        self.assertEqual(r["achievements"]["all"], ["trials_all"])
+
     def test_chest_offers_new_gear_then_levels_and_rare_pieces(self):
         gear, top = self.result["gear"], self.balance["chest"]["max_level"]
         pieces = {g["id"]: g for g in self.balance["gear"]}
