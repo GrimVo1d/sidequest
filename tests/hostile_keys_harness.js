@@ -52,7 +52,7 @@ function play(name, game, extra) {
 }
 {
   const D = project + "/game";
-  for (const f of ["maps", "terrain", "modes", "build", "classes", "game"]) load(`${D}/${f}.js`);
+  for (const f of ["maps", "terrain", "modes", "build", "events", "trials", "classes", "game"]) load(`${D}/${f}.js`);
   const B = JSON.parse(readFile(D + "/balance.json"));
   play("arena", LCS.createGame(B, {seed: 1, mode: "agent"}), () => ({x: 0, y: 0}));
 }

@@ -67,6 +67,12 @@
                         + "bugs keep coming and growing stronger for as long as you live. The "
                         + "week's modifiers stay the same all week. An agent that starts working "
                         + "joins in to help."},
+    trials: {solo: true, agents: false, wins: false, endless: false,
+             name: "Испытания", name_en: "Trials",
+             text: "Короткие забеги с целью и условием: все боссы подряд, без урона, только пистолет. "
+                   + "Пройденные отмечаются, лучшее время сохраняется. Без агентов.",
+             text_en: "Short runs with a goal and a condition: every boss in a row, no hits taken, the "
+                      + "pistol alone. The ones passed are marked, the best time is kept. No agents."},
   };
 
   // FNV-1a of a text: the seed of a day or a week.

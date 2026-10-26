@@ -130,14 +130,17 @@ body:has(.screen:not([hidden])) :is(#tip, #notice) { display: none; }
 .menu-actions .hint { margin: 0; font-size: 11px; }
 
 .menu-buttons { display: flex; gap: 8px; }
-/* Six modes in two even rows of three: none is left alone on a row. */
-#modes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; width: min(480px, 100%); }
+/* Seven modes in rows of four and three, the short row centred: none is left alone on a row. */
+#modes { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; width: min(640px, 100%); }
+#modes .mode { flex: 0 0 calc((100% - 24px) / 4); min-width: 0; }
 #ghosts { display: flex; flex-direction: column; gap: 4px; width: min(420px, 100%); max-height: 210px;
   overflow-y: auto; }
-.ghost { display: flex; flex-direction: column; gap: 2px; text-align: left; box-shadow: none; }
-.ghost.on { border-color: var(--accent); }
-.ghost .name { color: var(--title); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ghost .text { font-size: 11px; color: var(--dim); }
+#trials { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; width: min(640px, 100%); }
+.ghost, .trial { display: flex; flex-direction: column; gap: 2px; text-align: left; box-shadow: none; }
+.ghost.on, .trial.on { border-color: var(--accent); }
+.trial.done .name { color: var(--green); }
+.ghost .name, .trial .name { color: var(--title); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ghost .text, .trial .text { font-size: 11px; color: var(--dim); }
 #daily-text { margin: 0; color: var(--title); text-align: center; }
 #mods { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; }
 .mod { font-size: 12px; padding: 4px 6px; box-shadow: none; }

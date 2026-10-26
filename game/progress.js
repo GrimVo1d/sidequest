@@ -6,6 +6,8 @@
 //   days = LCSProgress.addDay(days, results)            // the daily task: best score per day
 //   LCSProgress.streak(days, "2026-10-09")              // days in a row up to that day
 //   ghosts = LCSProgress.addGhost(ghosts, results)      // best score per replayed session
+//   trials = LCSProgress.addTrial(trials, balance.trials.list, results)   // {id: {done, best, tries}}
+//   LCSProgress.trialsDone(trials)                      // how many trials are passed
 //   bests = LCSProgress.addBests(bests, balance.achievements, results)   // best single match
 //   LCSProgress.progressOf(achievement, records, bests, known)    // how far a locked one is
 "use strict";
@@ -93,6 +95,27 @@
     return n;
   }
 
+  // The trials: passed or not, the best time of a pass and the tries; only the known ones.
+  function addTrial(saved, list, res) {
+    const all = {}, was = saved && typeof saved === "object" ? saved : {};
+    for (const {id} of list) {
+      const x = Object.hasOwn(was, id) ? was[id] : null;
+      if (x && typeof x === "object") {
+        all[id] = {done: x.done === true, best: Number.isFinite(x.best) && x.best > 0 ? x.best : 0,
+                   tries: Number.isInteger(x.tries) && x.tries >= 0 ? x.tries : 0};
+      }
+    }
+    if (res.mode === "trials" && list.some((x) => x.id === res.trial)) {
+      const x = all[res.trial] || {done: false, best: 0, tries: 0}, won = res.reason === "passed";
+      const time = res.trial_time;
+      all[res.trial] = {done: x.done || won,
+                        best: won && time > 0 && (!x.best || time < x.best) ? time : x.best, tries: x.tries + 1};
+    }
+    return all;
+  }
+
+  const trialsDone = (trials) => Object.values(trials || {}).filter((x) => x && x.done === true).length;
+
   // Replayed sessions: {session: {best_score, runs, at}}, the most recent ones.
   function addGhost(saved, res) {
     const all = {};
@@ -170,5 +193,6 @@
     return Object.assign(p, {have: Math.min(p.have, p.need)});
   }
 
-  root.LCSProgress = {migrate, addMatch, known, earned, addBests, progressOf, addDay, streak, addGhost, MODES};
+  root.LCSProgress = {migrate, addMatch, known, earned, addBests, progressOf, addDay, streak, addGhost, addTrial,
+                      trialsDone, MODES};
 })(typeof window !== "undefined" ? window : globalThis);
