@@ -261,6 +261,7 @@
       kind = EL.kinds[kind] ? kind : kinds[Math.floor(random() * kinds.length)];
       const k = EL.kinds[kind];
       e.elite = kind;
+      e.eliteHp = hpScale;   // a revived twin is as tough
       e.hp *= hpScale;
       e.maxHp = e.hp;
       e.score *= EL.score;
@@ -397,6 +398,7 @@
       const twin = spawn(e.type, {x: at.x, y: at.y}, Object.assign({partner: e, final: e.final},
         cfg.revive_hp ? {hpScale: cfg.revive_hp, score: 0, noLoot: true} : {}));
       twin.twinB = !e.twinB;
+      if (e.elite) makeElite(twin, e.elite, e.eliteHp);
       e.partner = twin;
       effect({type: "ring", x: at.x, y: at.y, r: 16, color: "#7fe0e0", life: 0.4});
       text(at.x, at.y - 10, tr("ГОНКА!", "RACE!"), "#7fe0e0");

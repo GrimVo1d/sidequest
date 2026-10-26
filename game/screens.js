@@ -46,6 +46,7 @@
     function progressText(p) {
       const n = (v) => (p.field === "time" ? clock(v) : String(v));
       const of = p.field === "daily_streak" ? t("дней подряд", "days in a row")
+        : p.field === "trials_done" ? t("пройдено", "passed")
         : p.of === "match" ? t("лучший матч", "best match") : t("всего", "so far");
       return `${of}: ${n(p.have)} / ${n(p.need)}`;
     }

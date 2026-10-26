@@ -738,6 +738,21 @@ result.arsenal.level_text = LCSBuild.levelText(balance.weapons.find((w) => w.id 
     stepFor(g, R.pause + 1, still);
     r.twins.next = bosses();
   }
+  // Rush+: a race twin that comes back keeps its pair's trait.
+  {
+    const g = trialGame(balance, "rush_plus"), ts = g.state, still = () => ({x: 0, y: 0});
+    g.dev.immortal();
+    Object.assign(ts.trial, {index: R.bosses.indexOf("boss_race"), nextAt: 0});
+    g.step(DT, still());
+    const [a, b] = ts.enemies.filter((e) => e.type === "boss_race");
+    Object.assign(a, {x: ts.player.x + 60, y: ts.player.y, hp: 1, shield: 0, speed: 0});
+    Object.assign(b, {x: ts.player.x + 1000, y: ts.player.y, hp: 1e9, speed: 0});
+    for (let t = 0; !a.dead && t < 10; t += DT) g.step(DT, still());
+    ts.stats.damage = 0;
+    stepFor(g, balance.enemies.boss_race.revive_seconds + 0.5, still);
+    const back = ts.enemies.find((e) => e.type === "boss_race" && e !== b && !e.dead);
+    r.twins.elite = {pair: [a.elite, b.elite], back: back ? back.elite || null : "missing"};
+  }
   // Rush+: the same first boss with an elite's trait and more health.
   const first = (id) => {
     const g = trialGame(balance, id);
@@ -822,8 +837,12 @@ result.arsenal.level_text = LCSBuild.levelText(balance.weapons.find((w) => w.id 
   r.records = {saved, done: LCSProgress.trialsDone(saved), proto: Object.getPrototypeOf(saved) === Object.prototype};
   const known = LCSProgress.known(balance, LCS_MAPS);
   const ach = (x) => LCSProgress.earned(balance.achievements, x, LCSProgress.migrate(null), known);
+  const passed = (n) => ach(Object.assign({}, night.state.results, {trials_done: n}));
+  const full = balance.achievements.find((a) => a.id === "trials_all");
   r.achievements = {plus: ach(Object.assign({}, rs.results, {trial: "rush_plus"})),
-                    all: ach(Object.assign({}, night.state.results, {trials_done: TR.list.length}))};
+                    all: passed(TR.list.length), almost: passed(TR.list.length - 1),
+                    progress: LCSProgress.progressOf(full, LCSProgress.migrate(null),
+                                                     LCSProgress.addBests(null, [full], {trials_done: 3}), known)};
 }
 // --- solo modes: the ghost, the daily task, modifiers ----------------------------------------
 {

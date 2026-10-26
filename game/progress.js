@@ -138,18 +138,21 @@
   // A condition holds when every part of it holds:
   //   min / max: {field: n} on the match results, is: {field: value},
   //   total_min: {field: n} on the totals after the match, maps_all: every map played,
+  //   trials_all: every trial passed (res.trials_done, counted by addTrial),
   //   kinds_min: {field: n} — that many different maps or classes played; only the ones that
   //   exist count, not a name left in the saves by an older version.
   const kinds = (records, field, known) =>
     (known[field] || []).filter((id) => records.totals[field] && records.totals[field][id] > 0).length;
   function known(balance, maps) {
-    return {maps: maps.map((m) => m.id), classes: (balance.classes || []).map((c) => c.id)};
+    return {maps: maps.map((m) => m.id), classes: (balance.classes || []).map((c) => c.id),
+            trials: (balance.trials ? balance.trials.list : []).map((x) => x.id)};
   }
   function holds(when, res, records, ids) {
     const w = when || {};
     for (const [k, n] of Object.entries(w.min || {})) if (!((res[k] || 0) >= n)) return false;
     for (const [k, n] of Object.entries(w.max || {})) if (!((res[k] || 0) <= n)) return false;
     for (const [k, v] of Object.entries(w.is || {})) if (res[k] !== v) return false;
+    if (w.trials_all && !((res.trials_done || 0) >= ids.trials.length)) return false;
     for (const [k, n] of Object.entries(w.total_min || {})) {
       if (!((records.totals[k] || 0) >= n)) return false;
     }
@@ -167,7 +170,8 @@
   function addBests(saved, list, res) {
     const bests = {};
     for (const a of list) {
-      for (const k of Object.keys((a.when && a.when.min) || {})) {
+      const w = a.when || {};
+      for (const k of [...Object.keys(w.min || {}), ...(w.trials_all ? ["trials_done"] : [])]) {
         const old = saved && Number.isFinite(saved[k]) ? saved[k] : 0;
         bests[k] = Math.max(old, Number.isFinite(res[k]) ? res[k] : 0);
       }
@@ -188,6 +192,7 @@
     if (w.maps_all) {
       parts.push({field: "maps", have: kinds(records, "maps", ids), need: ids.maps.length, of: "total"});
     }
+    if (w.trials_all) parts.push({field: "trials_done", have: bests.trials_done || 0, need: ids.trials.length, of: "total"});
     if (parts.length !== 1 || !(parts[0].need > 1)) return null;
     const p = parts[0];
     return Object.assign(p, {have: Math.min(p.have, p.need)});

@@ -445,7 +445,7 @@
      "when": {"is": {"trial": "rush_plus", "reason": "passed"}}},
     {"id": "trials_all", "icon": "shield", "name": "Полное покрытие", "text": "пройти все испытания",
      "name_en": "Full coverage", "text_en": "Pass every trial",
-     "when": {"min": {"trials_done": 8}}}
+     "when": {"trials_all": true}}
   ],
 
   "ghost": {"max_gap": 15, "after_task": 2, "lead": 2, "end_after": 4},

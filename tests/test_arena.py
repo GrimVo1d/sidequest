@@ -437,6 +437,9 @@ class ArenaTest(unittest.TestCase):
         self.assertEqual(twins["waiting"], ["boss_race"])
         self.assertIn(after, twins["next"])
         self.assertNotIn("boss_race", twins["next"])
+        pair, back = twins["elite"]["pair"], twins["elite"]["back"]
+        self.assertIn(back, self.balance["elites"]["kinds"])
+        self.assertIn(back, pair)
 
     def test_trials_decision_sticks(self):
         decided = self.result["trials"]["decided"]
@@ -499,7 +502,7 @@ class ArenaTest(unittest.TestCase):
         for _ru, en in self.result["trials"]["goals"]:
             self.assertNotRegex(en, "[А-Яа-яЁё]")
         all_done = next(a for a in self.balance["achievements"] if a["id"] == "trials_all")
-        self.assertEqual(all_done["when"]["min"]["trials_done"], len(ids))
+        self.assertEqual(all_done["when"], {"trials_all": True})
 
     def test_trials_records_and_achievements(self):
         r = self.result["trials"]
@@ -515,6 +518,12 @@ class ArenaTest(unittest.TestCase):
         self.assertIn("rush_plus", r["achievements"]["plus"])
         self.assertNotIn("classic_win", r["achievements"]["plus"])
         self.assertEqual(r["achievements"]["all"], ["trials_all"])
+        self.assertNotIn("trials_all", r["achievements"]["almost"])
+        n = len(self.balance["trials"]["list"])
+        self.assertEqual(
+            r["achievements"]["progress"],
+            {"field": "trials_done", "have": 3, "need": n, "of": "total"},
+        )
 
     def test_chest_offers_new_gear_then_levels_and_rare_pieces(self):
         gear, top = self.result["gear"], self.balance["chest"]["max_level"]
@@ -718,7 +727,8 @@ class ArenaTest(unittest.TestCase):
             with self.subTest(a["id"]):
                 self.assertTrue(a["name"] and a["text"] and a["when"])
                 self.assertLessEqual(
-                    set(a["when"]), {"min", "max", "is", "total_min", "maps_all", "kinds_min"}
+                    set(a["when"]),
+                    {"min", "max", "is", "total_min", "maps_all", "kinds_min", "trials_all"},
                 )
         for a in ("first", "classic_win", "solo", "friday", "boss"):
             self.assertIn(a, p["after_win"])
@@ -737,6 +747,7 @@ class ArenaTest(unittest.TestCase):
         p = self.result["progress"]
         # The best single match of each field an achievement asks of one match; nothing else.
         fields = {k for a in self.balance["achievements"] for k in a["when"].get("min", {})}
+        fields.add("trials_done")  # how many trials are passed, for "Full coverage"
         self.assertEqual(set(p["bests"]), fields)
         self.assertGreaterEqual(p["bests"]["kills"], 40)
         self.assertEqual(p["bests"]["time"], 900)
