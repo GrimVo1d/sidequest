@@ -398,6 +398,18 @@ class ArenaTest(unittest.TestCase):
         self.assertEqual((dead["reason"], dead["mode"]), ("dead", "infinity"))
         self.assertEqual(self.result["infinity"]["records"]["matches"], 1)
 
+    def test_mode_texts_name_the_classic_length(self):
+        with open(os.path.join(GAME, "modes.js"), encoding="utf-8") as f:
+            text = f.read()
+        m = self.balance["classic"]["seconds"] // 60
+        for phrase in (
+            f"Один, {m} минут",
+            f"Alone, {m} minutes",
+            f"на {m}-й минуте",
+            f"at the {m}th minute",
+        ):
+            self.assertIn(phrase, text)
+
     def test_infinity_week_modifiers(self):
         w, n = self.result["infinity"]["week"], self.balance["infinity"]["week_modifiers"]
         self.assertEqual(w["mon"], w["sun"])
