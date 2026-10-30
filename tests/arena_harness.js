@@ -693,6 +693,8 @@ result.arsenal.level_text = LCSBuild.levelText(balance.weapons.find((w) => w.id 
   // the bot gets through them.
   const WEAK = tweak((B) => { for (const id of R.bosses) B.enemies[id].hp = 1; });
   const rush = trialGame(WEAK, "rush"), rs = rush.state;
+  const startFinal = rs.finalAt;
+  r.status = {wait: LCSTrials.status(balance, rs)};
   rush.dev.immortal();
   const order = [], seen = new Set();
   let most = 0, finalType = null;
@@ -707,8 +709,25 @@ result.arsenal.level_text = LCSBuild.levelText(balance.weapons.find((w) => w.id 
     most = Math.max(most, new Set(bosses.map((e) => e.type)).size);
   }
   // No boss but the rush's, and no final boss of the classic's.
+  // The rush's last boss stands for the final one: once it is up, no arena events.
   r.rush = {order, most, final: finalType, results: rs.results,
-            no_final: rs.finalAt === Infinity, no_boss: rs.nextBoss === Infinity};
+            no_final: startFinal === Infinity, final_up: rs.finalAt, no_boss: rs.nextBoss === Infinity};
+  {
+    const g = trialGame(balance, "rush"), ts = g.state;
+    g.dev.immortal();
+    Object.assign(ts.trial, {index: R.bosses.length - 1, nextAt: 0});
+    ts.eventAt = 0;
+    stepFor(g, 3, () => ({x: 0, y: 0}));
+    r.rush.last = {final: ts.enemies.some((e) => e.final), event: Boolean(ts.deploy || ts.incident)};
+  }
+  // The rush has a time limit: a boss that cannot be finished fails it there.
+  {
+    const LIMIT = tweak((B) => { B.trials.rush.limit = 5; });
+    const g = trialGame(LIMIT, "rush");
+    g.dev.immortal();
+    stepFor(g, 20, () => ({x: 0, y: 0}));
+    r.rush.limit = {reason: g.state.results.reason, status: LCSTrials.status(LIMIT, g.state)};
+  }
   // Race twins in the rush: one down alone comes back, and the next boss waits until the
   // whole pair is down, the revived twin too.
   {
@@ -795,12 +814,22 @@ result.arsenal.level_text = LCSBuild.levelText(balance.weapons.find((w) => w.id 
   const kept = trialGame(SHORT, "night"), ks = kept.state;
   kept.dev.immortal();
   for (let t = 0; ks.endAt === null && t < 30; t += DT) kept.step(DT, {x: 0, y: 0});
+  kept.dev.level();   // no level-up cards once the trial is passed
+  const choices = ks.choices;
   kept.dev.immortal();
   ks.player.hp = 1;
   kept.dev.enemy("tank");
   Object.assign(ks.enemies[ks.enemies.length - 1], {x: ks.player.x, y: ks.player.y});
   stepFor(kept, 10, () => ({x: 0, y: 0}));
-  r.decided = {dead: dead.state.results.reason, kept: ks.results.reason, hp: ks.player.hp};
+  r.decided = {dead: dead.state.results.reason, kept: ks.results.reason, hp: ks.player.hp, choices};
+  // A pass at an arena event's or a boss's minute starts neither: the trial is decided first.
+  {
+    const g = trialGame(SHORT, "night"), ts = g.state;
+    g.dev.immortal();
+    Object.assign(ts, {eventAt: 15, nextBoss: 15});
+    for (let t = 0; ts.endAt === null && t < 30; t += DT) g.step(DT, {x: 0, y: 0});
+    r.decided.edge = {event: Boolean(ts.deploy || ts.incident), boss: ts.enemies.some((e) => !e.dead && isBoss(e))};
+  }
   // Kills: won once there are enough, failed when the time runs out first.
   const kills = trialGame(SHORT, "refactor");
   kills.dev.immortal();
@@ -816,6 +845,7 @@ result.arsenal.level_text = LCSBuild.levelText(balance.weapons.find((w) => w.id 
   hot.dev.immortal();
   stepFor(hot, 31, () => ({x: 0, y: 0}));
   r.hotfix.final = hot.state.enemies.some((e) => e.final);
+  r.status.hotfix = LCSTrials.status(SHORT, hot.state);
   hot.dev.stage();
   stepFor(hot, 10, () => ({x: 0, y: 0}));
   r.hotfix.results = hot.state.results;
@@ -828,8 +858,8 @@ result.arsenal.level_text = LCSBuild.levelText(balance.weapons.find((w) => w.id 
   // What the menu and the HUD say.
   r.goals = TR.list.map((T) => LCSTrials.goal(balance, T));
   r.goal_kinds = Object.keys(LCSTrials.GOALS);
-  r.status = {rush: LCSTrials.status(balance, rush.state), night: LCSTrials.status(SHORT, night.state),
-              kills: LCSTrials.status(SHORT, kills.state)};
+  Object.assign(r.status, {rush: LCSTrials.status(balance, rush.state), night: LCSTrials.status(SHORT, night.state),
+                          kills: LCSTrials.status(SHORT, kills.state), clean: LCSTrials.status(balance, clean.state)});
   // The records: passed once and for all, the best time of a pass, only known trials.
   const res = (trial, reason, time) => ({mode: "trials", trial, reason, trial_time: reason === "passed" ? time : null});
   let saved = JSON.parse('{"__proto__": {"done": true}, "nope": {"done": true},'

@@ -1007,6 +1007,7 @@
         1 + Math.floor(s.streak / B.score.streak_step) * B.score.multiplier_step);
       s.maxMultiplier = Math.max(s.maxMultiplier, s.multiplier);
       s.score += B.score.per_second * dt;
+      if (trialRun) trialRun.update();   // decided first: a pass starts no event in its frame
 
       updateHazards();
       T.update(dt, s);
@@ -1030,7 +1031,6 @@
       s.effects = s.effects.filter((x) => x.t < x.life);
       s.texts = s.texts.filter((x) => x.t < x.life);
 
-      if (trialRun) trialRun.update();
       if (s.finaleAt !== null && s.time >= s.finaleAt) finish("done");
       if (s.endAt !== null && s.time >= s.endAt) finish(s.endReason);
     }

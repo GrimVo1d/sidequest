@@ -459,7 +459,7 @@
   },
 
   "trials": {
-    "rush": {"first_at": 25, "pause": 6, "spawn": 0.5, "elite_hp": 1.25,
+    "rush": {"first_at": 25, "pause": 6, "spawn": 0.5, "elite_hp": 1.25, "limit": 600,
              "bosses": ["boss_oom", "boss_loop", "boss_race", "boss_fire", "boss"]},
     "list": [
       {"id": "rush", "map": "open", "goal": "rush",

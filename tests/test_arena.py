@@ -428,7 +428,14 @@ class ArenaTest(unittest.TestCase):
         self.assertEqual(rush["results"]["reason"], "passed")
         self.assertEqual(rush["results"]["bosses"], len(bosses))
         self.assertTrue(rush["no_final"])
+        self.assertIsNone(rush["final_up"])
         self.assertTrue(rush["no_boss"])
+        self.assertEqual(rush["last"], {"final": True, "event": False})
+
+    def test_trials_rush_fails_at_its_limit(self):
+        limit = self.result["trials"]["rush"]["limit"]
+        self.assertEqual(limit["reason"], "failed")
+        self.assertTrue(limit["status"][1].endswith("0:05 / 0:05"), limit["status"])
 
     def test_trials_rush_waits_for_both_race_twins(self):
         twins, bosses = self.result["trials"]["twins"], self.balance["trials"]["rush"]["bosses"]
@@ -446,6 +453,8 @@ class ArenaTest(unittest.TestCase):
         self.assertEqual(decided["dead"], "dead")
         self.assertEqual(decided["kept"], "passed")
         self.assertEqual(decided["hp"], 1)
+        self.assertIsNone(decided["choices"])
+        self.assertEqual(decided["edge"], {"event": False, "boss": False})
 
     def test_trials_rush_plus_bosses_are_enhanced(self):
         plus, k = self.result["trials"]["plus"], self.balance["trials"]["rush"]["elite_hp"]
@@ -466,8 +475,14 @@ class ArenaTest(unittest.TestCase):
         self.assertAlmostEqual(r["night"]["trial_time"], 15, delta=0.1)
         self.assertIsNone(r["clean"]["results"]["trial_time"])
         n = len(self.balance["trials"]["rush"]["bosses"])
-        self.assertRegex(r["status"]["rush"][1], rf"^boss {n}/{n} · \d+:\d\d$")
-        self.assertRegex(r["status"]["night"][1], r"^0:\d\d / 0:15$")
+        limit = self.balance["trials"]["rush"]["limit"]
+        first = self.balance["trials"]["rush"]["first_at"]
+        cap = f"{limit // 60}:{limit % 60:02d}"
+        self.assertRegex(r["status"]["rush"][1], rf"^boss {n}/{n} · \d+:\d\d / {cap}$")
+        self.assertEqual(r["status"]["wait"][1], f"boss 1/{n} in 0:{first:02d} · 0:00 / {cap}")
+        self.assertEqual(r["status"]["night"][1], "0:15 / 0:15")  # stopped at the pass
+        self.assertTrue(r["status"]["clean"][1].endswith(" · no hits"), r["status"]["clean"])
+        self.assertRegex(r["status"]["hotfix"][1], r"^final boss · \d+:\d\d$")
         self.assertRegex(r["status"]["kills"][1], r"^kills \d+/5 · \d+:\d\d / 10:00$")
         self.assertEqual(r["kills"]["won"]["reason"], "passed")
         self.assertGreaterEqual(r["kills"]["won"]["kills"], 5)

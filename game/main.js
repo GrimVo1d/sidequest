@@ -364,6 +364,7 @@
     banishing = false;
     buildKey = "";
     buffsKey = "";
+    clear($("buffs"));   // the key starts empty, so the last match's chips would stay
     acc = 0;
     keys.clear();
     show(null);
@@ -385,7 +386,9 @@
     $("hud").hidden = true;
     codexFrom = null;
     const ending = res.mode === "campaign" && res.reason === "win" ? balance.campaign.ending : null;
-    $("results-title").textContent = ending ? tf(ending, "title") : t(...(TITLES[res.reason] || TITLES.quit));
+    // Dying in a trial fails it.
+    const reason = res.trial && res.reason === "dead" ? "failed" : res.reason;
+    $("results-title").textContent = ending ? tf(ending, "title") : t(...(TITLES[reason] || TITLES.quit));
     $("results-ending").textContent = ending ? tf(ending, "text") : "";
     $("results-ending").hidden = !ending;
     // The mode, the map and the modifiers in one line; the score big; then the rest.
@@ -400,7 +403,10 @@
     }
     $("results-sub").textContent = sub.join(" · ");
     $("results-score").textContent = res.score;
-    $("results-time").textContent = `${clock(res.time)} · ${t("ур. ", "lv. ")}${res.level}`;
+    // A pass shows the trial's own time, without the delay after it.
+    const time = res.trial_time || res.time;
+    $("results-time").textContent = `${clock(time)} · ${t("ур. ", "lv. ")}${res.level}`;
+    const best = res.trial && trialRecords[res.trial] ? trialRecords[res.trial].best : 0;
     const rows = [
       [t("Убито", "Kills"), res.kills],
       [t("Боссов", "Bosses"), res.bosses], [t("Лучшая серия", "Best streak"), res.best_streak],
@@ -431,6 +437,10 @@
     const dl = $("results-list");
     dl.appendChild(el("dt", t("Звёзд", "Stars")));
     dl.appendChild(el("dd", `+${LCSMeta.starsFor(balance.stars, res)} ★`));
+    if (res.reason === "passed" && (!best || res.trial_time < best)) {
+      dl.appendChild(el("dt", t("Лучшее время", "Best time")));
+      dl.appendChild(el("dd", clock(res.trial_time) + t(" · новый рекорд", " · new best")));
+    }
     if (fresh.length) {
       const list = $("results-achievements");
       clear(list);
@@ -444,9 +454,12 @@
     }
   }
 
+  // Quitting while a win or a death plays out keeps that result; a campaign's stage clear
+  // has no next stage to go to, so it ends as a quit.
   function quit() {
     if (!game || game.state.over) return;
-    game.finish("quit");
+    const s = game.state;
+    game.finish(s.endAt !== null && s.endReason !== "stage" ? s.endReason : "quit");
     endMatch();
   }
 
