@@ -57,7 +57,7 @@
         s.xpNext = Math.round(s.xpNext * B.xp.growth);
         text(s.player.x, s.player.y - 16, tr(`УРОВЕНЬ ${s.level}`, `LEVEL ${s.level}`), "#e8c14a", 1.5);
       }
-      if (s.pendingLevels && !s.choices) offerChoices();
+      if (s.pendingLevels && !s.choices && s.endAt === null) offerChoices();
     }
 
     // Everything a level-up could offer now: new levels of what the player has, new weapons
@@ -166,7 +166,9 @@
       s.choiceKind = "chest";
     }
 
+    // Nothing new once the match is decided: the win or the death runs out without cards.
     function nextChoice() {
+      if (s.endAt !== null) return;
       if (s.pendingChests > 0) offerChest();
       if (!s.choices && s.pendingLevels > 0) offerChoices();
     }
