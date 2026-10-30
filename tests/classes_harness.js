@@ -4,7 +4,7 @@
 "use strict";
 const [project] = arguments;
 const GAME = project + "/game";
-for (const f of ["maps", "terrain", "modes", "build", "events", "trials", "classes", "game", "progress", "meta"]) load(`${GAME}/${f}.js`);
+for (const f of ["maps", "terrain", "modes", "build", "events", "trials", "weapons", "allies", "classes", "game", "progress", "meta"]) load(`${GAME}/${f}.js`);
 const balance = JSON.parse(readFile(GAME + "/balance.json"));
 const DT = 1 / 60;
 const OPEN = LCS_MAPS.find((m) => m.id === "open");
