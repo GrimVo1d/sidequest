@@ -33,6 +33,8 @@ load(GAME + "/terrain.js");
 load(GAME + "/modes.js");
 load(GAME + "/build.js");
 load(GAME + "/events.js");
+load(GAME + "/weapons.js");
+load(GAME + "/allies.js");
 load(GAME + "/trials.js");
 load(GAME + "/classes.js");
 load(GAME + "/game.js");
@@ -169,10 +171,12 @@ for (const [ch, g] of Object.entries(LCSFont.GLYPHS)) {
 }
 const ALPHABET = "АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 const missing = [...ALPHABET].filter((ch) => !LCSFont.has(ch));
-// Every text the game shows on the arena: string literals in text(...) calls and the
-// boss name.
+// Every text the game shows on the arena: string literals in text(...) calls of the
+// simulation's files and the boss name.
 const texts = [];
-for (const call of readFile(GAME + "/game.js").match(/\btext\([^;]*\);/g) || []) {
+const SIMULATION = ["game", "allies", "weapons", "events", "trials", "build", "classes", "terrain", "tutorial"];
+const textCalls = SIMULATION.flatMap((f) => readFile(`${GAME}/${f}.js`).match(/\btext\([^;]*\);/g) || []);
+for (const call of textCalls) {
   for (const m of call.match(/"[^"]*"|`[^`]*`/g) || []) {
     const value = m.slice(1, -1).replace(/\$\{[^}]*\}/g, "");
     if (!value.startsWith("#")) texts.push(value);
