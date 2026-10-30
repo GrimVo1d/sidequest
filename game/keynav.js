@@ -4,6 +4,7 @@
 // Up and Down leave it. The gamepad sends the same keys. Used by the arena and the shell.
 //   if (SidequestKeys.handle(event, screenElement)) return;   // in a keydown handler
 //   SidequestKeys.handle(event, dialog, {rows: true})   // a form: Up and Down go row by row
+//   SidequestKeys.next(from, list, [1, 0])              // the button to the right, or null
 "use strict";
 
 (function (root) {
@@ -26,16 +27,22 @@
     });
   }
 
-  // The nearest button in the direction, preferring ones straight ahead.
+  // The gap between two spans on one axis, 0 when they overlap.
+  const gap = (a0, a1, b0, b1) => Math.max(0, b0 - a1, a0 - b1);
+
+  // The nearest button in the direction, measured edge to edge and preferring ones straight
+  // ahead. Left and Right stay in a narrow cone: past a row's end they go nowhere rather than
+  // into the next row or the top bar.
   function next(from, list, [dx, dy]) {
-    const a = centre(from);
+    const a = from.getBoundingClientRect(), ac = centre(from);
     let best = null, bestScore = Infinity;
     for (const el of list) {
       if (el === from) continue;
-      const b = centre(el);
-      const along = (b.x - a.x) * dx + (b.y - a.y) * dy;
-      if (along < 4) continue;
-      const across = Math.abs((b.x - a.x) * dy + (b.y - a.y) * dx);
+      const b = el.getBoundingClientRect(), bc = centre(el);
+      if ((bc.x - ac.x) * dx + (bc.y - ac.y) * dy < 4) continue;
+      const along = dx ? gap(a.left, a.right, b.left, b.right) : gap(a.top, a.bottom, b.top, b.bottom);
+      const across = dx ? gap(a.top, a.bottom, b.top, b.bottom) : gap(a.left, a.right, b.left, b.right);
+      if (dx && across * 2 > along) continue;
       const score = along + across * 3;
       if (score < bestScore) { bestScore = score; best = el; }
     }
@@ -114,5 +121,5 @@
     return true;
   }
 
-  root.SidequestKeys = {handle};
+  root.SidequestKeys = {handle, next};
 })(typeof window !== "undefined" ? window : globalThis);
