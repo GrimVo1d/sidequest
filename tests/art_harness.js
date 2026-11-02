@@ -28,6 +28,7 @@ load(GAME + "/maps.js");
 load(GAME + "/avatar.js");
 load(GAME + "/sprites.js");
 load(GAME + "/hero.js");
+load(GAME + "/portrait.js");
 load(GAME + "/font.js");
 load(GAME + "/terrain.js");
 load(GAME + "/modes.js");
@@ -84,7 +85,7 @@ function checkHero(look, what) {
   }
 }
 for (const slot of LCSHero.SLOTS) {
-  const table = slot.parts || SidequestAvatar.COLORS[slot.colors];
+  const table = slot.parts || LCSHero.colorTables()[slot.colors];
   for (const id of Object.keys(table)) checkHero({[slot.key]: id}, `${slot.key}=${id}`);
 }
 const heroLooks = {
@@ -103,6 +104,42 @@ const heroFacts = {
   restMuzzle: heroFrame("idle", 0, {rest: true}).muzzle,
   recoilAtRest: heroFrame("idle", 0, {recoil: true, rest: true}).muzzle,
   downMuzzle: heroFrame("down", 0).muzzle,
+};
+
+// The portrait: every choice of every slot and every preset, 64 by 64, every letter with a
+// color; the parts the bust shows each change it.
+const portraitErrors = [];
+function checkPortrait(look, what) {
+  let f;
+  try { f = LCSPortrait.frame(look); } catch (e) { portraitErrors.push(`${what}: ${e}`); return null; }
+  if (f.rows.length !== LCSPortrait.N) portraitErrors.push(`${what}: ${f.rows.length} rows`);
+  f.rows.forEach((row, i) => {
+    if (row.length !== LCSPortrait.N) portraitErrors.push(`${what} row ${i}: width ${row.length}`);
+    for (const c of new Set(row)) {
+      if (c !== "." && !/^#[0-9a-f]{6}$/.test(f.palette[c] || "")) portraitErrors.push(`${what}: no color for ${c}`);
+    }
+  });
+  const img = LCSPortrait.image(look);
+  if (img.width !== LCSPortrait.N || img.height !== LCSPortrait.N || img.data.length !== LCSPortrait.N ** 2 * 4) {
+    portraitErrors.push(`${what}: image ${img.width}x${img.height}`);
+  }
+  return f.rows.join("|") + JSON.stringify(f.palette);
+}
+const portraitSame = [];
+for (const slot of LCSHero.SLOTS) {
+  const table = slot.parts || LCSHero.colorTables()[slot.colors];
+  const seen = new Map();
+  for (const id of Object.keys(table)) {
+    const key = checkPortrait({[slot.key]: id}, `${slot.key}=${id}`);
+    if (seen.has(key)) portraitSame.push(`${slot.key}: ${seen.get(key)} = ${id}`);
+    seen.set(key, id);
+  }
+}
+heroLooks.presets.forEach((look, i) => checkPortrait(look, `preset ${i}`));
+const portraitFacts = {
+  same: portraitSame,
+  junk: LCSPortrait.frame({hair: "../x", top: "__proto__", hat: "constructor"}).rows.join("|")
+    === LCSPortrait.frame(null).rows.join("|"),
 };
 
 // The hero editor's data: names in both languages, unlocks that point at real choices and
@@ -312,5 +349,5 @@ const bossBars = {none: bossBarsEnd([]), one: bossBarsEnd([balance.bosses.order[
 // The achievements screen draws each achievement's icon.
 const achievementIcons = balance.achievements.filter((a) => !LCSSprites.SPRITES[a.icon]).map((a) => a.id);
 
-print(JSON.stringify({spriteErrors, heroErrors, heroLooks, heroFacts, heroEditor, sizes, fontErrors, missing, missingInTexts, texts, maps, calls, badCall,
+print(JSON.stringify({spriteErrors, heroErrors, heroLooks, heroFacts, portraitErrors, portraitFacts, heroEditor, sizes, fontErrors, missing, missingInTexts, texts, maps, calls, badCall,
                       codexErrors, codexIds, hints, achievementIcons, bossBars, drawn: [...drawn]}));

@@ -158,6 +158,12 @@ body:has(.screen:not([hidden])) :is(#tip, #notice) { display: none; }
 .achievements li.got, #results-achievements li { border-left-color: var(--title); }
 .achievements li.got .name, #results-achievements li .name { color: var(--title); }
 .avatar { width: 96px; height: 96px; border: 2px solid var(--edge); background: var(--panel); }
+/* The hero's portrait (portrait.js), 64x64 scaled up whole: 1.5 times in the menu, three
+   device pixels on a retina screen. */
+.menu-faces { display: flex; gap: 6px; }
+.portrait { image-rendering: pixelated; border: 2px solid var(--edge); background: var(--panel); }
+#menu-portrait { width: 96px; height: 96px; cursor: pointer; }
+#results-portrait { width: 128px; height: 128px; }
 dl { display: grid; grid-template-columns: auto auto; gap: 2px 16px; margin: 4px 0; }
 dt { color: var(--dim); }
 dd { margin: 0; text-align: right; }
@@ -276,7 +282,9 @@ input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 1p
 #character > :first-child { margin-top: auto; }
 #character > :last-child { margin-bottom: auto; }
 .char-cols { display: flex; gap: 20px; align-items: flex-start; min-height: 0; }
-.char-side { display: flex; flex-direction: column; align-items: stretch; gap: 8px; width: 180px; }
+.char-side { display: flex; flex-direction: column; align-items: stretch; gap: 8px; width: 200px; }
+#char-portrait { width: 192px; height: 192px; align-self: center; }
+@media (max-height: 760px) { #char-portrait { width: 128px; height: 128px; } }
 .char-side .hint { margin: 0; }
 #char-preview { image-rendering: pixelated; background: var(--panel); border: 2px solid var(--edge);
   padding: 8px; align-self: center; }

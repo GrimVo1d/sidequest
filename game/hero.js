@@ -407,7 +407,7 @@
             bottom_color: "blue", shoes: "boots", shoes_color: "black", hat: "beanie"}},
     {id: "intern", name: "Стажёр", name_en: "Intern",
      look: {skin: "light", hair: "spiky", hair_color: "blonde", eyes: "big", mouth: "open",
-            face: "none", top: "tee", top_color: "yellow", bottom: "shorts",
+            face: "none", top: "tee", top_color: "green", bottom: "shorts",
             bottom_color: "blue", shoes: "sneakers", shoes_color: "red", hat: "cap"}},
     {id: "lead", name: "Тимлид", name_en: "Team lead",
      look: {skin: "dark", hair: "short", hair_color: "black", eyes: "dots", mouth: "grin",
@@ -557,5 +557,6 @@
   }
 
   root.LCSHero = {W, H, BODY_X, SLOTS, DEFAULT_LOOK, ANIMS, PRESETS, clean, fromAvatar, frame,
-                  choiceIds, slotName, choiceName, isColor, swatch, lockedBy, rarity, isOpen, random};
+                  colorTables, choiceIds, slotName, choiceName, isColor, swatch, lockedBy, rarity,
+                  isOpen, random};
 })(typeof window !== "undefined" ? window : globalThis);

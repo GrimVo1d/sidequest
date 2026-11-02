@@ -116,6 +116,7 @@
     const profile = await Sidequest.profile();
     const saved = await Sidequest.storage.get("character");
     look = saved ? LCSHero.clean(saved) : LCSHero.fromAvatar(profile.avatar);
+    LCSPortrait.paint($("menu-portrait"), look);
   }
 
   async function openMenu() {
@@ -388,6 +389,7 @@
     const ending = res.mode === "campaign" && res.reason === "win" ? balance.campaign.ending : null;
     // Dying in a trial fails it.
     const reason = res.trial && res.reason === "dead" ? "failed" : res.reason;
+    LCSPortrait.paint($("results-portrait"), matchLook);
     $("results-title").textContent = ending ? tf(ending, "title") : t(...(TITLES[reason] || TITLES.quit));
     $("results-ending").textContent = ending ? tf(ending, "text") : "";
     $("results-ending").hidden = !ending;
@@ -726,6 +728,7 @@
       save: async (next) => {
         await Sidequest.storage.set("character", next);
         look = next;
+        LCSPortrait.paint($("menu-portrait"), look);
       },
       close: () => {
         show("menu");
@@ -965,6 +968,7 @@
   $("btn-quit").addEventListener("click", () => { escOpen = false; quit(); });
   $("btn-again").addEventListener("click", openMenu);
   $("btn-character").addEventListener("click", openCharacter);
+  $("menu-portrait").addEventListener("click", openCharacter);
   $("btn-codex").addEventListener("click", () => openCodex("menu"));
   $("btn-esc-codex").addEventListener("click", () => openCodex("esc"));
   $("btn-codex-back").addEventListener("click", closeCodex);
