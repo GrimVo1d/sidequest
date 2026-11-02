@@ -45,7 +45,10 @@
   <div class="menu-body">
     <div class="menu-cols">
       <div class="menu-side">
-        <canvas id="avatar" class="avatar" title="Сменить аватарку" data-en-title="Change the avatar"></canvas>
+        <div class="menu-faces">
+          <canvas id="avatar" class="avatar" title="Сменить аватарку" data-en-title="Change the avatar"></canvas>
+          <canvas id="menu-portrait" class="portrait" title="Герой" data-en-title="Hero"></canvas>
+        </div>
         <button id="btn-avatar" class="small" data-en="Change the avatar">Сменить аватарку</button>
         <input id="profile-name" maxlength="32" spellcheck="false" title="Имя" data-en-title="Name">
         <h3 id="records-title"></h3>
@@ -132,8 +135,10 @@
 <section id="character" class="screen" hidden>
   <h2 data-en="Hero">Герой</h2>
   <div class="char-cols">
-    <!-- The preview, what the focused choice is, then the buttons that act on the whole look. -->
+    <!-- The portrait and the walking hero, what the focused choice is, then the buttons that
+         act on the whole look. -->
     <div class="char-side">
+      <canvas id="char-portrait" class="portrait" aria-hidden="true"></canvas>
       <canvas id="char-preview"></canvas>
       <p id="char-status"></p>
       <button id="btn-char-random" data-en="Random">Случайно</button>
@@ -151,6 +156,7 @@
 <section id="results" class="screen" hidden>
   <!-- The score first and biggest, then the rest of the match in two columns. -->
   <div class="results-box">
+    <canvas id="results-portrait" class="portrait" aria-hidden="true"></canvas>
     <h2 id="results-title"></h2>
     <p id="results-sub" class="hint"></p>
     <div class="results-score"><span data-en="Score">Счёт</span> <span id="results-score"></span></div>
@@ -248,6 +254,7 @@
 <script src="maps.js"></script>
 <script src="sprites.js"></script>
 <script src="hero.js"></script>
+<script src="portrait.js"></script>
 <script src="font.js"></script>
 <script src="pixelfont.js"></script>
 <script src="terrain.js"></script>

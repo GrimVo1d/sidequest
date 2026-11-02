@@ -863,6 +863,19 @@ class ArenaArtTest(unittest.TestCase):
         )
         self.assertIn("headphones", [look["hat"] for look in presets])
 
+    def test_portrait_is_well_formed(self):
+        self.assertEqual(self.result["portraitErrors"], [])
+        facts = self.result["portraitFacts"]
+        # Bottoms and shoes are below the bust; every other choice shows on it.
+        self.assertTrue(
+            all(
+                s.split(":")[0] in ("bottom", "bottom_color", "shoes", "shoes_color")
+                for s in facts["same"]
+            ),
+            facts["same"],
+        )
+        self.assertTrue(facts["junk"])
+
     def test_hero_editor_data(self):
         editor = self.result["heroEditor"]
         self.assertEqual(editor["badNames"], [])

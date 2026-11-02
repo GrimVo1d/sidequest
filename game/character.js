@@ -1,7 +1,8 @@
-// The "Hero" screen: the look of the hero who runs the arena. A live preview that walks,
-// shoots and lowers the gun; the parts and colors by tabs, ready looks and "random". Rare
-// choices open with achievements (balance.character.unlocks) and carry a rarity, the color
-// of their frame; a locked one is gray and says what opens it. Nothing is saved until "Save".
+// The "Hero" screen: the look of the hero who runs the arena. The portrait (portrait.js) and a
+// live preview that walks, shoots and lowers the gun, both redrawn as the look changes; the
+// parts and colors by tabs, ready looks and "random". Rare choices open with achievements
+// (balance.character.unlocks) and carry a rarity, the color of their frame; a locked one is
+// gray and says what opens it. Nothing is saved until "Save".
 //   LCSCharacter.open({look, owned, balance, got, save, close})   // the screen must be visible
 //   LCSCharacter.cancel()                                  // Esc
 "use strict";
@@ -34,6 +35,7 @@
   let tab = "looks";
   let raf = 0;
   let shown = "";        // the preview frame on the canvas: draw only when it changes
+  let portrayed = "";    // the look on the portrait
   let saving = false;
 
   function el(tag, text, cls) {
@@ -62,7 +64,12 @@
     const walk = s < WALK, anim = walk ? "walk" : "idle";
     const n = Math.floor(s * HERO.ANIMS[anim].fps);
     const gun = walk ? {} : {recoil: s < SHOOT && (s - WALK) % SHOT_EVERY < RECOIL, rest: s >= SHOOT};
-    const key = `${JSON.stringify(draft)}|${anim}|${n % HERO.ANIMS[anim].frames}|${!!gun.recoil}|${!!gun.rest}`;
+    const look = JSON.stringify(draft);
+    if (look !== portrayed) {
+      portrayed = look;
+      root.LCSPortrait.paint($("char-portrait"), draft);
+    }
+    const key = `${look}|${anim}|${n % HERO.ANIMS[anim].frames}|${!!gun.recoil}|${!!gun.rest}`;
     if (key === shown) return;
     shown = key;
     paint($("char-preview"), draft, anim, n, gun, SCALE);
@@ -193,7 +200,7 @@
   function open(options) {
     opts = options;
     saving = false;
-    shown = "";
+    shown = portrayed = "";
     draft = HERO.clean(options.look);
     tab = "looks";
     status("");
