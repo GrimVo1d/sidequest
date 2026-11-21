@@ -116,4 +116,6 @@ tested with the `jsc` that comes with macOS, so Node is not needed.
 Sidequest is an independent project and is not affiliated with Anthropic; Claude Code is a
 product of Anthropic.
 
-There is no license yet: the code is public to read, and all rights are reserved.
+The original source code and documentation are [MIT licensed](LICENSE). Original game
+artwork, including pixel art encoded in JavaScript and the screenshot, remains all rights
+reserved. The vendored wheel has its own notices in [vendor/LICENSES.md](vendor/LICENSES.md).
