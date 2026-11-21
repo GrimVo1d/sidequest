@@ -10,9 +10,9 @@ pywebview==6.2.1 \
     --hash=sha256:9d07275f53894ab4d5e2e0e996227193e7187dec276d9b624dccbce029216b46
 bottle==0.13.4 \
     --hash=sha256:045684fbd2764eac9cdeb824861d1551d113e8b683d8d26e296898d3dd99a12e
-# pywebview's proxy_tools 0.1.0, which PyPI has only as source: built from it, pip would
-# fetch an unpinned setuptools to do that. dev/vendor_wheel.py makes this wheel of it instead.
-./vendor/proxy_tools-0.1.0-py3-none-any.whl \
+# pywebview's proxy_tools 0.1.0 is source-only on PyPI. Before installing, run
+# python3 dev/vendor_wheel.py to make this hash-checked wheel in the ignored .tmp/ folder.
+./.tmp/proxy_tools-0.1.0-py3-none-any.whl \
     --hash=sha256:bba49471153e9296a8af045e2ce8cd9af2b293ee5b1e1eda00fff54e53a2221d
 pyobjc-core==12.2.2; sys_platform == "darwin" \
     --hash=sha256:122e6ad302a2abf5d4d4adb0156db751600ddf2768441696cba17b31323085e7 \

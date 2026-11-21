@@ -64,7 +64,8 @@ or with `brew install python`.
 
 ```sh
 git clone https://github.com/GrimVo1d/sidequest.git && cd sidequest
-python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+python3 -m venv .venv
+python3 dev/vendor_wheel.py && .venv/bin/pip install -r requirements.txt
 .venv/bin/python -m sidequest install   # connect the hooks to Claude Code
 .venv/bin/python -m sidequest           # open the game
 ```
@@ -76,7 +77,8 @@ to see it, and the hook needs an `nc` that speaks to Unix sockets:
 ```sh
 sudo apt install python3-venv python3-gi gir1.2-webkit2-4.1 netcat-openbsd
 git clone https://github.com/GrimVo1d/sidequest.git && cd sidequest
-python3 -m venv --system-site-packages .venv && .venv/bin/pip install -r requirements.txt
+python3 -m venv --system-site-packages .venv
+python3 dev/vendor_wheel.py && .venv/bin/pip install -r requirements.txt
 .venv/bin/python -m sidequest install
 .venv/bin/python -m sidequest
 ```
@@ -118,4 +120,4 @@ product of Anthropic.
 
 The original source code and documentation are [MIT licensed](LICENSE). Original game
 artwork, including pixel art encoded in JavaScript and the screenshot, remains all rights
-reserved. The vendored wheel has its own notices in [vendor/LICENSES.md](vendor/LICENSES.md).
+reserved.

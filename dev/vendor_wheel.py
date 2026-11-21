@@ -1,4 +1,4 @@
-"""Build vendor/proxy_tools-0.1.0-py3-none-any.whl from the release on PyPI.
+"""Build .tmp/proxy_tools-0.1.0-py3-none-any.whl from the release on PyPI.
 
 pywebview needs proxy_tools, which PyPI has only as source. Installing it from source makes
 pip build it, and to build it pip fetches the newest setuptools with no hash and runs it, so
@@ -6,7 +6,7 @@ not every file of an install would be pinned. This wheel holds the release's one
 its metadata, taken from the source archive whose hash is fixed below; nothing of the
 archive is run. requirements.txt installs the wheel by its own hash (dev/hashes.py).
 
-    .venv/bin/python dev/vendor_wheel.py
+    python3 dev/vendor_wheel.py
 """
 
 import base64
@@ -22,7 +22,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 NAME, VERSION = "proxy_tools", "0.1.0"
 SDIST_URL = "https://files.pythonhosted.org/packages/source/p/proxy_tools/proxy_tools-0.1.0.tar.gz"
 SDIST_SHA256 = "ccb3751f529c047e2d8a58440d86b205303cf0fe8146f784d1cbcd94f0a28010"
-WHEEL = os.path.join(ROOT, "vendor", f"{NAME}-{VERSION}-py3-none-any.whl")
+WHEEL = os.path.join(ROOT, ".tmp", f"{NAME}-{VERSION}-py3-none-any.whl")
 # The same bytes on every run: a fixed time and mode for every entry.
 DATE = (1980, 1, 1, 0, 0, 0)
 

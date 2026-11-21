@@ -4,8 +4,8 @@ Each `name==version` line gets the sha256 of every wheel PyPI has for that relea
 platform's), so pip installs only files that were there when the version was pinned: with a
 hash on every line pip turns on --require-hashes by itself. The sdist is left out, and the
 files say --only-binary=:all:: building one would make pip fetch its build tools with no hash
-at all, so a Python with no wheel fails instead. A line that is a wheel in vendor/
-(dev/vendor_wheel.py) gets the hash of that file.
+at all, so a Python with no wheel fails instead. The local proxy_tools wheel in .tmp/
+(built by dev/vendor_wheel.py) gets the hash of that file.
 Run it after changing a version: `.venv/bin/python dev/hashes.py`. It reads PyPI, so it is
 a development tool; the game itself never goes online.
 """
@@ -20,7 +20,7 @@ import urllib.request
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FILES = ("requirements.txt", "requirements-dev.txt")
 PIN = re.compile(r"^([A-Za-z0-9_.-]+)==([A-Za-z0-9_.!+-]+)(\s*;.*)?$")
-VENDORED = re.compile(r"^\./vendor/[A-Za-z0-9_.-]+\.whl$")
+LOCAL_WHEEL = re.compile(r"^\./\.tmp/[A-Za-z0-9_.-]+\.whl$")
 
 
 def release_hashes(name: str, version: str) -> list[str]:
@@ -30,7 +30,9 @@ def release_hashes(name: str, version: str) -> list[str]:
     wheels = [f for f in release["urls"] if f["packagetype"] == "bdist_wheel"]
     hashes = sorted({f["digests"]["sha256"] for f in wheels})
     if not hashes:
-        raise SystemExit(f"{name}=={version}: PyPI has no wheels, vendor one (dev/vendor_wheel.py)")
+        raise SystemExit(
+            f"{name}=={version}: PyPI has no wheels; build one with dev/vendor_wheel.py"
+        )
     return hashes
 
 
@@ -54,7 +56,7 @@ def pin(text: str) -> str:
         if match:
             name, version, marker = match.groups()
             out += with_hashes(f"{name}=={version}{marker or ''}", release_hashes(name, version))
-        elif VENDORED.match(line.strip()):
+        elif LOCAL_WHEEL.match(line.strip()):
             out += with_hashes(line.strip(), [file_hash(line.strip())])
         else:
             out.append(line)

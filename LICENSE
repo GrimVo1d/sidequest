@@ -2,8 +2,7 @@ Sidequest's original source code and documentation are licensed under the MIT Li
 below. This license does not cover the original game artwork, including pixel art
 encoded as data in source files and the screenshot in docs/arena.png. That artwork is
 copyright (c) 2026 GrimVo1d, all rights reserved. Functional code in files that also
-contain artwork remains MIT licensed. Third-party material retains its own license;
-see vendor/LICENSES.md for the vendored wheel.
+contain artwork remains MIT licensed.
 
 MIT License
 

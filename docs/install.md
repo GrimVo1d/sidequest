@@ -56,6 +56,7 @@ The game's dependencies go into `.venv` inside the folder.
 
 ```sh
 python3 -m venv .venv
+python3 dev/vendor_wheel.py
 .venv/bin/pip install -r requirements.txt
 ```
 
@@ -63,6 +64,7 @@ python3 -m venv .venv
 
 ```sh
 python3 -m venv --system-site-packages .venv
+python3 dev/vendor_wheel.py
 .venv/bin/pip install -r requirements.txt
 ```
 
@@ -119,6 +121,7 @@ If you get Claude Code later, do step 5 then; your records and progress stay.
 
 ```sh
 git pull
+python3 dev/vendor_wheel.py
 .venv/bin/pip install -r requirements.txt
 ```
 
